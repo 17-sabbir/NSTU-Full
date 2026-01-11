@@ -128,14 +128,14 @@ class _ForgetPasswordState extends State<ForgetPassword> {
 
   // Step 2: Handle verification code
   void handleStep2() {
-    final code = _codeControllers.map((c) => c.text).join();
+    final code = _codeControllers[0].text.trim(); // single field now
 
     if (code.length != 6) {
       setState(() => codeError = 'Please enter all 6 digits');
       return;
     }
 
-    if (!RegExp(r'^\d{6}\$').hasMatch(code)) {
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
       setState(() => codeError = 'Code must contain only numbers');
       return;
     }
@@ -145,6 +145,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
     // Verify using backend
     _verifyOtp(code);
   }
+
 
   Future<void> _verifyOtp(String code) async {
     if (_resetToken == null) {
@@ -388,47 +389,39 @@ class _ForgetPasswordState extends State<ForgetPassword> {
       stepNumber: 2,
       child: Column(
         children: [
-          // Code input fields
+          // Single Code input field
           _buildFormGroup(
             label: 'Verification Code',
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(
-                    6,
-                    (index) => SizedBox(
-                      width: 50,
-                      height: 50,
-                      child: TextField(
-                        controller: _codeControllers[index],
-                        textAlign: TextAlign.center,
-                        keyboardType: TextInputType.number,
-                        maxLength: 1,
-                        decoration: InputDecoration(
-                          counterText: '',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFDDDDDD),
-                              width: 2,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: tealColor, width: 2),
-                          ),
-                        ),
-                        onChanged: (value) {
-                          if (value.isNotEmpty && index < 5) {
-                            FocusScope.of(context).nextFocus();
-                          }
-                        },
-                      ),
-                    ),
-                  ),
+            child: TextField(
+              // Using the first controller from your list or create a new single one
+              // For this implementation, I recommend using _codeControllers[0]
+              // or defining a new 'final _otpController = TextEditingController();'
+              controller: _codeControllers[0],
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 24,
+                letterSpacing: 8,
+                fontWeight: FontWeight.bold,
+              ),
+              decoration: InputDecoration(
+                hintText: '000000',
+                counterText: '', // Hides the character counter
+                hintStyle: TextStyle(color: Colors.grey[400], letterSpacing: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
                 ),
-              ],
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: tealColor, width: 2),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: errorColor),
+                ),
+              ),
             ),
             error: codeError,
           ),
@@ -469,21 +462,21 @@ class _ForgetPasswordState extends State<ForgetPassword> {
               ),
               child: _isVerifying
                   ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
                   : const Text(
-                      'Verify Code',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
+                'Verify Code',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 12),

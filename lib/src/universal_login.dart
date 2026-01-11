@@ -229,7 +229,7 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 20),
                 // Title
                 Text(
-                  'NSTU Campus Clinic',//e-Campus care //
+                  'Dishari',//e-Campus care //
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: 'Poppins',
