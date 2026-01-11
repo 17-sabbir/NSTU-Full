@@ -241,7 +241,7 @@ class ExportService {
             pw.SizedBox(height: 25),
 
             // 5. Monthly Breakdown
-            sectionTitle('Lab Tests Revenue Breakdown (${months[selectedMonthIndex]})'),
+            sectionTitle('Lab Tests Breakdown (${months[selectedMonthIndex]})'),
             pw.Table(
               border: pw.TableBorder.all(color: PdfColors.grey300),
               children: [
