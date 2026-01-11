@@ -1,0 +1,99 @@
+adminEndpoints:
+  - listUsersByRole:
+  - toggleUserActive:
+  - createUser:
+  - createUserWithPassword:
+  - getRosters:
+  - deleteRoster:
+  - saveRoster:
+  - listStaff:
+  - getAdminProfile:
+  - updateAdminProfile:
+  - changePassword:
+  - createAuditLog:
+  - getAuditLogs:
+  - addAmbulanceContact:
+  - updateAmbulanceContact:
+adminInventoryEndpoints:
+  - addInventoryCategory:
+  - listInventoryCategories:
+  - addInventoryItem:
+  - updateInventoryStock:
+  - updateDispenserRestockFlag:
+  - listInventoryItems:
+  - updateMinimumThreshold:
+  - getItemTransactions:
+  - getInventoryAuditLogs:
+adminReportEndpoints:
+  - getDashboardAnalytics:
+auth:
+  - login:
+  - register:
+  - resendOtp:
+  - verifyOtp:
+  - requestPasswordReset:
+  - verifyPasswordReset:
+  - resetPassword:
+  - changePasswordUniversal:
+dispenser:
+  - getDispenserProfile:
+  - updateDispenserProfile:
+  - listInventoryItems:
+  - restockItem:
+  - getDispenserHistory:
+  - getPendingPrescriptions:
+  - getPrescriptionDetail:
+  - getStockByFirstWord:
+  - searchInventoryItems:
+  - dispensePrescription:
+doctor:
+  - getDoctorInfo:
+  - getDoctorProfile:
+  - updateDoctorProfile:
+  - getPatientByPhone:
+  - createPrescription:
+  - getReportsForDoctor:
+  - revisePrescription:
+  - getPatientPrescriptionList:
+  - getPrescriptionDetails:
+lab:
+  - getAllLabTests:
+  - createTestResult:
+  - createLabTest:
+  - updateLabTest:
+  - attachResultFileCloudinary:
+  - sendDummySms:
+  - submitResult:
+  - submitResultWithFile:
+  - getAllTestResults:
+  - getStaffProfile:
+  - updateStaffProfile:
+  - uploadProfileImage:
+  - getLabHomeTwoDaySummary:
+  - getLast10TestHistory:
+notification:
+  - createNotification:
+  - getMyNotifications:
+  - getMyNotificationCounts:
+  - getNotificationById:
+  - markAsRead:
+  - markAllAsRead:
+password:
+  - changePasswordByUserIdEmail:
+patient:
+  - getPatientProfile:
+  - listTests:
+  - getUserRole:
+  - updatePatientProfile:
+  - getMyLabReports:
+  - getMyPrescriptionList:
+  - finalizeReportUpload:
+  - getMyExternalReports:
+  - getPrescriptionList:
+  - getPrescriptionsByPatientId:
+  - getPrescriptionDetail:
+  - getMedicalStaff:
+  - getAmbulanceContacts:
+  - getOndutyStaff:
+greeting:
+  - hello:

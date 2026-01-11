@@ -1,0 +1,5 @@
+enum: RosterUserRole
+values:
+  - DOCTOR
+  - NURSE
+  - STAFF

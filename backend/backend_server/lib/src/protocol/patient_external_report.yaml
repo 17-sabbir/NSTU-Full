@@ -1,0 +1,11 @@
+class: PatientExternalReport
+fields:
+  reportId: int?
+  patientId: int
+  type: String
+  reportDate: DateTime
+  filePath: String
+  prescribedDoctorId: int
+  prescriptionId: int?
+  uploadedBy: int
+  createdAt: DateTime?

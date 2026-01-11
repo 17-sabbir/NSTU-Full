@@ -1,0 +1,7 @@
+class: StaffInfo
+fields:
+  name: String
+  phone: String
+  designation: String?
+  profilePictureUrl: String?
+  qualification: String?

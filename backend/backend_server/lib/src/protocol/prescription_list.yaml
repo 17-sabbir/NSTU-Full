@@ -1,0 +1,5 @@
+class: PrescriptionList
+fields:
+  prescriptionId: int
+  date: DateTime
+  doctorName: String
