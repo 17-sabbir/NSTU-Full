@@ -871,7 +871,7 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
                                 ),
                                 DataCell(Text('${item.previous}')),
                                 DataCell(Text('${item.current}')),
-                                DataCell(Text('${item.used}')),
+                                DataCell(Text('${item.previous-item.current}')),
                                 DataCell(
                                   Container(
                                     padding: const EdgeInsets.symmetric(
