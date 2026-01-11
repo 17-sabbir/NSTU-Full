@@ -754,7 +754,7 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   sectionTitle(
-                    'Lab Tests Revenue',
+                    'Lab Tests',
                     subtitle: 'Click a month to see breakdown',
                   ),
                   SizedBox(height: 300, child: barChartInteractive()),
@@ -781,7 +781,7 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  sectionTitle('Top Diseases'),
+                  sectionTitle('Disease Trending'),
                   SizedBox(height: 240, child: pieChart()),
                 ],
               ),
