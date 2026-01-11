@@ -277,7 +277,7 @@ class ExportService {
             pw.SizedBox(height: 25),
 
             // 6. Top Diseases
-            sectionTitle('Top Diseases'),
+            sectionTitle('Disease Trending'),
             pw.Row(
               children: [
                 pw.SizedBox(
