@@ -51,20 +51,23 @@ class _PatientReportsState extends State<PatientReports> {
       setState(() => isLoading = false);
     }
   }
+
+
+
   Future<void> downloadReportFromLink(String url) async {
-    // debugPrint("ORIGINAL URL = $url");
+    String downloadUrl = url;
 
-    final downloadUrl = url.replaceFirst(
-      '/image/upload/',
-      '/image/upload/fl_attachment/',
-    );
-
-    // debugPrint("DOWNLOAD URL = $downloadUrl");
-
-    final uri = Uri.parse(downloadUrl);
+    // ✅ Only apply fl_attachment for IMAGES
+    if (!url.toLowerCase().endsWith('.pdf') &&
+        url.contains('/image/upload/')) {
+      downloadUrl = url.replaceFirst(
+        '/image/upload/',
+        '/image/upload/fl_attachment/',
+      );
+    }
 
     await launchUrl(
-      uri,
+      Uri.parse(downloadUrl),
       mode: LaunchMode.externalApplication,
     );
   }

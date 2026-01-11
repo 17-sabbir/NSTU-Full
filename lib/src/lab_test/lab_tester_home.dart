@@ -247,47 +247,61 @@ class _LabTesterHomeState extends State<LabTesterHome> {
           ),
           const SizedBox(height: 12),
 
-          Wrap(
-            runSpacing: 12,
-            spacing: 12,
-            children: [
-              SizedBox(
-                width: MediaQuery.of(context).size.width * 0.50,
-                child: _interactiveStat(
-                  todayPending,
-                  'Pending (Today)',
-                  Icons.pending_actions,
-                  Colors.orange,
-                ),
-              ),
-              SizedBox(
-                width: MediaQuery.of(context).size.width * 0.40,
-                child: _interactiveStat(
-                  todaySubmitted,
-                  'Submitted (Today)',
-                  Icons.task_alt,
-                  Colors.green,
-                ),
-              ),
-              SizedBox(
-                width: MediaQuery.of(context).size.width * 0.50,
-                child: _interactiveStat(
-                  yesterdayPending,
-                  'Pending (Yesterday)',
-                  Icons.pending_actions,
-                  Colors.deepOrange,
-                ),
-              ),
-              SizedBox(
-                width: MediaQuery.of(context).size.width * 0.40,
-                child: _interactiveStat(
-                  yesterdaySubmitted,
-                  'Submitted (Yesterday)',
-                  Icons.task_alt,
-                  Colors.teal,
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 600;
+
+              return Wrap(
+                runSpacing: 12,
+                spacing: 12,
+                children: [
+                  SizedBox(
+                    width: isMobile
+                        ? constraints.maxWidth
+                        : constraints.maxWidth * 0.48,
+                    child: _interactiveStat(
+                      todayPending,
+                      'Pending (Today)',
+                      Icons.pending_actions,
+                      Colors.orange,
+                    ),
+                  ),
+                  SizedBox(
+                    width: isMobile
+                        ? constraints.maxWidth
+                        : constraints.maxWidth * 0.48,
+                    child: _interactiveStat(
+                      todaySubmitted,
+                      'Submitted (Today)',
+                      Icons.task_alt,
+                      Colors.green,
+                    ),
+                  ),
+                  SizedBox(
+                    width: isMobile
+                        ? constraints.maxWidth
+                        : constraints.maxWidth * 0.48,
+                    child: _interactiveStat(
+                      yesterdayPending,
+                      'Pending (Yesterday)',
+                      Icons.pending_actions,
+                      Colors.deepOrange,
+                    ),
+                  ),
+                  SizedBox(
+                    width: isMobile
+                        ? constraints.maxWidth
+                        : constraints.maxWidth * 0.48,
+                    child: _interactiveStat(
+                      yesterdaySubmitted,
+                      'Submitted (Yesterday)',
+                      Icons.task_alt,
+                      Colors.teal,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 18),
@@ -351,13 +365,18 @@ class _LabTesterHomeState extends State<LabTesterHome> {
                         const double statusBadgeWidth = 90;
 
                         return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           child: Row(
                             children: [
                               CircleAvatar(
                                 backgroundColor: Colors.grey.shade200,
                                 child: Icon(
-                                  isPending ? Icons.pending_actions : Icons.task_alt,
+                                  isPending
+                                      ? Icons.pending_actions
+                                      : Icons.task_alt,
                                   color: statusColor,
                                 ),
                               ),
@@ -369,17 +388,24 @@ class _LabTesterHomeState extends State<LabTesterHome> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      item.patientName.isNotEmpty ? item.patientName : 'Unknown',
+                                      item.patientName.isNotEmpty
+                                          ? item.patientName
+                                          : 'Unknown',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontWeight: FontWeight.w600),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       '${item.mobileNumber}  •  $dateText',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -392,9 +418,14 @@ class _LabTesterHomeState extends State<LabTesterHome> {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: statusColor.withAlpha((0.12 * 255).round()),
+                                      color: statusColor.withAlpha(
+                                        (0.12 * 255).round(),
+                                      ),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
@@ -422,8 +453,7 @@ class _LabTesterHomeState extends State<LabTesterHome> {
                             ],
                           ),
                         );
-
-                }).toList(),
+                      }).toList(),
               ),
             ),
         ],
