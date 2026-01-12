@@ -3,12 +3,18 @@ import 'package:backend_server/src/generated/protocol.dart';
 
 import 'cloudinary_upload.dart';
 
+import '../utils/auth_user.dart';
+
 class DispenserEndpoint extends Endpoint {
+  @override
+  bool get requireLogin => true;
+
   Future<DispenserProfileR?> getDispenserProfile(
     Session session,
     int userId,
   ) async {
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       final result = await session.db.unsafeQuery(
         '''
         SELECT 
@@ -24,7 +30,7 @@ class DispenserEndpoint extends Endpoint {
         WHERE u.user_id = @userId
           AND u.role = 'DISPENSER'
         ''',
-        parameters: QueryParameters.named({'userId': userId}),
+        parameters: QueryParameters.named({'userId': resolvedUserId}),
       );
 
       if (result.isEmpty) return null;
@@ -60,6 +66,7 @@ class DispenserEndpoint extends Endpoint {
     String? base64Image,
   }) async {
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       String? imageUrl;
 
       // 🔹 Upload image if exists
@@ -82,7 +89,7 @@ class DispenserEndpoint extends Endpoint {
           AND role = 'DISPENSER'
         ''',
           parameters: QueryParameters.named({
-            'id': userId,
+            'id': resolvedUserId,
             'name': name,
             'phone': phone,
             'url': imageUrl,
@@ -98,7 +105,7 @@ class DispenserEndpoint extends Endpoint {
          designation = EXCLUDED.designation
         ''',
           parameters: QueryParameters.named({
-            'id': userId,
+            'id': resolvedUserId,
             'qualification': qualification,
             'designation': designation,
           }),
@@ -166,6 +173,7 @@ class DispenserEndpoint extends Endpoint {
     if (quantity <= 0) return false;
 
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       // Start transaction
       await session.db.unsafeExecute('BEGIN');
 
@@ -213,7 +221,7 @@ class DispenserEndpoint extends Endpoint {
         parameters: QueryParameters.named({
           'id': itemId,
           'qty': quantity,
-          'uid': userId,
+          'uid': resolvedUserId,
         }),
       );
 
@@ -229,7 +237,7 @@ class DispenserEndpoint extends Endpoint {
           'id': itemId,
           'old': oldQty,
           'new': newQty,
-          'uid': userId,
+          'uid': resolvedUserId,
         }),
       );
 
@@ -249,6 +257,7 @@ class DispenserEndpoint extends Endpoint {
     int userId,
   ) async {
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       final result = await session.db.unsafeQuery(
         '''
       SELECT
@@ -266,7 +275,7 @@ class DispenserEndpoint extends Endpoint {
       ORDER BY a.changed_at DESC
       ''',
         parameters: QueryParameters.named({
-          'uid': userId,
+          'uid': resolvedUserId,
         }),
       );
 

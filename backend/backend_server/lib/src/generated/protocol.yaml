@@ -28,8 +28,14 @@ adminReportEndpoints:
   - getDashboardAnalytics:
 auth:
   - login:
+  - startSignupPhoneOtp:
+  - verifyLoginOtp:
+  - logout:
   - register:
   - resendOtp:
+  - verifySignupEmailAndStartPhoneOtp:
+  - completeSignupWithPhoneOtp:
+  - sendWelcomeEmailViaResend:
   - verifyOtp:
   - requestPasswordReset:
   - verifyPasswordReset:

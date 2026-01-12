@@ -66,12 +66,14 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptions> {
       final prefs = await SharedPreferences.getInstance();
       final storedUserId = prefs.getString('user_id');
       int? patientId = storedUserId != null ? int.tryParse(storedUserId) : null;
+      // ignore: avoid_print
       print("Fetching data for Patient ID: $patientId"); // Debugging er jonno
 
       if (patientId != null) {
         final list = await client.patient.getPrescriptionsByPatientId(
           patientId,
         );
+
         print("Data found: ${list.length}"); // Check korun data asche kina
 
         // Sort by date descending (latest first). Handle possible null dates safely.
@@ -121,6 +123,7 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptions> {
         await _downloadPrescriptionPDF(detail);
       }
     } catch (e) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
       );
@@ -172,8 +175,6 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptions> {
     final bytes = await pdf.save();
     _savePdfFile(bytes, "Prescription_${detail.prescription.id}.pdf");
   }
-
-  // --- PDF Helper Widgets (আপনার স্ট্র্কচার অনুযায়ী) ---
 
   pw.Widget _buildHeader(pw.TextStyle style) {
     return pw.Row(
@@ -563,6 +564,7 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptions> {
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/$fileName');
       await file.writeAsBytes(bytes);
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Saved to: ${file.path}"),

@@ -31,6 +31,7 @@ class _PatientAmbulanceStaffState extends State<PatientAmbulanceStaff> {
       if (await canLaunchUrl(launchUri)) {
         await launchUrl(launchUri);
       } else {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Could not launch dialer for $phoneNumber")),
         );
@@ -180,7 +181,7 @@ class _PatientAmbulanceStaffState extends State<PatientAmbulanceStaff> {
                 ? contact.phoneEn
                 : contact.phoneBn;
             if (kIsWeb) {
-              _showWebCallAlert("$callNumber", contact.contactTitle);
+              _showWebCallAlert(callNumber, contact.contactTitle);
             } else {
               _makePhoneCall(callNumber, contact.contactTitle);
             }

@@ -37,8 +37,6 @@ import 'src/patient/patient_signup.dart';
 import 'src/universal_login.dart';
 // Forgot password
 import 'src/forget_password.dart';
-//notification
-import 'src/notifications.dart';
 // Import from your existing backend_client package
 import 'package:backend_client/backend_client.dart';
 
@@ -103,7 +101,7 @@ class MyApp extends StatelessWidget {
         '/patient/lab': (context) => const PatientLabTestAvailability(),
         '/patient/ambulance': (context) => const PatientAmbulanceStaff(),
 
-        // Signup & forgot
+        // Signup ,forgot password and change password
         '/signup': (context) => const PatientSignupPage(),
         '/patient-signup': (context) => const PatientSignupPage(), // alias for links coming from login
         '/forgotpassword': (context) => const ForgetPassword(),

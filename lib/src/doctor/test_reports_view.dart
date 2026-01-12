@@ -363,6 +363,7 @@ class _TestReportsViewState extends State<TestReportsView> {
                       if (p == null) return w;
                       return const Center(child: CircularProgressIndicator());
                     },
+                    // ignore: unnecessary_underscores
                     errorBuilder: (_, __, ___) =>
                         const Center(child: Text('Failed to load image')),
                   ),
@@ -1072,6 +1073,7 @@ class _TestReportsViewState extends State<TestReportsView> {
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
                 itemCount: _reports.length,
+                // ignore: unnecessary_underscores
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final report = _reports[index];
@@ -1177,8 +1179,7 @@ class _TestReportsViewState extends State<TestReportsView> {
 
 class FullScreenImagePage extends StatefulWidget {
   final String imageUrl;
-  const FullScreenImagePage({Key? key, required this.imageUrl})
-    : super(key: key);
+  const FullScreenImagePage({super.key, required this.imageUrl});
 
   @override
   State<FullScreenImagePage> createState() => _FullScreenImagePageState();
@@ -1225,7 +1226,7 @@ class _FullScreenImagePageState extends State<FullScreenImagePage>
       _animation = Matrix4Tween(begin: current, end: identity).animate(
         CurveTween(curve: Curves.easeOut).animate(_animationController!),
       );
-      _animationController!..forward(from: 0);
+      _animationController!.forward(from: 0);
       return;
     }
 
@@ -1241,14 +1242,16 @@ class _FullScreenImagePageState extends State<FullScreenImagePage>
     final translateY = -dy * (zoom - 1);
 
     final Matrix4 target = Matrix4.identity()
+      // ignore: deprecated_member_use
       ..translate(translateX, translateY)
+      // ignore: deprecated_member_use
       ..scale(zoom);
 
     _animation = Matrix4Tween(
       begin: current,
       end: target,
     ).animate(CurveTween(curve: Curves.easeOut).animate(_animationController!));
-    _animationController!..forward(from: 0);
+    _animationController!.forward(from: 0);
   }
 
   @override
@@ -1287,6 +1290,7 @@ class _FullScreenImagePageState extends State<FullScreenImagePage>
                               child: CircularProgressIndicator(),
                             );
                           },
+                          // ignore: unnecessary_underscores
                           errorBuilder: (_, __, ___) => const Center(
                             child: Text(
                               'Failed to load image',

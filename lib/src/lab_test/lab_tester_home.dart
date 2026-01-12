@@ -1,3 +1,5 @@
+// ignore_for_file: unused_local_variable, deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'lab_test_create_and_upload.dart';
 import 'lab_staff_profile.dart';
@@ -41,6 +43,13 @@ class _LabTesterHomeState extends State<LabTesterHome> {
 
   Future<void> _verifyLabStaff() async {
     try {
+      final authKey = await client.authenticationKeyManager?.get();
+      if (authKey == null || authKey.isEmpty) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final storedUserId = prefs.getString('user_id');
       if (storedUserId == null || storedUserId.isEmpty) {
@@ -57,7 +66,7 @@ class _LabTesterHomeState extends State<LabTesterHome> {
 
       String role = '';
       try {
-        role = (await client.patient.getUserRole(numericId)).toUpperCase();
+        role = (await client.patient.getUserRole(0)).toUpperCase();
       } catch (e) {
         debugPrint('Failed to fetch user role: $e');
       }
@@ -84,7 +93,7 @@ class _LabTesterHomeState extends State<LabTesterHome> {
 
   Future<void> _loadBasicProfile(int userId) async {
     try {
-      final profile = await client.lab.getStaffProfile(userId);
+      final profile = await client.lab.getStaffProfile(0);
 
       if (profile != null && mounted) {
         setState(() {
@@ -348,12 +357,12 @@ class _LabTesterHomeState extends State<LabTesterHome> {
                         final isPending = item.isUploaded == false;
                         final isSubmitted = item.submittedAt != null;
 
-                        String _fmt(DateTime? dt) {
+                        String fmt(DateTime? dt) {
                           if (dt == null) return '';
                           return '${dt.day}/${dt.month}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
                         }
 
-                        final dateText = _fmt(item.createdAt);
+                        final dateText =fmt(item.createdAt);
                         final statusText = isPending
                             ? 'Pending'
                             : (isSubmitted ? 'Submitted' : 'Uploaded');

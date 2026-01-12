@@ -1,9 +1,9 @@
+// ignore_for_file: use_build_context_synchronously, duplicate_ignore, unnecessary_underscores
+
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 import 'dart:convert';
 
 import 'package:url_launcher/url_launcher.dart';
@@ -139,6 +139,7 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload> {
                       pickedFiles.remove(r.resultId);
                       pickedFileNames.remove(r.resultId);
                     });
+                    // ignore: use_build_context_synchronously
                     ScaffoldMessenger.of(context)
                         .showSnackBar(const SnackBar(content: Text('Result submitted')));
                   } else {

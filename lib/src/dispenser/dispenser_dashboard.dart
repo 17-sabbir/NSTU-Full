@@ -45,6 +45,14 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
 
   Future<void> _verifyDispenser() async {
     try {
+      // ignore: deprecated_member_use
+      final authKey = await client.authenticationKeyManager?.get();
+      if (authKey == null || authKey.isEmpty) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final storedUserId = prefs.getString('user_id');
       if (storedUserId == null || storedUserId.isEmpty) {
@@ -60,7 +68,7 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
       }
       String role = '';
       try {
-        role = (await client.patient.getUserRole(numericId)).toUpperCase();
+        role = (await client.patient.getUserRole(0)).toUpperCase();
       } catch (e) {
         debugPrint('Failed to fetch user role: $e');
       }
@@ -134,6 +142,7 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
 
       if (detail == null || detail.items.isEmpty) {
         debugPrint('No prescription items found for ID $presId');
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No prescription items found')),
         );
@@ -198,19 +207,23 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
         }
       }
 
-      items.add(DispenseItemRequest(
-        itemId: m.itemId!,
-        medicineName: m.name,
-        quantity: m.dispenseQty,
-        isAlternative: m.isAlternative,
-        originalMedicineId: originalId, // only safe ID
-      ));
+      items.add(
+        DispenseItemRequest(
+          itemId: m.itemId!,
+          medicineName: m.name,
+          quantity: m.dispenseQty,
+          isAlternative: m.isAlternative,
+          originalMedicineId: originalId, // only safe ID
+        ),
+      );
     }
 
-
     if (items.isEmpty) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No valid medicine selected for dispensing')),
+        const SnackBar(
+          content: Text('No valid medicine selected for dispensing'),
+        ),
       );
       return;
     }
@@ -227,13 +240,12 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
         setState(() => _currentPrescription = null);
       }
     } catch (e) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Dispense failed: ${e.toString()}')),
       );
     }
   }
-
-
 
   void _updateMedicine(Medicine updatedMed) {
     final meds = (_currentPrescription!['medicines'] as List<Medicine>);
@@ -437,7 +449,7 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
                   final med = entry.value;
                   return MedicineItem(
                     client: client,
-                    key: ValueKey('${med.itemId}-${index}'),
+                    key: ValueKey('${med.itemId}-$index'),
                     medicine: med,
                     onChanged: _updateMedicine,
                   );
@@ -577,9 +589,18 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     if (shouldLogout == true) {
       // Clear stored session if needed, then navigate to root
       try {
+        try {
+          await client.auth.logout();
+        } catch (_) {}
+        // ignore: deprecated_member_use
+        await client.authenticationKeyManager?.remove();
+      } catch (_) {}
+
+      try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('user_id');
         await prefs.remove('user_role');
+        await prefs.remove('user_email');
       } catch (_) {}
 
       if (!mounted) return;
@@ -589,6 +610,7 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    // ignore: deprecated_member_use
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(

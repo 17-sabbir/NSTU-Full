@@ -1,8 +1,8 @@
-class: PatientProfileDto
+class: PatientProfile
 fields:
   name: String
   email: String
   phone: String
-  bloodGroup: String
-  allergies: String
+  bloodGroup: String?
+  dateOfBirth: DateTime?
   profilePictureUrl: String?

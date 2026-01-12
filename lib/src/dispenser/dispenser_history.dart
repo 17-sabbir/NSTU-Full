@@ -31,7 +31,7 @@ class _DispenseLogsScreenState extends State<DispenseLogsScreen> {
     if (userId != null) {
       try {
         // ব্যাকএন্ড থেকে ডেটা ফেচ (আপনার এন্ডপয়েন্ট অনুযায়ী নাম চেক করে নিন)
-        final result = await client.dispenser.getDispenserHistory(userId);
+        final result = await client.dispenser.getDispenserHistory(0);
         if (mounted) {
           setState(() {
             _logs = result;

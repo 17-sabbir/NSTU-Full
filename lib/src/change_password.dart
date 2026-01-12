@@ -125,7 +125,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
 
       debugPrint('🧪 PARSED userId: $userId');
 
-      if (userId == 0 || email == null || email.trim().isEmpty) {
+      if (userId == 0 || email.trim().isEmpty) {
         _show(
           'Session Error',
           'Invalid user session.\nID: $userId\nEmail: $email',
@@ -134,7 +134,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
       }
 
       final res = await client.password.changePasswordByUserIdEmail(
-        userId: userId,
+        userId: 0,
         email: email.trim(),
         currentPassword: current,
         newPassword: newPass,
@@ -156,10 +156,11 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
             duration: Duration(seconds: 2),
           ),
         );
-        Navigator.of(context).pop(); // 🔥 close bottom sheet → back to previous page
+        Navigator.of(
+          context,
+        ).pop(); // 🔥 close bottom sheet → back to previous page
         return;
-      }
-      else {
+      } else {
         _show('Failed', res);
       }
     } catch (e) {

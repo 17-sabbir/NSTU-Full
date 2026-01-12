@@ -41,7 +41,7 @@ class _PatientReportsState extends State<PatientReports> {
         return;
       }
 
-      final data = await client.patient.getMyLabReports(userId);
+      final data = await client.patient.getMyLabReports(0);
       setState(() {
         reports = data;
         isLoading = false;
@@ -51,8 +51,6 @@ class _PatientReportsState extends State<PatientReports> {
       setState(() => isLoading = false);
     }
   }
-
-
 
   Future<void> downloadReportFromLink(String url) async {
     String downloadUrl = url;
@@ -76,8 +74,6 @@ class _PatientReportsState extends State<PatientReports> {
       mode: LaunchMode.externalApplication,
     );
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +168,6 @@ class _PatientReportsState extends State<PatientReports> {
                                   disabledBackgroundColor: Colors.grey,
                                 ),
                               ),
-
                             ],
                           ),
                         ),

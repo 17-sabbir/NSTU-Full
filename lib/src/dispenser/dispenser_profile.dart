@@ -90,7 +90,7 @@ class _DispenserProfileState extends State<DispenserProfile> {
       final userId = int.tryParse(prefs.getString('user_id') ?? '');
       if (userId == null) return;
 
-      final profile = await client.dispenser.getDispenserProfile(userId);
+      final profile = await client.dispenser.getDispenserProfile(0);
       if (profile == null) return;
 
       if (!mounted) return;
@@ -127,6 +127,7 @@ class _DispenserProfileState extends State<DispenserProfile> {
     if (picked != null) {
       final bytes = await picked.readAsBytes();
       if (bytes.length > 2 * 1024 * 1024) {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Image must be under 2MB')),
         );
@@ -151,7 +152,7 @@ class _DispenserProfileState extends State<DispenserProfile> {
       if (userId == null) return;
 
       await client.dispenser.updateDispenserProfile(
-        userId: userId,
+        userId: 0,
         name: _nameCtrl.text.trim(),
         phone: _phoneCtrl.text.trim(),
         qualification: _qualificationCtrl.text.trim(),
@@ -166,12 +167,14 @@ class _DispenserProfileState extends State<DispenserProfile> {
         _isChanged = false;
       });
 
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated successfully')),
       );
     } catch (e) {
       debugPrint('Failed to update profile: $e');
       ScaffoldMessenger.of(
+        // ignore: use_build_context_synchronously
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to update profile: $e')));
     } finally {
@@ -293,7 +296,8 @@ class _DispenserProfileState extends State<DispenserProfile> {
                   width: MediaQuery.of(context).size.width * 0.5,
                   height: 44,
                   child: ElevatedButton.icon(
-                    onPressed: () => Navigator.pushNamed(context, '/change-password'),
+                    onPressed: () =>
+                        Navigator.pushNamed(context, '/change-password'),
                     icon: const Icon(Icons.lock_reset, size: 18),
                     label: const Text('Change Password'),
                     style: ElevatedButton.styleFrom(

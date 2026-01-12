@@ -1,45 +1,90 @@
 import 'package:serverpod/serverpod.dart';
 import 'package:backend_server/src/generated/protocol.dart';
 
+import '../utils/auth_user.dart';
+
 import 'cloudinary_upload.dart';
 
 class PatientEndpoint extends Endpoint {
-  // Fetch patient profile
-  Future<PatientProfileDto?> getPatientProfile(
-      Session session, int userId) async {
+  @override
+  bool get requireLogin => true;
+
+  Future<void> _ensurePatientProfileDobColumn(Session session) async {
     try {
+      final res = await session.db.unsafeQuery(
+        '''
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'patient_profiles'
+          AND column_name = 'date_of_birth'
+        LIMIT 1
+        ''',
+      );
+      if (res.isNotEmpty) return;
+
+      await session.db.unsafeExecute(
+        '''
+        ALTER TABLE patient_profiles
+        ADD COLUMN date_of_birth DATE
+        ''',
+      );
+    } catch (e) {
+      session.log('Could not ensure patient_profiles.date_of_birth: $e',
+          level: LogLevel.warning);
+    }
+  }
+
+  DateTime? _safeDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    if (value is List<int>)
+      return DateTime.tryParse(String.fromCharCodes(value));
+    return DateTime.tryParse(value.toString());
+  }
+
+  // Fetch patient profile
+  Future<PatientProfile?> getPatientProfile(Session session, int userId) async {
+    try {
+      await _ensurePatientProfileDobColumn(session);
+      final resolvedUserId = requireAuthenticatedUserId(session);
+
       final result = await session.db.unsafeQuery(
         '''
-  SELECT 
-    u.name,
-    u.email,
-    u.phone,
-    u.profile_picture_url,
-    p.blood_group,
-    p.allergies
-  FROM users u
-  LEFT JOIN patient_profiles p ON p.user_id = u.user_id
-  WHERE u.user_id = @userId
-    AND u.role IN ('STUDENT','TEACHER','STAFF','OUTSIDE')
-  ''',
-        parameters: QueryParameters.named({'userId': userId}),
+      SELECT 
+        u.name,
+        u.email,
+        u.phone,
+        u.profile_picture_url,
+        p.blood_group,
+        p.date_of_birth
+      FROM users u
+      LEFT JOIN patient_profiles p
+        ON p.user_id = u.user_id
+      WHERE u.user_id = @userId
+        AND u.role IN ('STUDENT','TEACHER','STAFF','OUTSIDE')
+      ''',
+        parameters: QueryParameters.named({'userId': resolvedUserId}),
       );
 
       if (result.isEmpty) return null;
 
       final row = result.first.toColumnMap();
 
-      return PatientProfileDto(
+      return PatientProfile(
         name: _safeString(row['name']),
         email: _safeString(row['email']),
         phone: _safeString(row['phone']),
-        bloodGroup: _safeString(row['blood_group']),
-        allergies: _safeString(row['allergies']),
-        profilePictureUrl: _safeString(row['profile_picture_url']), // base64
+        bloodGroup: row['blood_group']?.toString(),
+        dateOfBirth: _safeDateTime(row['date_of_birth']),
+        profilePictureUrl: row['profile_picture_url']?.toString(),
       );
     } catch (e, stack) {
-      session.log('Error getting patient profile: $e\n$stack',
-          level: LogLevel.error);
+      session.log(
+        'Error getting patient profile: $e',
+        level: LogLevel.error,
+        stackTrace: stack,
+      );
       return null;
     }
   }
@@ -99,11 +144,12 @@ class PatientEndpoint extends Endpoint {
   /// Returns uppercase role string or empty string if not found.
   Future<String> getUserRole(Session session, int userId) async {
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       final result = await session.db.unsafeQuery(
         '''
         SELECT role::text as role FROM users WHERE user_id= @userId LIMIT 1
         ''',
-        parameters: QueryParameters.named({'userId': userId}),
+        parameters: QueryParameters.named({'userId': resolvedUserId}),
       );
 
       if (result.isEmpty) return '';
@@ -119,63 +165,82 @@ class PatientEndpoint extends Endpoint {
 
 // 2. Update Patient Profile
   Future<String> updatePatientProfile(
-      Session session,
-      int userId,
-      String name,
-      String phone,
-      String allergies,
-      String? profileImageUrl, // Now accepting the Cloudinary URL
-      ) async {
+    Session session,
+    int userId,
+    String name,
+    String phone,
+    String? bloodGroup,
+    DateTime? dateOfBirth,
+    String? profileImageUrl,
+  ) async {
     try {
-      // Use a transaction to ensure both tables update together
-      return await session.db.transaction((transaction) async {
+      await _ensurePatientProfileDobColumn(session);
+      final resolvedUserId = requireAuthenticatedUserId(session);
 
-        // Update core user data
+      return await session.db.transaction((transaction) async {
         await session.db.unsafeExecute(
           '''
-          UPDATE users 
-          SET name = @name, 
-              phone = @phone,
-              profile_picture_url = COALESCE(@url, profile_picture_url)
-          WHERE user_id = @id
-          ''',
+        UPDATE users
+        SET name = @name,
+            phone = @phone,
+            profile_picture_url = COALESCE(@url, profile_picture_url)
+        WHERE user_id = @id
+        ''',
           parameters: QueryParameters.named({
-            'id': userId,
+            'id': resolvedUserId,
             'name': name,
             'phone': phone,
             'url': profileImageUrl,
           }),
         );
 
-        // Update or insert medical data
         await session.db.unsafeExecute(
           '''
-          INSERT INTO patient_profiles (user_id, allergies)
-          VALUES (@id, @allergies)
-          ON CONFLICT (user_id)
-          DO UPDATE SET allergies = EXCLUDED.allergies
-          ''',
+        INSERT INTO patient_profiles
+          (user_id, blood_group, date_of_birth)
+        VALUES
+          (@id, NULLIF(@bg, ''), @dob)
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+          blood_group = COALESCE(EXCLUDED.blood_group, patient_profiles.blood_group),
+          date_of_birth = EXCLUDED.date_of_birth
+        ''',
           parameters: QueryParameters.named({
-            'id': userId,
-            'allergies': allergies,
+            'id': resolvedUserId,
+            'bg': bloodGroup,
+            'dob': dateOfBirth,
           }),
         );
 
         return 'Profile updated successfully';
       });
     } catch (e, stack) {
-      session.log('Update profile failed: $e', level: LogLevel.error, stackTrace: stack);
-      return 'Failed to update profile: $e';
+      session.log(
+        'Update profile failed: $e',
+        level: LogLevel.error,
+        stackTrace: stack,
+      );
+      return 'Failed to update profile';
     }
+  }
+
+  int? _safeInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    if (value is List<int>) return int.tryParse(String.fromCharCodes(value));
+    return int.tryParse(value.toString());
   }
 
   /// Fetch logged-in patient's lab reports using phone number
   /// Fetch logged-in patient's lab reports using phone number
   Future<List<PatientReportDto>> getMyLabReports(
-      Session session,
-      int userId,
-      ) async {
+    Session session,
+    int userId,
+  ) async {
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       final result = await session.db.unsafeQuery(
         '''
       SELECT 
@@ -192,7 +257,7 @@ class PatientEndpoint extends Endpoint {
       WHERE u.user_id = @userId
       ORDER BY tr.created_at DESC
       ''',
-        parameters: QueryParameters.named({'userId': userId}),
+        parameters: QueryParameters.named({'userId': resolvedUserId}),
       );
 
       return result.map((r) {
@@ -214,8 +279,11 @@ class PatientEndpoint extends Endpoint {
       return [];
     }
   }
+
 // ১. ড্রপডাউনে দেখানোর জন্য রোগীর আগের প্রেসক্রিপশন লিস্ট আনা
-  Future<List<PrescriptionList>> getMyPrescriptionList(Session session, int userId) async {
+  Future<List<PrescriptionList>> getMyPrescriptionList(
+      Session session, int userId) async {
+    final resolvedUserId = requireAuthenticatedUserId(session);
     final query = '''
       SELECT p.prescription_id, p.prescription_date, u.name as doctor_name
       FROM prescriptions p
@@ -227,7 +295,7 @@ class PatientEndpoint extends Endpoint {
 
     final result = await session.db.unsafeQuery(
       query,
-      parameters: QueryParameters.named({'userId': userId}),
+      parameters: QueryParameters.named({'userId': resolvedUserId}),
     );
 
     return result.map((r) {
@@ -241,7 +309,8 @@ class PatientEndpoint extends Endpoint {
   }
 
   // ২. ক্লাউডিনারি আপলোডসহ রিপোর্ট ডাটা সেভ এবং নোটিফিকেশন পাঠানো
-  Future<bool> finalizeReportUpload(Session session, {
+  Future<bool> finalizeReportUpload(
+    Session session, {
     required int patientId,
     required int prescriptionId,
     required String reportType,
@@ -249,11 +318,13 @@ class PatientEndpoint extends Endpoint {
     required String fileName,
   }) async {
     try {
+      final int resolvedPatientId = requireAuthenticatedUserId(session);
       final bool isPdf = fileName.toLowerCase().endsWith('.pdf');
 
       // ক্লাউডিনারিতে আপলোড
       final String? secureUrl = await CloudinaryUpload.uploadFile(
-        base64Data: base64Data, // নিশ্চিত করুন cloudinary_upload.dart এ এই নামই আছে
+        base64Data:
+            base64Data, // নিশ্চিত করুন cloudinary_upload.dart এ এই নামই আছে
         folder: 'patient_external_reports',
         isPdf: isPdf,
       );
@@ -265,7 +336,9 @@ class PatientEndpoint extends Endpoint {
         '''SELECT report_id, created_at FROM UploadpatientR
            WHERE patient_id = @pId AND prescription_id = @refId 
            ORDER BY created_at DESC LIMIT 1''',
-        parameters: QueryParameters.named({'pId': patientId, 'refId': prescriptionId}),
+        parameters: QueryParameters.named(
+          {'pId': resolvedPatientId, 'refId': prescriptionId},
+        ),
       );
 
       if (existing.isNotEmpty) {
@@ -298,13 +371,14 @@ class PatientEndpoint extends Endpoint {
         INSERT INTO UploadpatientR
         (patient_id, type, report_date, file_path, prescribed_doctor_id, prescription_id, uploaded_by, created_at)
         VALUES (@pId, @type, CURRENT_DATE, @path, @docId, @refId, @pId, NOW())
-      ''', parameters: QueryParameters.named({
-        'pId': patientId,
-        'type': reportType,
-        'path': secureUrl,
-        'docId': doctorId,
-        'refId': prescriptionId,
-      }));
+      ''',
+          parameters: QueryParameters.named({
+            'pId': resolvedPatientId,
+            'type': reportType,
+            'path': secureUrl,
+            'docId': doctorId,
+            'refId': prescriptionId,
+          }));
 
       // ডাক্তারকে নোটিফিকেশন
       await session.db.unsafeExecute('''
@@ -323,6 +397,7 @@ class PatientEndpoint extends Endpoint {
   Future<List<PatientExternalReport>> getMyExternalReports(
       Session session, int userId) async {
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       // এখানে আপনার টেবিলের নাম অনুযায়ী কুয়েরি হবে (ধরে নিচ্ছি 'upload_patient_reports')
       final result = await session.db.unsafeQuery(
         '''
@@ -333,7 +408,7 @@ class PatientEndpoint extends Endpoint {
         WHERE patient_id = @userId
         ORDER BY created_at DESC
         ''',
-        parameters: QueryParameters.named({'userId': userId}),
+        parameters: QueryParameters.named({'userId': resolvedUserId}),
       );
 
       return result.map((r) {
@@ -350,16 +425,17 @@ class PatientEndpoint extends Endpoint {
         );
       }).toList();
     } catch (e, stack) {
-      session.log('Error fetching external reports: $e', level: LogLevel.error, stackTrace: stack);
+      session.log('Error fetching external reports: $e',
+          level: LogLevel.error, stackTrace: stack);
       return [];
     }
   }
 
   /// ১. রোগীর সব প্রেসক্রিপশনের লিস্ট আনা
   Future<List<PrescriptionList>> getPrescriptionList(
-      Session session,
-      int patientId,
-      ) async {
+    Session session,
+    int patientId,
+  ) async {
     try {
       // এখানে 'prescription' টেবিল এবং 'users' টেবিল জয়েন করে ডাক্তারের নামসহ লিস্ট আনা হচ্ছে
       final rows = await session.db.unsafeQuery(
@@ -385,15 +461,17 @@ class PatientEndpoint extends Endpoint {
         );
       }).toList();
     } catch (e, stack) {
-      session.log('Error fetching prescription list: $e', level: LogLevel.error, stackTrace: stack);
+      session.log('Error fetching prescription list: $e',
+          level: LogLevel.error, stackTrace: stack);
       return [];
     }
   }
+
   /// সরাসরি Patient ID (User ID) দিয়ে প্রেসক্রিপশন লিস্ট আনা
   Future<List<PrescriptionList>> getPrescriptionsByPatientId(
-      Session session,
-      int patientId,
-      ) async {
+    Session session,
+    int patientId,
+  ) async {
     try {
       // db.sql onujayi table er nam 'prescriptions' (not 'prescription')
       // ebong kolyamer nam 'prescription_id'
@@ -428,9 +506,9 @@ class PatientEndpoint extends Endpoint {
 
   /// ২. একটি নির্দিষ্ট প্রেসক্রিপশনের বিস্তারিত তথ্য (PDF এর জন্য)
   Future<PrescriptionDetail?> getPrescriptionDetail(
-      Session session,
-      int prescriptionId,
-      ) async {
+    Session session,
+    int prescriptionId,
+  ) async {
     try {
       // ---- 1. Fetch prescription and doctor info ----
       final presRows = await session.db.unsafeQuery(
@@ -499,7 +577,8 @@ class PatientEndpoint extends Endpoint {
         doctorSignatureUrl: _safeString(p['signature_url']),
       );
     } catch (e, stack) {
-      session.log('Error fetching prescription detail: $e', level: LogLevel.error, stackTrace: stack);
+      session.log('Error fetching prescription detail: $e',
+          level: LogLevel.error, stackTrace: stack);
       return null;
     }
   }
@@ -508,8 +587,7 @@ class PatientEndpoint extends Endpoint {
   /// Fetch all active medical staff (Admin, Doctor, Dispenser, Labstaff)
   Future<List<StaffInfo>> getMedicalStaff(Session session) async {
     try {
-      final results = await session.db.unsafeQuery(
-          '''
+      final results = await session.db.unsafeQuery('''
       SELECT 
         u.name,
         u.phone,
@@ -522,8 +600,7 @@ class PatientEndpoint extends Endpoint {
       WHERE u.role IN ('ADMIN', 'DOCTOR', 'DISPENSER', 'LABSTAFF')
         AND u.is_active = TRUE
       ORDER BY u.role, u.name;
-      '''
-      );
+      ''');
 
       return results.map((row) {
         final map = row.toColumnMap();
@@ -548,8 +625,7 @@ class PatientEndpoint extends Endpoint {
 
   Future<List<AmbulanceContact>> getAmbulanceContacts(Session session) async {
     try {
-      final result = await session.db.unsafeQuery(
-          '''
+      final result = await session.db.unsafeQuery('''
       SELECT
         id,
         title,
@@ -558,8 +634,7 @@ class PatientEndpoint extends Endpoint {
       FROM ambulance_contact
       WHERE is_active = true
       ORDER BY is_primary DESC, id ASC
-      '''
-      );
+      ''');
 
       return result.map((row) {
         final map = row.toColumnMap();
@@ -576,11 +651,11 @@ class PatientEndpoint extends Endpoint {
         );
       }).toList();
     } catch (e, stack) {
-      session.log('Error fetching ambulance contacts: $e', level: LogLevel.error, stackTrace: stack);
+      session.log('Error fetching ambulance contacts: $e',
+          level: LogLevel.error, stackTrace: stack);
       return [];
     }
   }
-
 
   String _safeString(dynamic value) {
     if (value == null) return '';
@@ -590,8 +665,8 @@ class PatientEndpoint extends Endpoint {
   }
 
   Future<List<OndutyStaff>> getOndutyStaff(
-      Session session,
-      ) async {
+    Session session,
+  ) async {
     try {
       final result = await session.db.unsafeQuery(
         '''
@@ -613,12 +688,13 @@ class PatientEndpoint extends Endpoint {
           staffId: row['staff_id'] as int,
           staffName: row['staff_name']?.toString() ?? '',
           staffRole: RosterUserRole.values.firstWhere(
-                (e) => e.name == (row['staff_role']?.toString().toUpperCase() ?? ''),
+            (e) =>
+                e.name == (row['staff_role']?.toString().toUpperCase() ?? ''),
             orElse: () => RosterUserRole.STAFF,
           ),
           shiftDate: row['shift_date'] as DateTime,
           shift: ShiftType.values.firstWhere(
-                (e) => e.name == (row['shift']?.toString().toUpperCase() ?? ''),
+            (e) => e.name == (row['shift']?.toString().toUpperCase() ?? ''),
             orElse: () => ShiftType.MORNING,
           ),
         );
@@ -629,5 +705,4 @@ class PatientEndpoint extends Endpoint {
       return [];
     }
   }
-
 }

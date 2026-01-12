@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'prescription_page.dart';
 import 'package:backend_client/backend_client.dart';
 
 class PatientRecordsPage extends StatefulWidget {

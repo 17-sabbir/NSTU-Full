@@ -886,6 +886,11 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<String>(),
               nullable: false,
             ),
+            'deviceId': _i1.ParameterDescription(
+              name: 'deviceId',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
           },
           call:
               (
@@ -895,7 +900,79 @@ class Endpoints extends _i1.EndpointDispatch {
                 session,
                 params['email'],
                 params['password'],
+                deviceId: params['deviceId'],
               ),
+        ),
+        'startSignupPhoneOtp': _i1.MethodConnector(
+          name: 'startSignupPhoneOtp',
+          params: {
+            'email': _i1.ParameterDescription(
+              name: 'email',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'phone': _i1.ParameterDescription(
+              name: 'phone',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['auth'] as _i5.AuthEndpoint).startSignupPhoneOtp(
+                    session,
+                    params['email'],
+                    params['phone'],
+                  ),
+        ),
+        'verifyLoginOtp': _i1.MethodConnector(
+          name: 'verifyLoginOtp',
+          params: {
+            'email': _i1.ParameterDescription(
+              name: 'email',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'otp': _i1.ParameterDescription(
+              name: 'otp',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'otpToken': _i1.ParameterDescription(
+              name: 'otpToken',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'deviceId': _i1.ParameterDescription(
+              name: 'deviceId',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint).verifyLoginOtp(
+                session,
+                params['email'],
+                params['otp'],
+                params['otpToken'],
+                deviceId: params['deviceId'],
+              ),
+        ),
+        'logout': _i1.MethodConnector(
+          name: 'logout',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['auth'] as _i5.AuthEndpoint).logout(session),
         ),
         'register': _i1.MethodConnector(
           name: 'register',
@@ -968,6 +1045,135 @@ class Endpoints extends _i1.EndpointDispatch {
                 params['name'],
                 params['role'],
               ),
+        ),
+        'verifySignupEmailAndStartPhoneOtp': _i1.MethodConnector(
+          name: 'verifySignupEmailAndStartPhoneOtp',
+          params: {
+            'email': _i1.ParameterDescription(
+              name: 'email',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'emailOtp': _i1.ParameterDescription(
+              name: 'emailOtp',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'emailOtpToken': _i1.ParameterDescription(
+              name: 'emailOtpToken',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'phone': _i1.ParameterDescription(
+              name: 'phone',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint)
+                  .verifySignupEmailAndStartPhoneOtp(
+                    session,
+                    params['email'],
+                    params['emailOtp'],
+                    params['emailOtpToken'],
+                    params['phone'],
+                  ),
+        ),
+        'completeSignupWithPhoneOtp': _i1.MethodConnector(
+          name: 'completeSignupWithPhoneOtp',
+          params: {
+            'email': _i1.ParameterDescription(
+              name: 'email',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'phone': _i1.ParameterDescription(
+              name: 'phone',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'phoneOtp': _i1.ParameterDescription(
+              name: 'phoneOtp',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'phoneOtpToken': _i1.ParameterDescription(
+              name: 'phoneOtpToken',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'password': _i1.ParameterDescription(
+              name: 'password',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'name': _i1.ParameterDescription(
+              name: 'name',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'role': _i1.ParameterDescription(
+              name: 'role',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'bloodGroup': _i1.ParameterDescription(
+              name: 'bloodGroup',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'dateOfBirth': _i1.ParameterDescription(
+              name: 'dateOfBirth',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint)
+                  .completeSignupWithPhoneOtp(
+                    session,
+                    params['email'],
+                    params['phone'],
+                    params['phoneOtp'],
+                    params['phoneOtpToken'],
+                    params['password'],
+                    params['name'],
+                    params['role'],
+                    params['bloodGroup'],
+                    params['dateOfBirth'],
+                  ),
+        ),
+        'sendWelcomeEmailViaResend': _i1.MethodConnector(
+          name: 'sendWelcomeEmailViaResend',
+          params: {
+            'email': _i1.ParameterDescription(
+              name: 'email',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'name': _i1.ParameterDescription(
+              name: 'name',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint)
+                  .sendWelcomeEmailViaResend(
+                    session,
+                    params['email'],
+                    params['name'],
+                  ),
         ),
         'verifyOtp': _i1.MethodConnector(
           name: 'verifyOtp',
@@ -2212,10 +2418,15 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<String>(),
               nullable: false,
             ),
-            'allergies': _i1.ParameterDescription(
-              name: 'allergies',
-              type: _i1.getType<String>(),
-              nullable: false,
+            'bloodGroup': _i1.ParameterDescription(
+              name: 'bloodGroup',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'dateOfBirth': _i1.ParameterDescription(
+              name: 'dateOfBirth',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
             ),
             'profileImageUrl': _i1.ParameterDescription(
               name: 'profileImageUrl',
@@ -2233,7 +2444,8 @@ class Endpoints extends _i1.EndpointDispatch {
                     params['userId'],
                     params['name'],
                     params['phone'],
-                    params['allergies'],
+                    params['bloodGroup'],
+                    params['dateOfBirth'],
                     params['profileImageUrl'],
                   ),
         ),

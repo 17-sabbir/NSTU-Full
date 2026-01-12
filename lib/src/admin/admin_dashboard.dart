@@ -18,7 +18,9 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   int _selectedIndex = 0;
-  final Color primaryColor = const Color(0xFF00796B); // Deep Teal (For consistency)
+  final Color primaryColor = const Color(
+    0xFF00796B,
+  ); // Deep Teal (For consistency)
   final Color accentColor = const Color(0xFF80CBC4); // Light Teal
 
   // navigation history like DoctorDashboard
@@ -37,7 +39,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     "Inventory Management",
     "Reports & Analytics",
     "Audit History",
-    "Staff Rostering"
+    "Staff Rostering",
   ];
 
   // Auth guard state
@@ -55,6 +57,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _verifyAdmin() async {
     try {
+      final authKey = await client.authenticationKeyManager?.get();
+      if (authKey == null || authKey.isEmpty) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final storedUserId = prefs.getString('user_id');
 
@@ -76,7 +85,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       // Ask backend for the user's role
       String role = '';
       try {
-        role = (await client.patient.getUserRole(numericId)).toUpperCase();
+        role = (await client.patient.getUserRole(0)).toUpperCase();
       } catch (e) {
         debugPrint('Failed to fetch user role: $e');
         role = '';
@@ -105,9 +114,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget build(BuildContext context) {
     // While checking auth, show a full screen loader to avoid flashing admin UI
     if (_checkingAuth) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (!_authorized) {
@@ -159,12 +166,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.white, // Setting scaffold background for AppBar elevation effect
+        backgroundColor: Colors
+            .white, // Setting scaffold background for AppBar elevation effect
         appBar: AppBar(
           title: Text(
             _titles[_selectedIndex],
             style: const TextStyle(
-                fontWeight: FontWeight.bold, color: Colors.blueAccent), // Color changed to white
+              fontWeight: FontWeight.bold,
+              color: Colors.blueAccent,
+            ), // Color changed to white
           ),
           backgroundColor: Colors.white, // Fixed to Deep Teal
           centerTitle: true,
@@ -172,21 +182,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
           actions: [
             // Ambulance Button
             IconButton(
-              icon: const Icon(Icons.local_hospital,
-                  color: Colors.blueAccent, size: 28),
+              icon: const Icon(
+                Icons.local_hospital,
+                color: Colors.blueAccent,
+                size: 28,
+              ),
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const AdminAmbulance()),
+                    builder: (context) => const AdminAmbulance(),
+                  ),
                 );
               },
               tooltip: 'Manage Ambulances',
             ),
             // Profile Button
             IconButton(
-              icon:
-              const Icon(Icons.person, color: Colors.blueAccent, size: 28),
+              icon: const Icon(
+                Icons.person,
+                color: Colors.blueAccent,
+                size: 28,
+              ),
               onPressed: () {
                 Navigator.push(
                   context,
@@ -214,16 +231,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
             });
           },
           items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.people), label: "Users"),
             BottomNavigationBarItem(
-                icon: Icon(Icons.people), label: "Users"),
+              icon: Icon(Icons.inventory),
+              label: "Inventory",
+            ),
             BottomNavigationBarItem(
-                icon: Icon(Icons.inventory), label: "Inventory"),
+              icon: Icon(Icons.bar_chart),
+              label: "Reports",
+            ),
             BottomNavigationBarItem(
-                icon: Icon(Icons.bar_chart), label: "Reports"),
+              icon: Icon(Icons.history),
+              label: "History",
+            ),
             BottomNavigationBarItem(
-                icon: Icon(Icons.history), label: "History"),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.schedule), label: "Roster"),
+              icon: Icon(Icons.schedule),
+              label: "Roster",
+            ),
           ],
         ),
       ),

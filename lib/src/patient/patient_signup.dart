@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:async'; // Timer ব্যবহারের জন্য
 import 'package:dishari/src/universal_login.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:flutter/services.dart';
@@ -22,13 +21,6 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
   bool _pwHasNumber = false;
   bool _pwHasSpecial = false;
 
-  // --- OTP TIMER STATE ---
-  int _countdownSeconds = 120; // 2 minutes
-  Timer? _timer;
-  bool _canResend = false;
-  String? _otpToken; // JWT token returned from backend for OTP verification
-  // -----------------------
-
   // --- Controllers ---
   TextEditingController? _nameController;
   TextEditingController? _emailController;
@@ -36,8 +28,8 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
   TextEditingController? _passwordController;
   TextEditingController? _confirmPasswordController;
   TextEditingController? _bloodGroupController;
-  TextEditingController? _allergiesController;
-  TextEditingController? _otpController;
+
+  DateTime? _dateOfBirth;
 
   String _patientType = 'STUDENT';
 
@@ -50,8 +42,6 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
     _passwordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
     _bloodGroupController = TextEditingController();
-    _allergiesController = TextEditingController();
-    _otpController = TextEditingController();
     // live update of password criteria
     _passwordController!.addListener(_passwordCriteria);
   }
@@ -147,38 +137,6 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
     return null;
   }
 
-  // --- TIMER FUNCTIONS ---
-  String _formatTime(int totalSeconds) {
-    final minutes = totalSeconds ~/ 60;
-    final seconds = totalSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  void _startTimer({required Function(int) onUpdate}) {
-    _countdownSeconds = 120; // Reset to 2 minutes
-    _canResend = false;
-
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-
-      if (_countdownSeconds < 1) {
-        timer.cancel();
-        setState(() {
-          _canResend = true;
-        });
-      } else {
-        setState(() {
-          _countdownSeconds--;
-        });
-        onUpdate(_countdownSeconds);
-      }
-    });
-  }
-
   @override
   void dispose() {
     _nameController?.dispose();
@@ -187,10 +145,12 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
     _passwordController?.dispose();
     _confirmPasswordController?.dispose();
     _bloodGroupController?.dispose();
-    _allergiesController?.dispose();
-    _otpController?.dispose();
-    _timer?.cancel(); // 🔑 TIMER MUST BE CANCELLED
     super.dispose();
+  }
+
+  String _formatDob(DateTime? d) {
+    if (d == null) return 'Select date';
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }
 
   // Custom Input Decoration for better look
@@ -216,112 +176,174 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
     );
   }
 
-  // --- OTP DIALOG (Uses StatefulBuilder for Countdown) ---
-  void _showOtpDialog() {
-    bool dialogTimerStarted = false; // ensure timer starts only once per dialog
+  Future<void> _startSignupPhoneOtpFlow() async {
+    if (!_formKey.currentState!.validate() || _isLoading) return;
 
-    showDialog(
+    if (_passwordController!.text != _confirmPasswordController!.text) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Passwords do not match!')));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final email = _emailController!.text.trim();
+      final phoneToSend = _normalizePhoneForBackend(_phoneController!.text);
+
+      final challenge = await client.auth.startSignupPhoneOtp(
+        email,
+        phoneToSend,
+      );
+
+      if (challenge == null || challenge.success != true) {
+        final msg = challenge?.error?.toString() ?? 'Unknown error';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to start phone OTP: $msg')),
+          );
+        }
+        return;
+      }
+
+      final phoneOtpToken = challenge.token;
+      final debugOtp = challenge.debugOtp;
+      if (phoneOtpToken == null || phoneOtpToken.isEmpty || debugOtp == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to start phone verification.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      await _showPhoneOtpDialog(debugOtp: debugOtp, token: phoneOtpToken);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Signup failed. Check server connection: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _showPhoneOtpDialog({
+    required String debugOtp,
+    required String token,
+  }) async {
+    final ctrl = TextEditingController(text: debugOtp);
+
+    Future<void> submit() async {
+      final phoneOtp = ctrl.text.trim();
+      if (!RegExp(r'^\d{6}$').hasMatch(phoneOtp)) {
+        _showErrorDialog('Invalid OTP', 'Enter a valid 6-digit OTP.');
+        return;
+      }
+
+      setState(() => _isLoading = true);
+      try {
+        final email = _emailController!.text.trim();
+        final phone = _normalizePhoneForBackend(_phoneController!.text);
+        final password = _passwordController!.text;
+        final name = _nameController!.text.trim();
+        final role = _patientType;
+        final bloodGroup = _bloodGroupController!.text.trim();
+        final dob = _dateOfBirth;
+
+        final res = await client.auth.completeSignupWithPhoneOtp(
+          email,
+          phone,
+          phoneOtp,
+          token,
+          password,
+          name,
+          role,
+          bloodGroup.isEmpty ? null : bloodGroup,
+          dob,
+        );
+
+        if (res == null || res.success != true) {
+          _showErrorDialog(
+            'Signup Failed',
+            res?.error?.toString() ?? 'Unknown error',
+          );
+          return;
+        }
+
+        final authToken = res.token;
+        if (authToken != null && authToken.isNotEmpty) {
+          // ignore: deprecated_member_use
+          await client.authenticationKeyManager?.put(authToken);
+        }
+
+        if (!mounted) return;
+        Navigator.of(context).pop(); // close phone otp dialog
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()),
+        );
+      } catch (e) {
+        _showErrorDialog('Error', 'Phone OTP verification failed: $e');
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
+
+    await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        // StatefulBuilder ব্যবহার করা হয়েছে যাতে কাউন্টডাউন চলাকালীন ডায়ালগ আপডেট হতে পারে
-        return AlertDialog(
-          title: const Text('Verify Email'),
-          content: StatefulBuilder(
-            builder: (BuildContext dialogContext, StateSetter setStateDialog) {
-              // Start timer only once for this dialog instance
-              if (!dialogTimerStarted) {
-                dialogTimerStarted = true;
-                _startTimer(
-                  onUpdate: (seconds) {
-                    // update only the dialog UI
-                    try {
-                      setStateDialog(() {});
-                    } catch (_) {}
-                  },
-                );
-              }
-
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'A 6-digit OTP has been sent to ${_emailController!.text}.',
-                  ),
-                  const SizedBox(height: 15),
-
-                  // 🔑 COUNTDOWN DISPLAY
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Time remaining:',
-                        style: TextStyle(color: Colors.black87),
-                      ),
-                      Text(
-                        _formatTime(_countdownSeconds),
-                        style: TextStyle(
-                          color: _canResend ? Colors.red : kPrimaryColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  TextFormField(
-                    controller: _otpController,
-                    keyboardType: TextInputType.number,
-                    decoration: _inputDecoration('Enter OTP', Icons.vpn_key),
-                    maxLength: 6,
-                    validator: (value) =>
-                        value!.length != 6 ? 'OTP must be 6 digits' : null,
-                  ),
-
-                  // Resend Button
-                  TextButton(
-                    onPressed: _canResend ? _resendOtp : null,
-                    child: Text(
-                      _canResend
-                          ? 'RESEND OTP'
-                          : 'Resend available in ${_formatTime(_countdownSeconds)}',
-                      style: TextStyle(
-                        color: _canResend ? kPrimaryColor : Colors.grey,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                // Cancel timer and reset dialog-related states so next open is clean
-                _timer?.cancel(); // Cancel timer on manual close
-                if (_isLoading) {
-                  setState(() {
-                    _isLoading = false;
-                  });
-                }
-                setState(() {
-                  _canResend = false;
-                  _countdownSeconds = 120; // reset for next time
-                  _otpToken = null; // clear token on cancel
-                });
-                Navigator.of(context).pop();
-              },
-              child: Text('Cancel', style: TextStyle(color: kPrimaryColor)),
+      builder: (_) => AlertDialog(
+        title: const Text('Verify Phone Number'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'SMS API is not connected yet. Showing OTP here temporarily:',
+              textAlign: TextAlign.center,
             ),
-            ElevatedButton(
-              onPressed: _verifyOtpAndCreateAccount,
-              style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor),
-              child: const Text(
-                'VERIFY',
-                style: TextStyle(color: Colors.white),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: const InputDecoration(
+                labelText: 'Phone OTP',
+                hintText: '6 digits',
               ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: _isLoading ? null : submit,
+            child: const Text('Verify & Create Account'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title, textAlign: TextAlign.center),
+          content: Text(message, textAlign: TextAlign.center),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
             ),
           ],
         );
@@ -329,154 +351,24 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
     );
   }
 
-  // --- VERIFY OTP AND CREATE ACCOUNT (Serverpod Call) ---
-  Future<void> _verifyOtpAndCreateAccount() async {
-    if (_otpController!.text.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a 6-digit OTP.')),
-      );
-      return;
-    }
-
-    Navigator.of(context).pop();
-    _timer?.cancel(); // Cancel timer once verified/submitted
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final phoneToSend = _normalizePhoneForBackend(_phoneController!.text);
-      final result = await (client.auth as dynamic).verifyOtp(
-        _emailController!.text,
-        _otpController!.text,
-        _otpToken ?? '',
-        _passwordController!.text,
-        _nameController!.text,
-        _patientType.toUpperCase(),
-        phoneToSend,
-        _bloodGroupController!.text,
-        _allergiesController!.text,
-      );
-
-
-      if (!mounted) {
-        setState(() {
-          _isLoading = false;
-          _otpToken = null;
-        });
-        return;
-      }
-
-      if (result == 'Account created successfully') {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Account created successfully! Redirecting to login.',
-              ),
-            ),
-          );
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomePage()),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Verification Failed: $result')),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('An error occurred during verification. Error: $e'),
-          ),
+  Widget _buildDobPicker() {
+    return InkWell(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: _dateOfBirth ?? DateTime(2000, 1, 1),
+          firstDate: DateTime(1900, 1, 1),
+          lastDate: DateTime.now(),
         );
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-        _otpController!.clear();
-        _otpToken = null; // clear token after attempt
-      });
-    }
-  }
-
-  // --- RESEND OTP LOGIC ---
-  void _resendOtp() {
-    _submitForm(isResend: true);
-    // Timer is restarted within _submitForm on success
-  }
-
-  // --- UPDATED: SUBMIT FORM (Serverpod Call - Register/Send OTP) ---
-  void _submitForm({bool isResend = false}) async {
-    // Check validation only on initial submission, not resend
-    if (!isResend && (!_formKey.currentState!.validate() || _isLoading)) return;
-
-    if (!isResend &&
-        _passwordController!.text != _confirmPasswordController!.text) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Passwords do not match!')));
-      return;
-    }
-
-    // Close any previous dialog if this is a resend
-    if (isResend && Navigator.canPop(context)) {
-      Navigator.of(context).pop();
-    }
-
-    setState(() {
-      _isLoading = true;
-      _canResend = false;
-    });
-
-    // Clear the current timer to prevent conflicts
-    _timer?.cancel();
-
-    try {
-      final result = await (client.auth as dynamic).register(
-        _emailController!.text,
-        _passwordController!.text,
-        _nameController!.text,
-        _patientType.toUpperCase(),
-      );
-
-
-      // Backend now returns a JWT token on success (compact serialization with two dots)
-      if (result.split('.').length == 3) {
-        // treat as JWT token
-        _otpToken = result;
-        if (mounted) {
-          // Start the timer and show the dialog
-          _showOtpDialog();
+        if (picked != null) {
+          setState(() => _dateOfBirth = picked);
         }
-        // Keep loading state until verification or cancel
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(result.toString())));
-        }
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Registration failed. Check server connection: $e'),
-          ),
-        );
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
+      },
+      child: InputDecorator(
+        decoration: _inputDecoration('Date of Birth', Icons.cake),
+        child: Text(_formatDob(_dateOfBirth)),
+      ),
+    );
   }
 
   String _normalizePhoneForBackend(String raw) {
@@ -603,14 +495,7 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
                     ),
                     const SizedBox(height: 15),
 
-                    // Allergies
-                    TextFormField(
-                      controller: _allergiesController,
-                      decoration: _inputDecoration(
-                        'Allergies (Optional)',
-                        Icons.warning,
-                      ),
-                    ),
+                    _buildDobPicker(),
                     const SizedBox(height: 20),
 
                     // Password Field (stronger validation)
@@ -695,7 +580,7 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submitForm,
+                  onPressed: _isLoading ? null : _startSignupPhoneOtpFlow,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimaryColor,
                     elevation: 6,

@@ -71,22 +71,19 @@ class _AdminProfileState extends State<AdminProfile> {
     super.dispose();
   }
 
-
   void _onChanged() {
     final changed =
         _nameCtrl.text.trim() != name ||
-            _phoneCtrl.text.trim() != phone ||
-            _emailCtrl.text.trim() != email ||
-            _designationCtrl.text.trim() != designation ||
-            _qualificationCtrl.text.trim() != qualification ||
-            _imageBytes != null;
-
+        _phoneCtrl.text.trim() != phone ||
+        _emailCtrl.text.trim() != email ||
+        _designationCtrl.text.trim() != designation ||
+        _qualificationCtrl.text.trim() != qualification ||
+        _imageBytes != null;
 
     if (changed != _isChanged && mounted) {
       setState(() => _isChanged = changed);
     }
   }
-
 
   Future<void> _loadProfile() async {
     if (!mounted) return;
@@ -95,7 +92,10 @@ class _AdminProfileState extends State<AdminProfile> {
     try {
       final prefs = await SharedPreferences.getInstance();
       // Try common keys for stored email
-      final storedEmail = prefs.getString('email') ?? prefs.getString('user_email') ?? prefs.getString('userId');
+      final storedEmail =
+          prefs.getString('email') ??
+          prefs.getString('user_email') ??
+          prefs.getString('userId');
       if (storedEmail == null || storedEmail.isEmpty) {
         // fallback to dummy data (previous behaviour)
         await Future.delayed(const Duration(milliseconds: 200));
@@ -113,7 +113,8 @@ class _AdminProfileState extends State<AdminProfile> {
       }
 
       // Fetch from backend using generated client endpoint reference
-      final AdminProfileRespond? profile =await client.adminEndpoints.getAdminProfile(storedEmail);
+      final AdminProfileRespond? profile = await client.adminEndpoints
+          .getAdminProfile(storedEmail);
 
       if (profile != null) {
         setState(() {
@@ -133,10 +134,8 @@ class _AdminProfileState extends State<AdminProfile> {
         });
       }
 
-
       if (!mounted) return;
-      setState(() {
-      });
+      setState(() {});
     } catch (e) {
       debugPrint('Failed to load admin profile: $e');
       if (!mounted) return;
@@ -181,9 +180,14 @@ class _AdminProfileState extends State<AdminProfile> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final storedEmail = prefs.getString('email') ?? prefs.getString('user_email') ?? prefs.getString('userId');
+      final storedEmail =
+          prefs.getString('email') ??
+          prefs.getString('user_email') ??
+          prefs.getString('userId');
       if (storedEmail == null || storedEmail.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No signed-in user')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('No signed-in user')));
         setState(() => _isSaving = false);
         return;
       }
@@ -195,28 +199,45 @@ class _AdminProfileState extends State<AdminProfile> {
 
       // Call backend update using generated client endpoint
       final phoneToSend = _normalizePhoneForBackend(_phoneCtrl.text.trim());
-      final res = await client.adminEndpoints.updateAdminProfile(storedEmail, _nameCtrl.text.trim(), phoneToSend, profileData, _designationCtrl.text.trim(), _qualificationCtrl.text.trim(),);
+      final res = await client.adminEndpoints.updateAdminProfile(
+        storedEmail,
+        _nameCtrl.text.trim(),
+        phoneToSend,
+        profileData,
+        _designationCtrl.text.trim(),
+        _qualificationCtrl.text.trim(),
+      );
 
       if (res == 'OK') {
         // refresh
         await _loadProfile();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated'),
+            backgroundColor: Colors.green,
+          ),
+        );
       } else {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Update failed: $res')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Update failed: $res')));
       }
-
     } catch (e) {
       debugPrint('Save failed: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to save changes'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to save changes'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (!mounted) return;
       setState(() => _isSaving = false);
     }
   }
-
 
   void _logout() {
     showDialog(
@@ -232,13 +253,34 @@ class _AdminProfileState extends State<AdminProfile> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Logged out successfully"),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+              () async {
+                try {
+                  try {
+                    await client.auth.logout();
+                  } catch (_) {}
+                  await client.authenticationKeyManager?.remove();
+                } catch (_) {}
+
+                try {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.remove('user_id');
+                  await prefs.remove('user_email');
+                  await prefs.remove('user_role');
+                } catch (_) {}
+
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Logged out successfully"),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/',
+                  (route) => false,
+                );
+              }();
             },
             child: const Text("Logout", style: TextStyle(color: Colors.red)),
           ),
@@ -409,13 +451,16 @@ class _AdminProfileState extends State<AdminProfile> {
             _buildEditableField(_designationCtrl, Icons.badge, 'Designation'),
             const SizedBox(height: 12),
 
-            _buildEditableField(_qualificationCtrl, Icons.school, 'Qualification'),
+            _buildEditableField(
+              _qualificationCtrl,
+              Icons.school,
+              'Qualification',
+            ),
           ],
         ),
       ),
     );
   }
-
 
   Widget _buildActionButtons() {
     return Center(
@@ -458,7 +503,8 @@ class _AdminProfileState extends State<AdminProfile> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ElevatedButton.icon(
-                onPressed: () => Navigator.pushNamed(context, '/change-password'),
+                onPressed: () =>
+                    Navigator.pushNamed(context, '/change-password'),
                 icon: const Icon(Icons.lock_reset, size: 18),
                 label: const Text('Change Password'),
                 style: ElevatedButton.styleFrom(
@@ -504,7 +550,10 @@ class _AdminProfileState extends State<AdminProfile> {
         prefixIcon: Icon(icon, color: Colors.blueAccent),
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 14,
+          horizontal: 12,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
@@ -518,10 +567,11 @@ class _AdminProfileState extends State<AdminProfile> {
           borderSide: BorderSide.none,
         ),
       ),
-      inputFormatters: label.toLowerCase().contains('phone') ? [FilteringTextInputFormatter.digitsOnly] : null,
+      inputFormatters: label.toLowerCase().contains('phone')
+          ? [FilteringTextInputFormatter.digitsOnly]
+          : null,
     );
   }
-
 
   String _normalizePhoneForBackend(String raw) {
     final d = raw.replaceAll(RegExp(r'\D'), '');

@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_underscores, unused_element
+
 import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // SharedPreferences ইমপোর্ট করা হলো
@@ -49,12 +51,12 @@ class _NotificationsState extends State<Notifications> {
     return int.tryParse(stored ?? '') ?? 0;
   }
 
-
   // 2. ডাটা লোড করার ফাংশন (ID সহ)
   Future<void> _loadAll() async {
     setState(() => loading = true);
     try {
-      final userId = await _getUserId(); // ID নেওয়া হচ্ছে
+      // Do not send real userId from frontend; backend resolves from session.
+      const userId = 0;
 
       // ব্যাকএন্ডে userId পাঠানো হচ্ছে
       final counts = await client.notification.getMyNotificationCounts(
@@ -81,8 +83,7 @@ class _NotificationsState extends State<Notifications> {
 
   // সব মার্ক রিড করা
   Future<void> _markAllRead() async {
-    final userId = await _getUserId();
-    final ok = await client.notification.markAllAsRead(userId: userId);
+    final ok = await client.notification.markAllAsRead(userId: 0);
     if (ok) await _loadAll();
   }
 
@@ -90,10 +91,9 @@ class _NotificationsState extends State<Notifications> {
   Future<void> _markOneRead(NotificationInfo n) async {
     if (n.isRead) return;
 
-    final userId = await _getUserId();
     await client.notification.markAsRead(
       notificationId: n.notificationId,
-      userId: userId,
+      userId: 0,
     );
     await _loadAll();
   }
@@ -184,7 +184,6 @@ class _NotificationsState extends State<Notifications> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-
                 Expanded(
                   child: shown.isEmpty
                       ? const Center(child: Text('No notifications'))
@@ -228,11 +227,13 @@ class _NotificationsState extends State<Notifications> {
                                 if (!context.mounted) return;
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (_) => NotificationDetails(notificationId: n.notificationId,userID: n.userId,),
+                                    builder: (_) => NotificationDetails(
+                                      notificationId: n.notificationId,
+                                      userID: n.userId,
+                                    ),
                                   ),
                                 );
                               },
-
                             );
                           },
                         ),
@@ -247,7 +248,11 @@ class _NotificationsState extends State<Notifications> {
 class NotificationDetails extends StatefulWidget {
   final int notificationId;
   final int userID;
-  const NotificationDetails({super.key, required this.notificationId,required this.userID});
+  const NotificationDetails({
+    super.key,
+    required this.notificationId,
+    required this.userID,
+  });
 
   @override
   State<NotificationDetails> createState() => _NotificationDetailsState();
@@ -266,7 +271,6 @@ class _NotificationDetailsState extends State<NotificationDetails> {
   Future<void> _loadDetail() async {
     setState(() => loading = true);
     try {
-
       final res = await client.notification.getNotificationById(
         notificationId: widget.notificationId,
         userId: widget.userID, // ID পাস করা হলো

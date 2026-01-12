@@ -43,7 +43,7 @@ class _PatientLabTestAvailabilityState
         final int? numericId = int.tryParse(storedUserId);
         if (numericId != null) {
           try {
-            final role = await client.patient.getUserRole(numericId);
+            final role = await client.patient.getUserRole(0);
             _role = role.isEmpty ? '' : role.toUpperCase();
           } catch (e) {
             debugPrint('Failed to fetch role using numeric id: $e');

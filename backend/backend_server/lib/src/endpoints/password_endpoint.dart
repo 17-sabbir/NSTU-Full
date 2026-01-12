@@ -2,17 +2,23 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:serverpod/serverpod.dart';
 
+import '../utils/auth_user.dart';
+
 class PasswordEndpoint extends Endpoint {
+  @override
+  bool get requireLogin => true;
+
   Future<String> changePasswordByUserIdEmail(
-      Session session, {
-        required int userId,
-        required String email,
-        required String currentPassword,
-        required String newPassword,
-      }) async {
+    Session session, {
+    required int userId,
+    required String email,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final resolvedUserId = requireAuthenticatedUserId(session);
     return _changePasswordByUserIdEmail(
       session,
-      userId: userId,
+      userId: resolvedUserId,
       email: email,
       currentPassword: currentPassword,
       newPassword: newPassword,
@@ -22,12 +28,12 @@ class PasswordEndpoint extends Endpoint {
 
 // Raw helper function (private)
 Future<String> _changePasswordByUserIdEmail(
-    Session session, {
-      required int userId,
-      required String email,
-      required String currentPassword,
-      required String newPassword,
-    }) async {
+  Session session, {
+  required int userId,
+  required String email,
+  required String currentPassword,
+  required String newPassword,
+}) async {
   final currentHash = sha256.convert(utf8.encode(currentPassword)).toString();
 
   final rows = await session.db.unsafeQuery(

@@ -10,7 +10,6 @@ class InventoryManagement extends StatefulWidget {
 }
 
 class _InventoryManagementState extends State<InventoryManagement> {
-
   Future<int?> _getUserId() async {
     final prefs = await SharedPreferences.getInstance();
     final storedUserId = prefs.getString('user_id');
@@ -33,14 +32,18 @@ class _InventoryManagementState extends State<InventoryManagement> {
   Future<void> _loadInventory() async {
     try {
       final result = await client.dispenser.listInventoryItems();
-      final mapped = result.map((item) => {
-        'id': item.itemId,
-        'name': item.itemName,
-        'unit': item.unit,
-        'currentStock': item.currentQuantity,
-        'minThreshold': item.minimumStock,
-        'lastUpdate': DateTime.now(),
-      }).toList();
+      final mapped = result
+          .map(
+            (item) => {
+              'id': item.itemId,
+              'name': item.itemName,
+              'unit': item.unit,
+              'currentStock': item.currentQuantity,
+              'minThreshold': item.minimumStock,
+              'lastUpdate': DateTime.now(),
+            },
+          )
+          .toList();
 
       if (!mounted) return;
       setState(() {
@@ -81,7 +84,10 @@ class _InventoryManagementState extends State<InventoryManagement> {
                     const SizedBox(width: 12),
                     const Text(
                       'Low Stock Alert:',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -94,7 +100,11 @@ class _InventoryManagementState extends State<InventoryManagement> {
                       ),
                     ),
                     const Spacer(),
-                    Icon(Icons.inventory_2, color: Colors.blue.shade700, size: 28),
+                    Icon(
+                      Icons.inventory_2,
+                      color: Colors.blue.shade700,
+                      size: 28,
+                    ),
                   ],
                 ),
               ),
@@ -144,7 +154,9 @@ class _InventoryManagementState extends State<InventoryManagement> {
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
-                        color: isLowStock ? Colors.red.shade100 : Colors.green.shade100,
+                        color: isLowStock
+                            ? Colors.red.shade100
+                            : Colors.green.shade100,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: isLowStock ? Colors.red : Colors.green,
@@ -174,7 +186,9 @@ class _InventoryManagementState extends State<InventoryManagement> {
                             'Stock: $currentStock ${item['unit']} (Min: $minThreshold ${item['unit']})',
                             style: TextStyle(
                               color: isLowStock ? Colors.red : Colors.black,
-                              fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
+                              fontWeight: isLowStock
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -207,11 +221,17 @@ class _InventoryManagementState extends State<InventoryManagement> {
 
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
                               minimumSize: const Size(60, 30),
                               visualDensity: VisualDensity.compact,
                             ),
-                            child: const Text('Restock', style: TextStyle(fontSize: 12)),
+                            child: const Text(
+                              'Restock',
+                              style: TextStyle(fontSize: 12),
+                            ),
 
                             onPressed: () async {
                               final restockController = TextEditingController();
@@ -236,30 +256,45 @@ class _InventoryManagementState extends State<InventoryManagement> {
                                     ElevatedButton(
                                       child: const Text('Restock'),
                                       onPressed: () async {
-                                        final qty = int.tryParse(restockController.text) ?? 0;
+                                        final qty =
+                                            int.tryParse(
+                                              restockController.text,
+                                            ) ??
+                                            0;
                                         if (qty <= 0) return;
 
                                         final userId = await _getUserId();
                                         if (userId == null) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('User not logged in')),
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'User not logged in',
+                                              ),
+                                            ),
                                           );
                                           return;
                                         }
 
                                         // Use 'id' from local sample inventory. Replace with actual item id when integrating.
-                                        final success = await client.dispenser.restockItem(
-                                          userId: userId,
-                                          itemId: item['id'],
-                                          quantity: qty,
-                                        );
+                                        final success = await client.dispenser
+                                            .restockItem(
+                                              userId: 0,
+                                              itemId: item['id'],
+                                              quantity: qty,
+                                            );
 
                                         Navigator.pop(context);
 
                                         if (success) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
                                             const SnackBar(
-                                              content: Text('✅ Stock updated successfully'),
+                                              content: Text(
+                                                '✅ Stock updated successfully',
+                                              ),
                                               backgroundColor: Colors.green,
                                             ),
                                           );
@@ -267,9 +302,13 @@ class _InventoryManagementState extends State<InventoryManagement> {
                                           // 🔄 Refresh inventory from backend
                                           await _loadInventory();
                                         } else {
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
                                             const SnackBar(
-                                              content: Text('❌ Restock failed (permission or error)'),
+                                              content: Text(
+                                                '❌ Restock failed (permission or error)',
+                                              ),
                                               backgroundColor: Colors.red,
                                             ),
                                           );
@@ -280,8 +319,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
                                 ),
                               );
                             },
-                          )
-
+                          ),
                         ],
                       ),
                     ),

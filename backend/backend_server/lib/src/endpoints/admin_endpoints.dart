@@ -159,7 +159,7 @@ class AdminEndpoints extends Endpoint {
             await Future.microtask(() async {
               try {
                 final auth = AuthEndpoint();
-                await auth.sendWelcomeEmailViaResend(email, name);
+                await auth.sendWelcomeEmailViaResend(session, email, name);
               } catch (e, st) {
                 session.log('Failed to send welcome email (async): $e\n$st',
                     level: LogLevel.warning);

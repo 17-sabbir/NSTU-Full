@@ -36,52 +36,53 @@ import 'medicine_alternative.dart' as _i23;
 import 'medicine_details.dart' as _i24;
 import 'notification.dart' as _i25;
 import 'onduty_staff.dart' as _i26;
-import 'patient_external_report.dart' as _i27;
-import 'patient_record_list.dart' as _i28;
-import 'patient_record_prescribed_item.dart' as _i29;
-import 'patient_record_prescription_details.dart' as _i30;
-import 'patient_reponse.dart' as _i31;
-import 'patient_report.dart' as _i32;
-import 'patient_return_tests.dart' as _i33;
-import 'prescription.dart' as _i34;
-import 'prescription_detail.dart' as _i35;
-import 'prescription_list.dart' as _i36;
-import 'report_monthly.dart' as _i37;
-import 'report_prescription.dart' as _i38;
-import 'report_stock.dart' as _i39;
-import 'report_top_medicine.dart' as _i40;
-import 'roster_data.dart' as _i41;
-import 'roster_lists.dart' as _i42;
-import 'roster_user_role.dart' as _i43;
-import 'shift_type.dart' as _i44;
-import 'staff_profile.dart' as _i45;
-import 'test_result_create_upload.dart' as _i46;
-import 'user_list_item.dart' as _i47;
-import 'package:backend_server/src/generated/user_list_item.dart' as _i48;
-import 'package:backend_server/src/generated/roster_data.dart' as _i49;
-import 'package:backend_server/src/generated/roster_lists.dart' as _i50;
-import 'package:backend_server/src/generated/audit_entry.dart' as _i51;
-import 'package:backend_server/src/generated/InventoryCategory.dart' as _i52;
-import 'package:backend_server/src/generated/InventoryItemInfo.dart' as _i53;
+import 'otp_challenge_response.dart' as _i27;
+import 'patient_external_report.dart' as _i28;
+import 'patient_record_list.dart' as _i29;
+import 'patient_record_prescribed_item.dart' as _i30;
+import 'patient_record_prescription_details.dart' as _i31;
+import 'patient_reponse.dart' as _i32;
+import 'patient_report.dart' as _i33;
+import 'patient_return_tests.dart' as _i34;
+import 'prescription.dart' as _i35;
+import 'prescription_detail.dart' as _i36;
+import 'prescription_list.dart' as _i37;
+import 'report_monthly.dart' as _i38;
+import 'report_prescription.dart' as _i39;
+import 'report_stock.dart' as _i40;
+import 'report_top_medicine.dart' as _i41;
+import 'roster_data.dart' as _i42;
+import 'roster_lists.dart' as _i43;
+import 'roster_user_role.dart' as _i44;
+import 'shift_type.dart' as _i45;
+import 'staff_profile.dart' as _i46;
+import 'test_result_create_upload.dart' as _i47;
+import 'user_list_item.dart' as _i48;
+import 'package:backend_server/src/generated/user_list_item.dart' as _i49;
+import 'package:backend_server/src/generated/roster_data.dart' as _i50;
+import 'package:backend_server/src/generated/roster_lists.dart' as _i51;
+import 'package:backend_server/src/generated/audit_entry.dart' as _i52;
+import 'package:backend_server/src/generated/InventoryCategory.dart' as _i53;
+import 'package:backend_server/src/generated/InventoryItemInfo.dart' as _i54;
 import 'package:backend_server/src/generated/inventory_transaction.dart'
-    as _i54;
-import 'package:backend_server/src/generated/inventory_audit_log.dart' as _i55;
-import 'package:backend_server/src/generated/prescription.dart' as _i56;
-import 'package:backend_server/src/generated/dispense_request.dart' as _i57;
-import 'package:backend_server/src/generated/PrescribedItem.dart' as _i58;
+    as _i55;
+import 'package:backend_server/src/generated/inventory_audit_log.dart' as _i56;
+import 'package:backend_server/src/generated/prescription.dart' as _i57;
+import 'package:backend_server/src/generated/dispense_request.dart' as _i58;
+import 'package:backend_server/src/generated/PrescribedItem.dart' as _i59;
 import 'package:backend_server/src/generated/patient_external_report.dart'
-    as _i59;
-import 'package:backend_server/src/generated/patient_record_list.dart' as _i60;
-import 'package:backend_server/src/generated/patient_return_tests.dart' as _i61;
+    as _i60;
+import 'package:backend_server/src/generated/patient_record_list.dart' as _i61;
+import 'package:backend_server/src/generated/patient_return_tests.dart' as _i62;
 import 'package:backend_server/src/generated/test_result_create_upload.dart'
-    as _i62;
-import 'package:backend_server/src/generated/lab_ten_history.dart' as _i63;
-import 'package:backend_server/src/generated/notification.dart' as _i64;
-import 'package:backend_server/src/generated/patient_report.dart' as _i65;
-import 'package:backend_server/src/generated/prescription_list.dart' as _i66;
-import 'package:backend_server/src/generated/StaffInfo.dart' as _i67;
-import 'package:backend_server/src/generated/ambulance_contact.dart' as _i68;
-import 'package:backend_server/src/generated/onduty_staff.dart' as _i69;
+    as _i63;
+import 'package:backend_server/src/generated/lab_ten_history.dart' as _i64;
+import 'package:backend_server/src/generated/notification.dart' as _i65;
+import 'package:backend_server/src/generated/patient_report.dart' as _i66;
+import 'package:backend_server/src/generated/prescription_list.dart' as _i67;
+import 'package:backend_server/src/generated/StaffInfo.dart' as _i68;
+import 'package:backend_server/src/generated/ambulance_contact.dart' as _i69;
+import 'package:backend_server/src/generated/onduty_staff.dart' as _i70;
 export 'InventoryCategory.dart';
 export 'InventoryItemInfo.dart';
 export 'PrescribedItem.dart';
@@ -106,6 +107,7 @@ export 'medicine_alternative.dart';
 export 'medicine_details.dart';
 export 'notification.dart';
 export 'onduty_staff.dart';
+export 'otp_challenge_response.dart';
 export 'patient_external_report.dart';
 export 'patient_record_list.dart';
 export 'patient_record_prescribed_item.dart';
@@ -238,68 +240,71 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i26.OndutyStaff) {
       return _i26.OndutyStaff.fromJson(data) as T;
     }
-    if (t == _i27.PatientExternalReport) {
-      return _i27.PatientExternalReport.fromJson(data) as T;
+    if (t == _i27.OtpChallengeResponse) {
+      return _i27.OtpChallengeResponse.fromJson(data) as T;
     }
-    if (t == _i28.PatientPrescriptionListItem) {
-      return _i28.PatientPrescriptionListItem.fromJson(data) as T;
+    if (t == _i28.PatientExternalReport) {
+      return _i28.PatientExternalReport.fromJson(data) as T;
     }
-    if (t == _i29.PatientPrescribedItem) {
-      return _i29.PatientPrescribedItem.fromJson(data) as T;
+    if (t == _i29.PatientPrescriptionListItem) {
+      return _i29.PatientPrescriptionListItem.fromJson(data) as T;
     }
-    if (t == _i30.PatientPrescriptionDetails) {
-      return _i30.PatientPrescriptionDetails.fromJson(data) as T;
+    if (t == _i30.PatientPrescribedItem) {
+      return _i30.PatientPrescribedItem.fromJson(data) as T;
     }
-    if (t == _i31.PatientProfileDto) {
-      return _i31.PatientProfileDto.fromJson(data) as T;
+    if (t == _i31.PatientPrescriptionDetails) {
+      return _i31.PatientPrescriptionDetails.fromJson(data) as T;
     }
-    if (t == _i32.PatientReportDto) {
-      return _i32.PatientReportDto.fromJson(data) as T;
+    if (t == _i32.PatientProfile) {
+      return _i32.PatientProfile.fromJson(data) as T;
     }
-    if (t == _i33.LabTests) {
-      return _i33.LabTests.fromJson(data) as T;
+    if (t == _i33.PatientReportDto) {
+      return _i33.PatientReportDto.fromJson(data) as T;
     }
-    if (t == _i34.Prescription) {
-      return _i34.Prescription.fromJson(data) as T;
+    if (t == _i34.LabTests) {
+      return _i34.LabTests.fromJson(data) as T;
     }
-    if (t == _i35.PrescriptionDetail) {
-      return _i35.PrescriptionDetail.fromJson(data) as T;
+    if (t == _i35.Prescription) {
+      return _i35.Prescription.fromJson(data) as T;
     }
-    if (t == _i36.PrescriptionList) {
-      return _i36.PrescriptionList.fromJson(data) as T;
+    if (t == _i36.PrescriptionDetail) {
+      return _i36.PrescriptionDetail.fromJson(data) as T;
     }
-    if (t == _i37.MonthlyBreakdown) {
-      return _i37.MonthlyBreakdown.fromJson(data) as T;
+    if (t == _i37.PrescriptionList) {
+      return _i37.PrescriptionList.fromJson(data) as T;
     }
-    if (t == _i38.PrescriptionStats) {
-      return _i38.PrescriptionStats.fromJson(data) as T;
+    if (t == _i38.MonthlyBreakdown) {
+      return _i38.MonthlyBreakdown.fromJson(data) as T;
     }
-    if (t == _i39.StockReport) {
-      return _i39.StockReport.fromJson(data) as T;
+    if (t == _i39.PrescriptionStats) {
+      return _i39.PrescriptionStats.fromJson(data) as T;
     }
-    if (t == _i40.TopMedicine) {
-      return _i40.TopMedicine.fromJson(data) as T;
+    if (t == _i40.StockReport) {
+      return _i40.StockReport.fromJson(data) as T;
     }
-    if (t == _i41.Roster) {
-      return _i41.Roster.fromJson(data) as T;
+    if (t == _i41.TopMedicine) {
+      return _i41.TopMedicine.fromJson(data) as T;
     }
-    if (t == _i42.Rosterlists) {
-      return _i42.Rosterlists.fromJson(data) as T;
+    if (t == _i42.Roster) {
+      return _i42.Roster.fromJson(data) as T;
     }
-    if (t == _i43.RosterUserRole) {
-      return _i43.RosterUserRole.fromJson(data) as T;
+    if (t == _i43.Rosterlists) {
+      return _i43.Rosterlists.fromJson(data) as T;
     }
-    if (t == _i44.ShiftType) {
-      return _i44.ShiftType.fromJson(data) as T;
+    if (t == _i44.RosterUserRole) {
+      return _i44.RosterUserRole.fromJson(data) as T;
     }
-    if (t == _i45.StaffProfileDto) {
-      return _i45.StaffProfileDto.fromJson(data) as T;
+    if (t == _i45.ShiftType) {
+      return _i45.ShiftType.fromJson(data) as T;
     }
-    if (t == _i46.TestResult) {
-      return _i46.TestResult.fromJson(data) as T;
+    if (t == _i46.StaffProfileDto) {
+      return _i46.StaffProfileDto.fromJson(data) as T;
     }
-    if (t == _i47.UserListItem) {
-      return _i47.UserListItem.fromJson(data) as T;
+    if (t == _i47.TestResult) {
+      return _i47.TestResult.fromJson(data) as T;
+    }
+    if (t == _i48.UserListItem) {
+      return _i48.UserListItem.fromJson(data) as T;
     }
     if (t == _i1.getType<_i3.InventoryCategory?>()) {
       return (data != null ? _i3.InventoryCategory.fromJson(data) : null) as T;
@@ -383,99 +388,103 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i1.getType<_i26.OndutyStaff?>()) {
       return (data != null ? _i26.OndutyStaff.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i27.PatientExternalReport?>()) {
-      return (data != null ? _i27.PatientExternalReport.fromJson(data) : null)
+    if (t == _i1.getType<_i27.OtpChallengeResponse?>()) {
+      return (data != null ? _i27.OtpChallengeResponse.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i28.PatientPrescriptionListItem?>()) {
+    if (t == _i1.getType<_i28.PatientExternalReport?>()) {
+      return (data != null ? _i28.PatientExternalReport.fromJson(data) : null)
+          as T;
+    }
+    if (t == _i1.getType<_i29.PatientPrescriptionListItem?>()) {
       return (data != null
-              ? _i28.PatientPrescriptionListItem.fromJson(data)
+              ? _i29.PatientPrescriptionListItem.fromJson(data)
               : null)
           as T;
     }
-    if (t == _i1.getType<_i29.PatientPrescribedItem?>()) {
-      return (data != null ? _i29.PatientPrescribedItem.fromJson(data) : null)
+    if (t == _i1.getType<_i30.PatientPrescribedItem?>()) {
+      return (data != null ? _i30.PatientPrescribedItem.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i30.PatientPrescriptionDetails?>()) {
+    if (t == _i1.getType<_i31.PatientPrescriptionDetails?>()) {
       return (data != null
-              ? _i30.PatientPrescriptionDetails.fromJson(data)
+              ? _i31.PatientPrescriptionDetails.fromJson(data)
               : null)
           as T;
     }
-    if (t == _i1.getType<_i31.PatientProfileDto?>()) {
-      return (data != null ? _i31.PatientProfileDto.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i32.PatientProfile?>()) {
+      return (data != null ? _i32.PatientProfile.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i32.PatientReportDto?>()) {
-      return (data != null ? _i32.PatientReportDto.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i33.PatientReportDto?>()) {
+      return (data != null ? _i33.PatientReportDto.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i33.LabTests?>()) {
-      return (data != null ? _i33.LabTests.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i34.LabTests?>()) {
+      return (data != null ? _i34.LabTests.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i34.Prescription?>()) {
-      return (data != null ? _i34.Prescription.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i35.Prescription?>()) {
+      return (data != null ? _i35.Prescription.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i35.PrescriptionDetail?>()) {
-      return (data != null ? _i35.PrescriptionDetail.fromJson(data) : null)
+    if (t == _i1.getType<_i36.PrescriptionDetail?>()) {
+      return (data != null ? _i36.PrescriptionDetail.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i36.PrescriptionList?>()) {
-      return (data != null ? _i36.PrescriptionList.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i37.PrescriptionList?>()) {
+      return (data != null ? _i37.PrescriptionList.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i37.MonthlyBreakdown?>()) {
-      return (data != null ? _i37.MonthlyBreakdown.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i38.MonthlyBreakdown?>()) {
+      return (data != null ? _i38.MonthlyBreakdown.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i38.PrescriptionStats?>()) {
-      return (data != null ? _i38.PrescriptionStats.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i39.PrescriptionStats?>()) {
+      return (data != null ? _i39.PrescriptionStats.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i39.StockReport?>()) {
-      return (data != null ? _i39.StockReport.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i40.StockReport?>()) {
+      return (data != null ? _i40.StockReport.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i40.TopMedicine?>()) {
-      return (data != null ? _i40.TopMedicine.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i41.TopMedicine?>()) {
+      return (data != null ? _i41.TopMedicine.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i41.Roster?>()) {
-      return (data != null ? _i41.Roster.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i42.Roster?>()) {
+      return (data != null ? _i42.Roster.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i42.Rosterlists?>()) {
-      return (data != null ? _i42.Rosterlists.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i43.Rosterlists?>()) {
+      return (data != null ? _i43.Rosterlists.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i43.RosterUserRole?>()) {
-      return (data != null ? _i43.RosterUserRole.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i44.RosterUserRole?>()) {
+      return (data != null ? _i44.RosterUserRole.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i44.ShiftType?>()) {
-      return (data != null ? _i44.ShiftType.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i45.ShiftType?>()) {
+      return (data != null ? _i45.ShiftType.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i45.StaffProfileDto?>()) {
-      return (data != null ? _i45.StaffProfileDto.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i46.StaffProfileDto?>()) {
+      return (data != null ? _i46.StaffProfileDto.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i46.TestResult?>()) {
-      return (data != null ? _i46.TestResult.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i47.TestResult?>()) {
+      return (data != null ? _i47.TestResult.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i47.UserListItem?>()) {
-      return (data != null ? _i47.UserListItem.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i48.UserListItem?>()) {
+      return (data != null ? _i48.UserListItem.fromJson(data) : null) as T;
     }
-    if (t == List<_i37.MonthlyBreakdown>) {
+    if (t == List<_i38.MonthlyBreakdown>) {
       return (data as List)
-              .map((e) => deserialize<_i37.MonthlyBreakdown>(e))
+              .map((e) => deserialize<_i38.MonthlyBreakdown>(e))
               .toList()
           as T;
     }
-    if (t == List<_i40.TopMedicine>) {
+    if (t == List<_i41.TopMedicine>) {
       return (data as List)
-              .map((e) => deserialize<_i40.TopMedicine>(e))
+              .map((e) => deserialize<_i41.TopMedicine>(e))
               .toList()
           as T;
     }
-    if (t == List<_i39.StockReport>) {
+    if (t == List<_i40.StockReport>) {
       return (data as List)
-              .map((e) => deserialize<_i39.StockReport>(e))
+              .map((e) => deserialize<_i40.StockReport>(e))
               .toList()
           as T;
     }
-    if (t == List<_i29.PatientPrescribedItem>) {
+    if (t == List<_i30.PatientPrescribedItem>) {
       return (data as List)
-              .map((e) => deserialize<_i29.PatientPrescribedItem>(e))
+              .map((e) => deserialize<_i30.PatientPrescribedItem>(e))
               .toList()
           as T;
     }
@@ -485,59 +494,59 @@ class Protocol extends _i1.SerializationManagerServer {
               .toList()
           as T;
     }
-    if (t == List<_i48.UserListItem>) {
+    if (t == List<_i49.UserListItem>) {
       return (data as List)
-              .map((e) => deserialize<_i48.UserListItem>(e))
+              .map((e) => deserialize<_i49.UserListItem>(e))
               .toList()
           as T;
     }
-    if (t == List<_i49.Roster>) {
-      return (data as List).map((e) => deserialize<_i49.Roster>(e)).toList()
+    if (t == List<_i50.Roster>) {
+      return (data as List).map((e) => deserialize<_i50.Roster>(e)).toList()
           as T;
     }
-    if (t == List<_i50.Rosterlists>) {
+    if (t == List<_i51.Rosterlists>) {
       return (data as List)
-              .map((e) => deserialize<_i50.Rosterlists>(e))
+              .map((e) => deserialize<_i51.Rosterlists>(e))
               .toList()
           as T;
     }
-    if (t == List<_i51.AuditEntry>) {
-      return (data as List).map((e) => deserialize<_i51.AuditEntry>(e)).toList()
+    if (t == List<_i52.AuditEntry>) {
+      return (data as List).map((e) => deserialize<_i52.AuditEntry>(e)).toList()
           as T;
     }
-    if (t == List<_i52.InventoryCategory>) {
+    if (t == List<_i53.InventoryCategory>) {
       return (data as List)
-              .map((e) => deserialize<_i52.InventoryCategory>(e))
+              .map((e) => deserialize<_i53.InventoryCategory>(e))
               .toList()
           as T;
     }
-    if (t == List<_i53.InventoryItemInfo>) {
+    if (t == List<_i54.InventoryItemInfo>) {
       return (data as List)
-              .map((e) => deserialize<_i53.InventoryItemInfo>(e))
+              .map((e) => deserialize<_i54.InventoryItemInfo>(e))
               .toList()
           as T;
     }
-    if (t == List<_i54.InventoryTransactionInfo>) {
+    if (t == List<_i55.InventoryTransactionInfo>) {
       return (data as List)
-              .map((e) => deserialize<_i54.InventoryTransactionInfo>(e))
+              .map((e) => deserialize<_i55.InventoryTransactionInfo>(e))
               .toList()
           as T;
     }
-    if (t == List<_i55.InventoryAuditLog>) {
+    if (t == List<_i56.InventoryAuditLog>) {
       return (data as List)
-              .map((e) => deserialize<_i55.InventoryAuditLog>(e))
+              .map((e) => deserialize<_i56.InventoryAuditLog>(e))
               .toList()
           as T;
     }
-    if (t == List<_i56.Prescription>) {
+    if (t == List<_i57.Prescription>) {
       return (data as List)
-              .map((e) => deserialize<_i56.Prescription>(e))
+              .map((e) => deserialize<_i57.Prescription>(e))
               .toList()
           as T;
     }
-    if (t == List<_i57.DispenseItemRequest>) {
+    if (t == List<_i58.DispenseItemRequest>) {
       return (data as List)
-              .map((e) => deserialize<_i57.DispenseItemRequest>(e))
+              .map((e) => deserialize<_i58.DispenseItemRequest>(e))
               .toList()
           as T;
     }
@@ -547,41 +556,41 @@ class Protocol extends _i1.SerializationManagerServer {
           )
           as T;
     }
-    if (t == List<_i58.PrescribedItem>) {
+    if (t == List<_i59.PrescribedItem>) {
       return (data as List)
-              .map((e) => deserialize<_i58.PrescribedItem>(e))
+              .map((e) => deserialize<_i59.PrescribedItem>(e))
               .toList()
           as T;
     }
-    if (t == List<_i59.PatientExternalReport>) {
+    if (t == List<_i60.PatientExternalReport>) {
       return (data as List)
-              .map((e) => deserialize<_i59.PatientExternalReport>(e))
+              .map((e) => deserialize<_i60.PatientExternalReport>(e))
               .toList()
           as T;
     }
-    if (t == List<_i60.PatientPrescriptionListItem>) {
+    if (t == List<_i61.PatientPrescriptionListItem>) {
       return (data as List)
-              .map((e) => deserialize<_i60.PatientPrescriptionListItem>(e))
+              .map((e) => deserialize<_i61.PatientPrescriptionListItem>(e))
               .toList()
           as T;
     }
-    if (t == List<_i61.LabTests>) {
-      return (data as List).map((e) => deserialize<_i61.LabTests>(e)).toList()
+    if (t == List<_i62.LabTests>) {
+      return (data as List).map((e) => deserialize<_i62.LabTests>(e)).toList()
           as T;
     }
-    if (t == List<_i62.TestResult>) {
-      return (data as List).map((e) => deserialize<_i62.TestResult>(e)).toList()
+    if (t == List<_i63.TestResult>) {
+      return (data as List).map((e) => deserialize<_i63.TestResult>(e)).toList()
           as T;
     }
-    if (t == List<_i63.LabTenHistory>) {
+    if (t == List<_i64.LabTenHistory>) {
       return (data as List)
-              .map((e) => deserialize<_i63.LabTenHistory>(e))
+              .map((e) => deserialize<_i64.LabTenHistory>(e))
               .toList()
           as T;
     }
-    if (t == List<_i64.NotificationInfo>) {
+    if (t == List<_i65.NotificationInfo>) {
       return (data as List)
-              .map((e) => deserialize<_i64.NotificationInfo>(e))
+              .map((e) => deserialize<_i65.NotificationInfo>(e))
               .toList()
           as T;
     }
@@ -591,31 +600,31 @@ class Protocol extends _i1.SerializationManagerServer {
           )
           as T;
     }
-    if (t == List<_i65.PatientReportDto>) {
+    if (t == List<_i66.PatientReportDto>) {
       return (data as List)
-              .map((e) => deserialize<_i65.PatientReportDto>(e))
+              .map((e) => deserialize<_i66.PatientReportDto>(e))
               .toList()
           as T;
     }
-    if (t == List<_i66.PrescriptionList>) {
+    if (t == List<_i67.PrescriptionList>) {
       return (data as List)
-              .map((e) => deserialize<_i66.PrescriptionList>(e))
+              .map((e) => deserialize<_i67.PrescriptionList>(e))
               .toList()
           as T;
     }
-    if (t == List<_i67.StaffInfo>) {
-      return (data as List).map((e) => deserialize<_i67.StaffInfo>(e)).toList()
+    if (t == List<_i68.StaffInfo>) {
+      return (data as List).map((e) => deserialize<_i68.StaffInfo>(e)).toList()
           as T;
     }
-    if (t == List<_i68.AmbulanceContact>) {
+    if (t == List<_i69.AmbulanceContact>) {
       return (data as List)
-              .map((e) => deserialize<_i68.AmbulanceContact>(e))
+              .map((e) => deserialize<_i69.AmbulanceContact>(e))
               .toList()
           as T;
     }
-    if (t == List<_i69.OndutyStaff>) {
+    if (t == List<_i70.OndutyStaff>) {
       return (data as List)
-              .map((e) => deserialize<_i69.OndutyStaff>(e))
+              .map((e) => deserialize<_i70.OndutyStaff>(e))
               .toList()
           as T;
     }
@@ -651,27 +660,28 @@ class Protocol extends _i1.SerializationManagerServer {
       _i24.MedicineDetail => 'MedicineDetail',
       _i25.NotificationInfo => 'NotificationInfo',
       _i26.OndutyStaff => 'OndutyStaff',
-      _i27.PatientExternalReport => 'PatientExternalReport',
-      _i28.PatientPrescriptionListItem => 'PatientPrescriptionListItem',
-      _i29.PatientPrescribedItem => 'PatientPrescribedItem',
-      _i30.PatientPrescriptionDetails => 'PatientPrescriptionDetails',
-      _i31.PatientProfileDto => 'PatientProfileDto',
-      _i32.PatientReportDto => 'PatientReportDto',
-      _i33.LabTests => 'LabTests',
-      _i34.Prescription => 'Prescription',
-      _i35.PrescriptionDetail => 'PrescriptionDetail',
-      _i36.PrescriptionList => 'PrescriptionList',
-      _i37.MonthlyBreakdown => 'MonthlyBreakdown',
-      _i38.PrescriptionStats => 'PrescriptionStats',
-      _i39.StockReport => 'StockReport',
-      _i40.TopMedicine => 'TopMedicine',
-      _i41.Roster => 'Roster',
-      _i42.Rosterlists => 'Rosterlists',
-      _i43.RosterUserRole => 'RosterUserRole',
-      _i44.ShiftType => 'ShiftType',
-      _i45.StaffProfileDto => 'StaffProfileDto',
-      _i46.TestResult => 'TestResult',
-      _i47.UserListItem => 'UserListItem',
+      _i27.OtpChallengeResponse => 'OtpChallengeResponse',
+      _i28.PatientExternalReport => 'PatientExternalReport',
+      _i29.PatientPrescriptionListItem => 'PatientPrescriptionListItem',
+      _i30.PatientPrescribedItem => 'PatientPrescribedItem',
+      _i31.PatientPrescriptionDetails => 'PatientPrescriptionDetails',
+      _i32.PatientProfile => 'PatientProfile',
+      _i33.PatientReportDto => 'PatientReportDto',
+      _i34.LabTests => 'LabTests',
+      _i35.Prescription => 'Prescription',
+      _i36.PrescriptionDetail => 'PrescriptionDetail',
+      _i37.PrescriptionList => 'PrescriptionList',
+      _i38.MonthlyBreakdown => 'MonthlyBreakdown',
+      _i39.PrescriptionStats => 'PrescriptionStats',
+      _i40.StockReport => 'StockReport',
+      _i41.TopMedicine => 'TopMedicine',
+      _i42.Roster => 'Roster',
+      _i43.Rosterlists => 'Rosterlists',
+      _i44.RosterUserRole => 'RosterUserRole',
+      _i45.ShiftType => 'ShiftType',
+      _i46.StaffProfileDto => 'StaffProfileDto',
+      _i47.TestResult => 'TestResult',
+      _i48.UserListItem => 'UserListItem',
       _ => null,
     };
   }
@@ -734,47 +744,49 @@ class Protocol extends _i1.SerializationManagerServer {
         return 'NotificationInfo';
       case _i26.OndutyStaff():
         return 'OndutyStaff';
-      case _i27.PatientExternalReport():
+      case _i27.OtpChallengeResponse():
+        return 'OtpChallengeResponse';
+      case _i28.PatientExternalReport():
         return 'PatientExternalReport';
-      case _i28.PatientPrescriptionListItem():
+      case _i29.PatientPrescriptionListItem():
         return 'PatientPrescriptionListItem';
-      case _i29.PatientPrescribedItem():
+      case _i30.PatientPrescribedItem():
         return 'PatientPrescribedItem';
-      case _i30.PatientPrescriptionDetails():
+      case _i31.PatientPrescriptionDetails():
         return 'PatientPrescriptionDetails';
-      case _i31.PatientProfileDto():
-        return 'PatientProfileDto';
-      case _i32.PatientReportDto():
+      case _i32.PatientProfile():
+        return 'PatientProfile';
+      case _i33.PatientReportDto():
         return 'PatientReportDto';
-      case _i33.LabTests():
+      case _i34.LabTests():
         return 'LabTests';
-      case _i34.Prescription():
+      case _i35.Prescription():
         return 'Prescription';
-      case _i35.PrescriptionDetail():
+      case _i36.PrescriptionDetail():
         return 'PrescriptionDetail';
-      case _i36.PrescriptionList():
+      case _i37.PrescriptionList():
         return 'PrescriptionList';
-      case _i37.MonthlyBreakdown():
+      case _i38.MonthlyBreakdown():
         return 'MonthlyBreakdown';
-      case _i38.PrescriptionStats():
+      case _i39.PrescriptionStats():
         return 'PrescriptionStats';
-      case _i39.StockReport():
+      case _i40.StockReport():
         return 'StockReport';
-      case _i40.TopMedicine():
+      case _i41.TopMedicine():
         return 'TopMedicine';
-      case _i41.Roster():
+      case _i42.Roster():
         return 'Roster';
-      case _i42.Rosterlists():
+      case _i43.Rosterlists():
         return 'Rosterlists';
-      case _i43.RosterUserRole():
+      case _i44.RosterUserRole():
         return 'RosterUserRole';
-      case _i44.ShiftType():
+      case _i45.ShiftType():
         return 'ShiftType';
-      case _i45.StaffProfileDto():
+      case _i46.StaffProfileDto():
         return 'StaffProfileDto';
-      case _i46.TestResult():
+      case _i47.TestResult():
         return 'TestResult';
-      case _i47.UserListItem():
+      case _i48.UserListItem():
         return 'UserListItem';
     }
     className = _i2.Protocol().getClassNameForObject(data);
@@ -862,68 +874,71 @@ class Protocol extends _i1.SerializationManagerServer {
     if (dataClassName == 'OndutyStaff') {
       return deserialize<_i26.OndutyStaff>(data['data']);
     }
+    if (dataClassName == 'OtpChallengeResponse') {
+      return deserialize<_i27.OtpChallengeResponse>(data['data']);
+    }
     if (dataClassName == 'PatientExternalReport') {
-      return deserialize<_i27.PatientExternalReport>(data['data']);
+      return deserialize<_i28.PatientExternalReport>(data['data']);
     }
     if (dataClassName == 'PatientPrescriptionListItem') {
-      return deserialize<_i28.PatientPrescriptionListItem>(data['data']);
+      return deserialize<_i29.PatientPrescriptionListItem>(data['data']);
     }
     if (dataClassName == 'PatientPrescribedItem') {
-      return deserialize<_i29.PatientPrescribedItem>(data['data']);
+      return deserialize<_i30.PatientPrescribedItem>(data['data']);
     }
     if (dataClassName == 'PatientPrescriptionDetails') {
-      return deserialize<_i30.PatientPrescriptionDetails>(data['data']);
+      return deserialize<_i31.PatientPrescriptionDetails>(data['data']);
     }
-    if (dataClassName == 'PatientProfileDto') {
-      return deserialize<_i31.PatientProfileDto>(data['data']);
+    if (dataClassName == 'PatientProfile') {
+      return deserialize<_i32.PatientProfile>(data['data']);
     }
     if (dataClassName == 'PatientReportDto') {
-      return deserialize<_i32.PatientReportDto>(data['data']);
+      return deserialize<_i33.PatientReportDto>(data['data']);
     }
     if (dataClassName == 'LabTests') {
-      return deserialize<_i33.LabTests>(data['data']);
+      return deserialize<_i34.LabTests>(data['data']);
     }
     if (dataClassName == 'Prescription') {
-      return deserialize<_i34.Prescription>(data['data']);
+      return deserialize<_i35.Prescription>(data['data']);
     }
     if (dataClassName == 'PrescriptionDetail') {
-      return deserialize<_i35.PrescriptionDetail>(data['data']);
+      return deserialize<_i36.PrescriptionDetail>(data['data']);
     }
     if (dataClassName == 'PrescriptionList') {
-      return deserialize<_i36.PrescriptionList>(data['data']);
+      return deserialize<_i37.PrescriptionList>(data['data']);
     }
     if (dataClassName == 'MonthlyBreakdown') {
-      return deserialize<_i37.MonthlyBreakdown>(data['data']);
+      return deserialize<_i38.MonthlyBreakdown>(data['data']);
     }
     if (dataClassName == 'PrescriptionStats') {
-      return deserialize<_i38.PrescriptionStats>(data['data']);
+      return deserialize<_i39.PrescriptionStats>(data['data']);
     }
     if (dataClassName == 'StockReport') {
-      return deserialize<_i39.StockReport>(data['data']);
+      return deserialize<_i40.StockReport>(data['data']);
     }
     if (dataClassName == 'TopMedicine') {
-      return deserialize<_i40.TopMedicine>(data['data']);
+      return deserialize<_i41.TopMedicine>(data['data']);
     }
     if (dataClassName == 'Roster') {
-      return deserialize<_i41.Roster>(data['data']);
+      return deserialize<_i42.Roster>(data['data']);
     }
     if (dataClassName == 'Rosterlists') {
-      return deserialize<_i42.Rosterlists>(data['data']);
+      return deserialize<_i43.Rosterlists>(data['data']);
     }
     if (dataClassName == 'RosterUserRole') {
-      return deserialize<_i43.RosterUserRole>(data['data']);
+      return deserialize<_i44.RosterUserRole>(data['data']);
     }
     if (dataClassName == 'ShiftType') {
-      return deserialize<_i44.ShiftType>(data['data']);
+      return deserialize<_i45.ShiftType>(data['data']);
     }
     if (dataClassName == 'StaffProfileDto') {
-      return deserialize<_i45.StaffProfileDto>(data['data']);
+      return deserialize<_i46.StaffProfileDto>(data['data']);
     }
     if (dataClassName == 'TestResult') {
-      return deserialize<_i46.TestResult>(data['data']);
+      return deserialize<_i47.TestResult>(data['data']);
     }
     if (dataClassName == 'UserListItem') {
-      return deserialize<_i47.UserListItem>(data['data']);
+      return deserialize<_i48.UserListItem>(data['data']);
     }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);

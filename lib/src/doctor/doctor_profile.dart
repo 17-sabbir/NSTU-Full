@@ -24,14 +24,12 @@ class _ProfilePageState extends State<ProfilePage> {
   String initialDesignation = "";
   String initialQualifications = "";
 
-
   // Controllers
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
   late final TextEditingController _phoneController;
   late final TextEditingController _designationController;
   late final TextEditingController _qualificationsController;
-
 
   File? _profileImage;
   File? _signatureImage; // newly added signature image
@@ -61,21 +59,16 @@ class _ProfilePageState extends State<ProfilePage> {
     return trimmed;
   }
 
-
-
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: initialName);
     _emailController = TextEditingController(text: initialEmail);
     _phoneController = TextEditingController(text: initialPhone);
-    _designationController = TextEditingController(
-      text: initialDesignation,
-    );
+    _designationController = TextEditingController(text: initialDesignation);
     _qualificationsController = TextEditingController(
       text: initialQualifications,
     );
-
 
     _nameController.addListener(_checkChanges);
     _emailController.addListener(_checkChanges); // listen for email changes
@@ -104,7 +97,8 @@ class _ProfilePageState extends State<ProfilePage> {
   void _checkChanges() {
     final changed =
         _nameController.text != initialName ||
-        _emailController.text != initialEmail || // include email in change detection
+        _emailController.text !=
+            initialEmail || // include email in change detection
         _phoneController.text != initialPhone ||
         _designationController.text != initialDesignation ||
         _qualificationsController.text != initialQualifications ||
@@ -181,7 +175,8 @@ class _ProfilePageState extends State<ProfilePage> {
         } else {
           _phoneController.text = profile.phone ?? '';
         }
-        initialPhone = _phoneController.text; // Update initial state for change detection
+        initialPhone =
+            _phoneController.text; // Update initial state for change detection
         initialDesignation = profile.designation ?? '';
         initialQualifications = profile.qualification ?? '';
 
@@ -275,12 +270,11 @@ class _ProfilePageState extends State<ProfilePage> {
       _checkChanges();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to pick image: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
     }
   }
-
 
   Future<void> _pickSignatureImage() async {
     try {
@@ -313,12 +307,11 @@ class _ProfilePageState extends State<ProfilePage> {
       }
       _checkChanges();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to pick signature: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to pick signature: $e')));
     }
   }
-
 
   Future<void> _saveProfile() async {
     if (_doctorId == null) return;
@@ -331,9 +324,9 @@ class _ProfilePageState extends State<ProfilePage> {
       // Email validation
       final email = _emailController.text.trim();
       if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid email address')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Invalid email address')));
         setState(() => _isSaving = false);
         return;
       }
@@ -341,9 +334,10 @@ class _ProfilePageState extends State<ProfilePage> {
       // Phone normalization
       final normalizedPhone = _normalizePhoneLocal(_phoneController.text);
       if (normalizedPhone == null) {
-
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Phone must be 14 digits (+88017XXXXXXXX)')),
+          const SnackBar(
+            content: Text('Phone must be 14 digits (+88017XXXXXXXX)'),
+          ),
         );
         setState(() => _isSaving = false);
         return;
@@ -351,47 +345,61 @@ class _ProfilePageState extends State<ProfilePage> {
 
       String? profileUrl = _profileImageUrl;
       String? signatureUrl = _signatureImageUrl;
-// Profile upload
+      // Profile upload
       if (_profileImage != null) {
         final bytes = await _profileImage!.readAsBytes();
         profileUrl = await _uploadToCloudinary(bytes);
         if (profileUrl == null) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to upload profile image')));
-          setState(() { _isSaving = false; });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to upload profile image')),
+          );
+          setState(() {
+            _isSaving = false;
+          });
           return;
         }
       } else if (_webProfileImageBytes != null) {
         profileUrl = await _uploadToCloudinary(_webProfileImageBytes!);
         if (profileUrl == null) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to upload profile image')));
-          setState(() { _isSaving = false; });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to upload profile image')),
+          );
+          setState(() {
+            _isSaving = false;
+          });
           return;
         }
       }
 
-// Signature upload
+      // Signature upload
       if (_signatureImage != null) {
         final bytes = await _signatureImage!.readAsBytes();
         signatureUrl = await _uploadToCloudinary(bytes);
         if (signatureUrl == null) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to upload signature')));
-          setState(() { _isSaving = false; });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to upload signature')),
+          );
+          setState(() {
+            _isSaving = false;
+          });
           return;
         }
       } else if (_webSignatureImageBytes != null) {
         signatureUrl = await _uploadToCloudinary(_webSignatureImageBytes!);
         if (signatureUrl == null) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to upload signature')));
-          setState(() { _isSaving = false; });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to upload signature')),
+          );
+          setState(() {
+            _isSaving = false;
+          });
           return;
         }
       }
-
-
 
       bool ok = false;
       try {
@@ -405,7 +413,6 @@ class _ProfilePageState extends State<ProfilePage> {
           _qualificationsController.text.trim(),
           signatureUrl,
         );
-
       } catch (err) {
         final emsg = err.toString();
         if (emsg.contains('Phone number already registered')) {
@@ -455,7 +462,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-
   // Navigate to rostering system
 
   // Added: show logout confirmation dialog and perform logout
@@ -473,18 +479,38 @@ class _ProfilePageState extends State<ProfilePage> {
           TextButton(
             onPressed: () {
               Navigator.pop(context); // close dialog
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Logged out successfully"),
-                  duration: Duration(seconds: 2),
-                ),
-              );
+              () async {
+                try {
+                  try {
+                    await client.auth.logout();
+                  } catch (_) {}
+                  // ignore: deprecated_member_use
+                  await client.authenticationKeyManager?.remove();
+                } catch (_) {}
 
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/', // HomePage route - adjust if different in your app
-                (route) => false, // remove all previous routes
-              );
+                try {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.remove('user_id');
+                  await prefs.remove('user_email');
+                  await prefs.remove('user_role');
+                } catch (_) {}
+
+                if (!mounted) return;
+                // ignore: use_build_context_synchronously
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Logged out successfully"),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+
+                Navigator.pushNamedAndRemoveUntil(
+                  // ignore: use_build_context_synchronously
+                  context,
+                  '/',
+                  (route) => false,
+                );
+              }();
             },
             child: const Text("Logout", style: TextStyle(color: Colors.red)),
           ),
@@ -508,7 +534,7 @@ class _ProfilePageState extends State<ProfilePage> {
     return CircleAvatar(
       radius: radius,
       backgroundImage: NetworkImage(url),
-      onBackgroundImageError: (_, __) {},
+      onBackgroundImageError: (_, _) {},
     );
   }
 
@@ -523,7 +549,10 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text("Doctor Profile",style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text(
+          "Doctor Profile",
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.white,
@@ -609,8 +638,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           const SizedBox(height: 6),
                           Row(
                             children: [
-
-                              const SizedBox(height: 6), Text(
+                              const SizedBox(height: 6),
+                              Text(
                                 _designationController.text,
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   color: Colors.white,
@@ -713,7 +742,6 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       ),
 
-
                       const SizedBox(height: 12),
 
                       // designation (moved before Qualifications)
@@ -788,13 +816,30 @@ class _ProfilePageState extends State<ProfilePage> {
                                     children: [
                                       const SizedBox(width: 12),
                                       _signatureImage != null
-                                          ? Image.file(_signatureImage!, height: 44, width: 120, fit: BoxFit.cover)
+                                          ? Image.file(
+                                              _signatureImage!,
+                                              height: 44,
+                                              width: 120,
+                                              fit: BoxFit.cover,
+                                            )
                                           : (_webSignatureImageBytes != null)
-                                          ? Image.memory(_webSignatureImageBytes!, height: 44, width: 120, fit: BoxFit.cover)
-                                          : (_signatureImageUrl != null && _signatureImageUrl!.startsWith('http'))
-                                          ? Image.network(_signatureImageUrl!, height: 44, width: 120, fit: BoxFit.contain)
+                                          ? Image.memory(
+                                              _webSignatureImageBytes!,
+                                              height: 44,
+                                              width: 120,
+                                              fit: BoxFit.cover,
+                                            )
+                                          : (_signatureImageUrl != null &&
+                                                _signatureImageUrl!.startsWith(
+                                                  'http',
+                                                ))
+                                          ? Image.network(
+                                              _signatureImageUrl!,
+                                              height: 44,
+                                              width: 120,
+                                              fit: BoxFit.contain,
+                                            )
                                           : Text('No signature uploaded'),
-
 
                                       const Spacer(),
                                       ElevatedButton.icon(
@@ -835,7 +880,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => Navigator.pushNamed(context, '/change-password'),
+                      onPressed: () =>
+                          Navigator.pushNamed(context, '/change-password'),
                       icon: const Icon(Icons.lock_reset, size: 20),
                       label: const Text("Change Password"),
                       style: OutlinedButton.styleFrom(
@@ -850,9 +896,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _isChanged && !_isSaving
-                          ? _saveProfile
-                          : null,
+                      onPressed: _isChanged && !_isSaving ? _saveProfile : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _isChanged
                             ? Colors.deepPurple

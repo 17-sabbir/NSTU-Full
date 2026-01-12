@@ -7,6 +7,8 @@ fields:
   userName: String?
   phone: String?
   bloodGroup: String?
-  allergies: String?
+  age: int?
   profilePictureUrl: String?
   token: String?
+  requiresEmailOtp: bool?
+  otpToken: String?

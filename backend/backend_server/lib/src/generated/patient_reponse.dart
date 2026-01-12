@@ -12,33 +12,37 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
 
-abstract class PatientProfileDto
+abstract class PatientProfile
     implements _i1.SerializableModel, _i1.ProtocolSerialization {
-  PatientProfileDto._({
+  PatientProfile._({
     required this.name,
     required this.email,
     required this.phone,
-    required this.bloodGroup,
-    required this.allergies,
+    this.bloodGroup,
+    this.dateOfBirth,
     this.profilePictureUrl,
   });
 
-  factory PatientProfileDto({
+  factory PatientProfile({
     required String name,
     required String email,
     required String phone,
-    required String bloodGroup,
-    required String allergies,
+    String? bloodGroup,
+    DateTime? dateOfBirth,
     String? profilePictureUrl,
-  }) = _PatientProfileDtoImpl;
+  }) = _PatientProfileImpl;
 
-  factory PatientProfileDto.fromJson(Map<String, dynamic> jsonSerialization) {
-    return PatientProfileDto(
+  factory PatientProfile.fromJson(Map<String, dynamic> jsonSerialization) {
+    return PatientProfile(
       name: jsonSerialization['name'] as String,
       email: jsonSerialization['email'] as String,
       phone: jsonSerialization['phone'] as String,
-      bloodGroup: jsonSerialization['bloodGroup'] as String,
-      allergies: jsonSerialization['allergies'] as String,
+      bloodGroup: jsonSerialization['bloodGroup'] as String?,
+      dateOfBirth: jsonSerialization['dateOfBirth'] == null
+          ? null
+          : _i1.DateTimeJsonExtension.fromJson(
+              jsonSerialization['dateOfBirth'],
+            ),
       profilePictureUrl: jsonSerialization['profilePictureUrl'] as String?,
     );
   }
@@ -49,32 +53,32 @@ abstract class PatientProfileDto
 
   String phone;
 
-  String bloodGroup;
+  String? bloodGroup;
 
-  String allergies;
+  DateTime? dateOfBirth;
 
   String? profilePictureUrl;
 
-  /// Returns a shallow copy of this [PatientProfileDto]
+  /// Returns a shallow copy of this [PatientProfile]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
-  PatientProfileDto copyWith({
+  PatientProfile copyWith({
     String? name,
     String? email,
     String? phone,
     String? bloodGroup,
-    String? allergies,
+    DateTime? dateOfBirth,
     String? profilePictureUrl,
   });
   @override
   Map<String, dynamic> toJson() {
     return {
-      '__className__': 'PatientProfileDto',
+      '__className__': 'PatientProfile',
       'name': name,
       'email': email,
       'phone': phone,
-      'bloodGroup': bloodGroup,
-      'allergies': allergies,
+      if (bloodGroup != null) 'bloodGroup': bloodGroup,
+      if (dateOfBirth != null) 'dateOfBirth': dateOfBirth?.toJson(),
       if (profilePictureUrl != null) 'profilePictureUrl': profilePictureUrl,
     };
   }
@@ -82,12 +86,12 @@ abstract class PatientProfileDto
   @override
   Map<String, dynamic> toJsonForProtocol() {
     return {
-      '__className__': 'PatientProfileDto',
+      '__className__': 'PatientProfile',
       'name': name,
       'email': email,
       'phone': phone,
-      'bloodGroup': bloodGroup,
-      'allergies': allergies,
+      if (bloodGroup != null) 'bloodGroup': bloodGroup,
+      if (dateOfBirth != null) 'dateOfBirth': dateOfBirth?.toJson(),
       if (profilePictureUrl != null) 'profilePictureUrl': profilePictureUrl,
     };
   }
@@ -100,41 +104,41 @@ abstract class PatientProfileDto
 
 class _Undefined {}
 
-class _PatientProfileDtoImpl extends PatientProfileDto {
-  _PatientProfileDtoImpl({
+class _PatientProfileImpl extends PatientProfile {
+  _PatientProfileImpl({
     required String name,
     required String email,
     required String phone,
-    required String bloodGroup,
-    required String allergies,
+    String? bloodGroup,
+    DateTime? dateOfBirth,
     String? profilePictureUrl,
   }) : super._(
          name: name,
          email: email,
          phone: phone,
          bloodGroup: bloodGroup,
-         allergies: allergies,
+         dateOfBirth: dateOfBirth,
          profilePictureUrl: profilePictureUrl,
        );
 
-  /// Returns a shallow copy of this [PatientProfileDto]
+  /// Returns a shallow copy of this [PatientProfile]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
-  PatientProfileDto copyWith({
+  PatientProfile copyWith({
     String? name,
     String? email,
     String? phone,
-    String? bloodGroup,
-    String? allergies,
+    Object? bloodGroup = _Undefined,
+    Object? dateOfBirth = _Undefined,
     Object? profilePictureUrl = _Undefined,
   }) {
-    return PatientProfileDto(
+    return PatientProfile(
       name: name ?? this.name,
       email: email ?? this.email,
       phone: phone ?? this.phone,
-      bloodGroup: bloodGroup ?? this.bloodGroup,
-      allergies: allergies ?? this.allergies,
+      bloodGroup: bloodGroup is String? ? bloodGroup : this.bloodGroup,
+      dateOfBirth: dateOfBirth is DateTime? ? dateOfBirth : this.dateOfBirth,
       profilePictureUrl: profilePictureUrl is String?
           ? profilePictureUrl
           : this.profilePictureUrl,

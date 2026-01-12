@@ -1,5 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart'; // Import from package
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class HomePage extends StatefulWidget {
@@ -20,6 +25,18 @@ class _HomePageState extends State<HomePage> {
 
   // New: control password visibility
   bool _obscurePassword = true;
+
+  Future<String> _getOrCreateDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString('device_id');
+    if (existing != null && existing.trim().isNotEmpty) return existing.trim();
+
+    final rand = Random.secure();
+    final bytes = List<int>.generate(16, (_) => rand.nextInt(256));
+    final id = base64UrlEncode(bytes);
+    await prefs.setString('device_id', id);
+    return id;
+  }
 
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
@@ -92,13 +109,44 @@ class _HomePageState extends State<HomePage> {
       final password = _passwordController.text.trim();
 
       try {
+        final deviceId = await _getOrCreateDeviceId();
         // Use the client that's initialized in the package
         // The 'client' variable is available from backend_client package
-        final response = await client.auth.login(email, password);
+        final response = await client.auth.login(
+          email,
+          password,
+          deviceId: deviceId,
+        );
 
         if (!response.success) {
           _showDialog('Login Failed', response.error ?? 'Unknown error');
+        } else if (response.requiresEmailOtp == true &&
+            (response.otpToken?.isNotEmpty ?? false)) {
+          // Login requires email OTP only when:
+          // - user explicitly logged out before, or
+          // - first login on this device/browser.
+          // IMPORTANT: stop the page-level loading spinner, otherwise the dialog
+          // buttons are disabled (since they were wired to _isLoading).
+          if (mounted) setState(() => _isLoading = false);
+          await _showLoginOtpDialog(
+            email: email,
+            otpToken: response.otpToken!,
+            password: password,
+            deviceId: deviceId,
+          );
         } else {
+          // Save auth token so Serverpod sends it on every request.
+          try {
+            final token = response.token;
+            if (token != null && token.isNotEmpty) {
+              // ignore: deprecated_member_use
+              await client.authenticationKeyManager?.put(token);
+            }
+          } catch (e) {
+            // non-fatal; user can still navigate but authenticated calls may fail
+            debugPrint('Failed to persist auth token: $e');
+          }
+
           // Use profile data included in LoginResponse to avoid an extra DB query
           final name = response.userName ?? '';
           final profilePictureUrl = response.profilePictureUrl;
@@ -125,11 +173,13 @@ class _HomePageState extends State<HomePage> {
             email: email,
             phone: response.phone,
             bloodGroup: response.bloodGroup,
-            allergies: response.allergies,
+            allergies: response.age?.toString(),
             profilePictureUrl: profilePictureUrl,
           );
         }
       } catch (e) {
+        debugPrint('Login error: $e');
+
         _showDialog('Login Error', 'An error occurred during login: $e');
       } finally {
         setState(() {
@@ -176,7 +226,231 @@ class _HomePageState extends State<HomePage> {
       default:
         _showDialog('Unknown Role', 'Role $role not recognized');
     }
+  }
 
+  Future<void> _showLoginOtpDialog({
+    required String email,
+    required String otpToken,
+    required String password,
+    required String deviceId,
+  }) async {
+    final ctrl = TextEditingController();
+
+    int countdownSeconds = 120;
+    bool canResend = false;
+    bool verifying = false;
+    bool resending = false;
+    String currentOtpToken = otpToken;
+    Timer? timer;
+
+    String formatTime(int totalSeconds) {
+      final minutes = totalSeconds ~/ 60;
+      final seconds = totalSeconds % 60;
+      return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+
+    void startTimer(StateSetter setStateDialog) {
+      timer?.cancel();
+      countdownSeconds = 120;
+      canResend = false;
+      timer = Timer.periodic(const Duration(seconds: 1), (t) {
+        if (!mounted) {
+          t.cancel();
+          return;
+        }
+        if (countdownSeconds <= 1) {
+          t.cancel();
+          setStateDialog(() {
+            countdownSeconds = 0;
+            canResend = true;
+          });
+        } else {
+          setStateDialog(() {
+            countdownSeconds -= 1;
+          });
+        }
+      });
+    }
+
+    Future<void> verify(StateSetter setStateDialog) async {
+      final otp = ctrl.text.trim();
+      if (!RegExp(r'^\d{6}$').hasMatch(otp)) {
+        _showDialog('Invalid Code', 'Enter the 6-digit code from your email.');
+        return;
+      }
+      if (verifying) return;
+
+      setStateDialog(() => verifying = true);
+      try {
+        final res = await client.auth.verifyLoginOtp(
+          email,
+          otp,
+          currentOtpToken,
+          deviceId: deviceId,
+        );
+        if (res.success != true) {
+          _showDialog(
+            'Verification Failed',
+            res.error?.toString() ?? 'Invalid or expired code',
+          );
+          return;
+        }
+
+        final token = res.token;
+        if (token != null && token.isNotEmpty) {
+          // ignore: deprecated_member_use
+          await client.authenticationKeyManager?.put(token);
+        }
+
+        // Persist identifiers for dashboards that rely on them.
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          if (res.userId != null && (res.userId?.isNotEmpty ?? false)) {
+            await prefs.setString('user_id', res.userId!);
+          }
+          if (email.isNotEmpty) {
+            await prefs.setString('user_email', email);
+          }
+        } catch (e) {
+          debugPrint('Failed to persist login prefs: $e');
+        }
+
+        timer?.cancel();
+        if (!mounted) return;
+        Navigator.of(context).pop();
+
+        _navigateToDashboard(
+          role: res.role ?? '',
+          name: res.userName ?? '',
+          email: email,
+          phone: res.phone,
+        );
+      } catch (e) {
+        _showDialog('Error', 'OTP verification failed: $e');
+      } finally {
+        if (mounted) setStateDialog(() => verifying = false);
+      }
+    }
+
+    Future<void> resend(StateSetter setStateDialog) async {
+      if (!canResend || resending) return;
+      setStateDialog(() => resending = true);
+      try {
+        final response = await client.auth.login(
+          email,
+          password,
+          deviceId: deviceId,
+        );
+        if (response.success != true || response.otpToken == null) {
+          _showDialog(
+            'Resend Failed',
+            response.error?.toString() ?? 'Failed to resend code',
+          );
+          return;
+        }
+        setStateDialog(() {
+          currentOtpToken = response.otpToken!;
+          ctrl.clear();
+        });
+        startTimer(setStateDialog);
+      } catch (e) {
+        _showDialog('Resend Failed', 'Failed to resend code: $e');
+      } finally {
+        if (mounted) setStateDialog(() => resending = false);
+      }
+    }
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        bool started = false;
+        return AlertDialog(
+          title: const Text('Verify Email'),
+          content: StatefulBuilder(
+            builder: (context, setStateDialog) {
+              if (!started) {
+                started = true;
+                startTimer(setStateDialog);
+              }
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('A 6-digit OTP has been sent to $email.'),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Time remaining:'),
+                      Text(
+                        formatTime(countdownSeconds),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: canResend ? Colors.red : Colors.teal,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: ctrl,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      labelText: 'Enter OTP',
+                      prefixIcon: Icon(Icons.key),
+                      counterText: ' ',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: canResend && !resending
+                          ? () => resend(setStateDialog)
+                          : null,
+                      child: Text(
+                        canResend
+                            ? (resending ? 'Resending...' : 'RESEND OTP')
+                            : 'Resend available in ${formatTime(countdownSeconds)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: canResend ? Colors.teal : Colors.grey,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: verifying
+                  ? null
+                  : () {
+                      timer?.cancel();
+                      Navigator.of(dialogContext).pop();
+                    },
+              child: const Text('Cancel'),
+            ),
+            StatefulBuilder(
+              builder: (context, setStateDialog) {
+                return TextButton(
+                  onPressed: verifying ? null : () => verify(setStateDialog),
+                  child: Text(verifying ? 'VERIFYING...' : 'VERIFY'),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    timer?.cancel();
   }
 
   @override
@@ -229,7 +503,7 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 20),
                 // Title
                 Text(
-                  'Dishari',//e-Campus care //
+                  'Dishari', //e-Campus care //
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: 'Poppins',
@@ -295,10 +569,13 @@ class _HomePageState extends State<HomePage> {
                     // Suffix icon to toggle password visibility
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                         color: Colors.grey[600],
                       ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       vertical: 18,

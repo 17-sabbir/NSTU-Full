@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
 
 enum UploadStatus { idle, success, failure }
@@ -63,9 +62,7 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
   // ১. প্রেসক্রিপশন লিস্ট আনা
   Future<void> _fetchPrescriptions() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final userId = int.parse(prefs.getString('user_id') ?? '0');
-      final list = await client.patient.getMyPrescriptionList(userId);
+      final list = await client.patient.getMyPrescriptionList(0);
       _prescriptions = list;
     } catch (e) {
       debugPrint("Prescription fetch error: $e");
@@ -75,10 +72,8 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
   // ২. আগের আপলোড করা রিপোর্টগুলো আনা (Serverpod backend থেকে)
   Future<void> _fetchMyPastReports() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final userId = int.parse(prefs.getString('user_id') ?? '0');
       // দ্রষ্টব্য: আপনার ব্যাকএন্ডে এই মেথডটি থাকতে হবে যা PatientExternalReport রিটার্ন করে
-      final reports = await client.patient.getMyExternalReports(userId);
+      final reports = await client.patient.getMyExternalReports(0);
       _myPastReports = reports;
     } catch (e) {
       debugPrint("Past reports fetch error: $e");
@@ -136,9 +131,6 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
 
     setState(() => _isUploading = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final userId = int.parse(prefs.getString('user_id') ?? '0');
-
       // Prefer in-memory bytes if available (works on web). Otherwise read from file.
       final bytes = _fileBytes ?? await _selectedFile!.readAsBytes();
 
@@ -146,6 +138,7 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
       // Serverpod default request limit is ~512KB; use 500KB client-side cap to avoid 413 errors.
       const int maxBytes = 2 * 1024 * 1024;
       if (bytes.lengthInBytes > maxBytes) {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -177,7 +170,7 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
       try {
         // assign to outer variable (don't redeclare)
         success = await client.patient.finalizeReportUpload(
-          patientId: userId,
+          patientId: 0,
           prescriptionId: replacePrescriptionId ?? _selectedPrescriptionId!,
           reportType: _selectedType ?? "Other",
           base64Data: base64Data,
@@ -187,6 +180,7 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
         // network/backend error
         debugPrint('finalizeReportUpload exception: $e');
         setState(() => _uploadStatus = UploadStatus.failure);
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Upload error: $e'),
@@ -201,6 +195,7 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
         // Server returned false or unexpected result
         debugPrint('finalizeReportUpload returned false');
         setState(() => _uploadStatus = UploadStatus.failure);
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Upload failed: server rejected the file'),
@@ -259,6 +254,7 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
         message = 'Invalid file format.';
       }
       setState(() => _uploadStatus = UploadStatus.failure);
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Upload failed: $message'),
@@ -435,6 +431,7 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
                           replacePrescriptionId: report.prescriptionId,
                         );
                       } else {
+                        // ignore: use_build_context_synchronously
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(

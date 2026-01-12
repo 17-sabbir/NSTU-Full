@@ -323,6 +323,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
       final doctorId = int.tryParse(prefs.getString('user_id') ?? '');
 
       if (doctorId == null) {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Doctor ID not found')));
         return;
       }
@@ -386,10 +387,12 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
       );
 
       if (resultId > 0) {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Prescription saved successfully!')));
         _markSaved();
       }
     } catch (e) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
@@ -1180,6 +1183,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                           ? Image.network(
                         _doctorSignatureUrl!,
                         fit: BoxFit.contain,
+                        // ignore: unnecessary_underscores
                         errorBuilder: (_, __, ___) => const Center(
                           child: Text('Invalid signature'),
                         ),

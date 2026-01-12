@@ -22,9 +22,11 @@ abstract class LoginResponse
     this.userName,
     this.phone,
     this.bloodGroup,
-    this.allergies,
+    this.age,
     this.profilePictureUrl,
     this.token,
+    this.requiresEmailOtp,
+    this.otpToken,
   });
 
   factory LoginResponse({
@@ -35,9 +37,11 @@ abstract class LoginResponse
     String? userName,
     String? phone,
     String? bloodGroup,
-    String? allergies,
+    int? age,
     String? profilePictureUrl,
     String? token,
+    bool? requiresEmailOtp,
+    String? otpToken,
   }) = _LoginResponseImpl;
 
   factory LoginResponse.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -49,9 +53,11 @@ abstract class LoginResponse
       userName: jsonSerialization['userName'] as String?,
       phone: jsonSerialization['phone'] as String?,
       bloodGroup: jsonSerialization['bloodGroup'] as String?,
-      allergies: jsonSerialization['allergies'] as String?,
+      age: jsonSerialization['age'] as int?,
       profilePictureUrl: jsonSerialization['profilePictureUrl'] as String?,
       token: jsonSerialization['token'] as String?,
+      requiresEmailOtp: jsonSerialization['requiresEmailOtp'] as bool?,
+      otpToken: jsonSerialization['otpToken'] as String?,
     );
   }
 
@@ -69,11 +75,15 @@ abstract class LoginResponse
 
   String? bloodGroup;
 
-  String? allergies;
+  int? age;
 
   String? profilePictureUrl;
 
   String? token;
+
+  bool? requiresEmailOtp;
+
+  String? otpToken;
 
   /// Returns a shallow copy of this [LoginResponse]
   /// with some or all fields replaced by the given arguments.
@@ -86,9 +96,11 @@ abstract class LoginResponse
     String? userName,
     String? phone,
     String? bloodGroup,
-    String? allergies,
+    int? age,
     String? profilePictureUrl,
     String? token,
+    bool? requiresEmailOtp,
+    String? otpToken,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -101,9 +113,11 @@ abstract class LoginResponse
       if (userName != null) 'userName': userName,
       if (phone != null) 'phone': phone,
       if (bloodGroup != null) 'bloodGroup': bloodGroup,
-      if (allergies != null) 'allergies': allergies,
+      if (age != null) 'age': age,
       if (profilePictureUrl != null) 'profilePictureUrl': profilePictureUrl,
       if (token != null) 'token': token,
+      if (requiresEmailOtp != null) 'requiresEmailOtp': requiresEmailOtp,
+      if (otpToken != null) 'otpToken': otpToken,
     };
   }
 
@@ -118,9 +132,11 @@ abstract class LoginResponse
       if (userName != null) 'userName': userName,
       if (phone != null) 'phone': phone,
       if (bloodGroup != null) 'bloodGroup': bloodGroup,
-      if (allergies != null) 'allergies': allergies,
+      if (age != null) 'age': age,
       if (profilePictureUrl != null) 'profilePictureUrl': profilePictureUrl,
       if (token != null) 'token': token,
+      if (requiresEmailOtp != null) 'requiresEmailOtp': requiresEmailOtp,
+      if (otpToken != null) 'otpToken': otpToken,
     };
   }
 
@@ -141,9 +157,11 @@ class _LoginResponseImpl extends LoginResponse {
     String? userName,
     String? phone,
     String? bloodGroup,
-    String? allergies,
+    int? age,
     String? profilePictureUrl,
     String? token,
+    bool? requiresEmailOtp,
+    String? otpToken,
   }) : super._(
          success: success,
          error: error,
@@ -152,9 +170,11 @@ class _LoginResponseImpl extends LoginResponse {
          userName: userName,
          phone: phone,
          bloodGroup: bloodGroup,
-         allergies: allergies,
+         age: age,
          profilePictureUrl: profilePictureUrl,
          token: token,
+         requiresEmailOtp: requiresEmailOtp,
+         otpToken: otpToken,
        );
 
   /// Returns a shallow copy of this [LoginResponse]
@@ -169,9 +189,11 @@ class _LoginResponseImpl extends LoginResponse {
     Object? userName = _Undefined,
     Object? phone = _Undefined,
     Object? bloodGroup = _Undefined,
-    Object? allergies = _Undefined,
+    Object? age = _Undefined,
     Object? profilePictureUrl = _Undefined,
     Object? token = _Undefined,
+    Object? requiresEmailOtp = _Undefined,
+    Object? otpToken = _Undefined,
   }) {
     return LoginResponse(
       success: success ?? this.success,
@@ -181,11 +203,15 @@ class _LoginResponseImpl extends LoginResponse {
       userName: userName is String? ? userName : this.userName,
       phone: phone is String? ? phone : this.phone,
       bloodGroup: bloodGroup is String? ? bloodGroup : this.bloodGroup,
-      allergies: allergies is String? ? allergies : this.allergies,
+      age: age is int? ? age : this.age,
       profilePictureUrl: profilePictureUrl is String?
           ? profilePictureUrl
           : this.profilePictureUrl,
       token: token is String? ? token : this.token,
+      requiresEmailOtp: requiresEmailOtp is bool?
+          ? requiresEmailOtp
+          : this.requiresEmailOtp,
+      otpToken: otpToken is String? ? otpToken : this.otpToken,
     );
   }
 }

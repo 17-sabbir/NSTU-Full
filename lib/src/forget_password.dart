@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:backend_client/backend_client.dart';
 
 class ForgetPassword extends StatefulWidget {
-  const ForgetPassword({Key? key}) : super(key: key);
+  const ForgetPassword({super.key});
 
   @override
   State<ForgetPassword> createState() => _ForgetPasswordState();

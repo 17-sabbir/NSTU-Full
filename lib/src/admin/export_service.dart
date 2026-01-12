@@ -1,13 +1,9 @@
 import 'dart:math' as math;
 
-import 'package:http/http.dart' as http;
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
-import 'dart:convert';
 import 'package:printing/printing.dart';
 import 'package:backend_client/backend_client.dart';
-import 'package:file_saver/file_saver.dart';
-import 'package:flutter/foundation.dart';
 class ExportService {
   static Future<void> exportDashboardAsPDF({
     required DashboardAnalytics analytics,

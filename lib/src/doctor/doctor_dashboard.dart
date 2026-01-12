@@ -21,7 +21,6 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 
   // Reordered pages: Patients -> Create Prescription -> Review Reports -> Profile
   late final List<Widget> _pages = [
-
     const PatientRecordsPage(),
     const PrescriptionPage(),
     TestReportsView(doctorId: _doctorId),
@@ -39,9 +38,18 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
       _verifyDoctor();
     });
   }
+
   int _doctorId = 0;
   Future<void> _verifyDoctor() async {
     try {
+      // ignore: deprecated_member_use
+      final authKey = await client.authenticationKeyManager?.get();
+      if (authKey == null || authKey.isEmpty) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final storedUserId = prefs.getString('user_id');
       if (!mounted) return;
@@ -53,7 +61,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 
       final int? numericId = int.tryParse(storedUserId);
 
-      if (numericId ==null ) {
+      if (numericId == null) {
         if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/');
         return;
@@ -61,7 +69,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
       _doctorId = numericId;
       String role = '';
       try {
-        role = (await client.patient.getUserRole(numericId)).toUpperCase();
+        role = (await client.patient.getUserRole(0)).toUpperCase();
       } catch (e) {
         debugPrint('Failed to fetch user role: $e');
       }
@@ -157,10 +165,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
               icon: Icon(Icons.upload_file),
               label: "Review Reports",
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              label: "Profile",
-            ),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
           ],
         ),
       ),

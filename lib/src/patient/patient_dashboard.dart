@@ -67,6 +67,14 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
   Future<void> _verifyAndFetch() async {
     try {
+      // ignore: deprecated_member_use
+      final authKey = await client.authenticationKeyManager?.get();
+      if (authKey == null || authKey.isEmpty) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final storedUserId = prefs.getString('user_id');
 
@@ -85,7 +93,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
       String role = '';
       try {
-        role = (await client.patient.getUserRole(numericId)).toUpperCase();
+        role = (await client.patient.getUserRole(0)).toUpperCase();
       } catch (e) {
         debugPrint('Failed to fetch user role: $e');
       }
@@ -135,7 +143,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
         return;
       }
 
-      final profile = await client.patient.getPatientProfile(numericId);
+      final profile = await client.patient.getPatientProfile(0);
 
       if (profile != null) {
         setState(() {
@@ -400,11 +408,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                           color: roleColor.withOpacity(0.1),
                         ),
                         child: Center(
-                          child: Icon(
-                            Icons.person,
-                            color: roleColor,
-                            size: 26,
-                          ),
+                          child: Icon(Icons.person, color: roleColor, size: 26),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -444,8 +448,10 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
                       // Right: small shift chip
                       Container(
-                        padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: roleColor.withOpacity(0.12),
                           borderRadius: BorderRadius.circular(20),
@@ -469,7 +475,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
       );
     }
 
-
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: SafeArea(
@@ -484,7 +489,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
               buildHeader(),
 
               SizedBox(height: responsiveHeight(20)),
-
 
               const Text(
                 "On Duty Medical Staff",

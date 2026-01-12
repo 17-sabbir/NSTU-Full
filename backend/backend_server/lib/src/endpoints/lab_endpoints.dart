@@ -5,6 +5,8 @@ import 'dart:typed_data';
 
 import 'cloudinary_upload.dart';
 
+import '../utils/auth_user.dart';
+
 class LabEndpoint extends Endpoint {
   /// Fetch all lab tests using your raw SQL schema
   Future<List<LabTests>> getAllLabTests(Session session) async {
@@ -34,14 +36,15 @@ class LabEndpoint extends Endpoint {
       return [];
     }
   }
+
   //result upload er jonnne user er test create
   Future<bool> createTestResult(
-      Session session, {
-        required int testId,
-        required String patientName,
-        required String mobileNumber,
-        String patientType = 'STUDENT',
-      }) async {
+    Session session, {
+    required int testId,
+    required String patientName,
+    required String mobileNumber,
+    String patientType = 'STUDENT',
+  }) async {
     try {
       await session.db.unsafeExecute(
         '''
@@ -119,15 +122,13 @@ class LabEndpoint extends Endpoint {
     }
   }
 
-
-
   /// Uploads lab result (PDF or Image) to Cloudinary and updates DB
   Future<String?> attachResultFileCloudinary(
-      Session session, {
-        required int resultId,
-        required String base64Data,
-        required String fileName,
-      }) async {
+    Session session, {
+    required int resultId,
+    required String base64Data,
+    required String fileName,
+  }) async {
     try {
       // ফাইল এক্সটেনশন চেক করে PDF কি না তা নির্ধারণ করা
       final bool isPdf = fileName.toLowerCase().endsWith('.pdf');
@@ -165,7 +166,6 @@ class LabEndpoint extends Endpoint {
       return null;
     }
   }
-
 
   /// Dummy SMS sender: logs message to server logs (no real SMS)
   Future<bool> sendDummySms(Session session,
@@ -205,11 +205,11 @@ class LabEndpoint extends Endpoint {
   /// Submit or resubmit result + dummy SMS notification
   /// Submit result: upload file to Cloudinary, save URL and timestamp
   Future<bool> submitResultWithFile(
-      Session session, {
-        required int resultId,
-        required String base64Data,
-        required String fileName,
-      }) async {
+    Session session, {
+    required int resultId,
+    required String base64Data,
+    required String fileName,
+  }) async {
     try {
       // Upload file to Cloudinary
       final bool isPdf = fileName.toLowerCase().endsWith('.pdf');
@@ -255,11 +255,11 @@ class LabEndpoint extends Endpoint {
 
       return true;
     } catch (e, st) {
-      session.log('Submit with file failed: $e', level: LogLevel.error, stackTrace: st);
+      session.log('Submit with file failed: $e',
+          level: LogLevel.error, stackTrace: st);
       return false;
     }
   }
-
 
 //Fetch all results (list screen)
   Future<List<TestResult>> getAllTestResults(Session session) async {
@@ -292,10 +292,10 @@ class LabEndpoint extends Endpoint {
     }
   }
 
-
   /// Fetch Lab Staff profile by userId
   Future<StaffProfileDto?> getStaffProfile(Session session, int userId) async {
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       final result = await session.db.unsafeQuery(
         '''
         SELECT 
@@ -309,7 +309,7 @@ class LabEndpoint extends Endpoint {
         LEFT JOIN staff_profiles s ON s.user_id = u.user_id
         WHERE u.user_id = @userId LIMIT 1
         ''',
-        parameters: QueryParameters.named({'userId': userId}),
+        parameters: QueryParameters.named({'userId': resolvedUserId}),
       );
 
       if (result.isEmpty) return null;
@@ -325,23 +325,25 @@ class LabEndpoint extends Endpoint {
         profilePictureUrl: row['profile_picture_url'] as String?,
       );
     } catch (e, stack) {
-      session.log('Error fetching staff profile: $e', level: LogLevel.error, stackTrace: stack);
+      session.log('Error fetching staff profile: $e',
+          level: LogLevel.error, stackTrace: stack);
       return null;
     }
   }
 
   /// Update Staff Profile (Users + Staff_Profiles tables)
   Future<bool> updateStaffProfile(
-      Session session, {
-        required int userId,
-        required String name,
-        required String phone,
-        required String email,
-        required String designation,
-        required String qualification,
-        String? profilePictureUrl,
-      }) async {
+    Session session, {
+    required int userId,
+    required String name,
+    required String phone,
+    required String email,
+    required String designation,
+    required String qualification,
+    String? profilePictureUrl,
+  }) async {
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       return await session.db.transaction((transaction) async {
         // 1. Update Core User Info
         await session.db.unsafeExecute(
@@ -354,7 +356,7 @@ class LabEndpoint extends Endpoint {
           WHERE user_id = @id
           ''',
           parameters: QueryParameters.named({
-            'id': userId,
+            'id': resolvedUserId,
             'name': name,
             'phone': phone,
             'email': email,
@@ -373,7 +375,7 @@ class LabEndpoint extends Endpoint {
             qualification = EXCLUDED.qualification
           ''',
           parameters: QueryParameters.named({
-            'id': userId,
+            'id': resolvedUserId,
             'des': designation,
             'qual': qualification,
           }),
@@ -382,16 +384,17 @@ class LabEndpoint extends Endpoint {
         return true;
       });
     } catch (e, stack) {
-      session.log('Failed to update staff profile: $e', level: LogLevel.error, stackTrace: stack);
+      session.log('Failed to update staff profile: $e',
+          level: LogLevel.error, stackTrace: stack);
       return false;
     }
   }
 
   /// স্টাফ প্রোফাইল ইমেজ আপলোড
   Future<String?> uploadProfileImage(
-      Session session,
-      String base64Data,
-      ) async {
+    Session session,
+    String base64Data,
+  ) async {
     // সরাসরি ক্লাউডিনারি সার্ভিস কল
     return await CloudinaryUpload.uploadFile(
       base64Data: base64Data,
@@ -399,7 +402,6 @@ class LabEndpoint extends Endpoint {
       isPdf: false,
     );
   }
-
 
   // --- Type Safety Helpers ---
 
@@ -445,8 +447,12 @@ class LabEndpoint extends Endpoint {
     WHERE created_at::date = (CURRENT_DATE - INTERVAL '1 day')::date
   ''');
 
-    final t = todayRows.isNotEmpty ? todayRows.first.toColumnMap() : <String, dynamic>{};
-    final y = yesterdayRows.isNotEmpty ? yesterdayRows.first.toColumnMap() : <String, dynamic>{};
+    final t = todayRows.isNotEmpty
+        ? todayRows.first.toColumnMap()
+        : <String, dynamic>{};
+    final y = yesterdayRows.isNotEmpty
+        ? yesterdayRows.first.toColumnMap()
+        : <String, dynamic>{};
 
     return LabToday(
       todayTotal: (t['total'] as int?) ?? 0,
@@ -489,7 +495,6 @@ class LabEndpoint extends Endpoint {
       );
     }).toList();
   }
-
 
   double _toDouble(dynamic value) {
     if (value == null) return 0.0;

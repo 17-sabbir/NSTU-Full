@@ -1,17 +1,19 @@
 import 'package:serverpod/serverpod.dart';
 import '../generated/protocol.dart';
+import '../utils/auth_user.dart';
 
 class NotificationEndpoint extends Endpoint {
-
+  @override
+  bool get requireLogin => true;
 
   // 1. Create Notification (Updated to accept userId if needed,
   // or you can keep passing it from where you trigger this)
   Future<bool> createNotification(
-      Session session, {
-        required int userId, // Passed explicitly
-        required String title,
-        required String message,
-      }) async {
+    Session session, {
+    required int userId, // Passed explicitly
+    required String title,
+    required String message,
+  }) async {
     try {
       await session.db.unsafeExecute(
         '''
@@ -37,10 +39,11 @@ class NotificationEndpoint extends Endpoint {
 
   // 2. Get Notifications (Accepts userId)
   Future<List<NotificationInfo>> getMyNotifications(
-      Session session, {
-        required int limit,
-        required int userId, // <--- Added parameter
-      }) async {
+    Session session, {
+    required int limit,
+    required int userId, // <--- Added parameter
+  }) async {
+    final resolvedUserId = requireAuthenticatedUserId(session);
     final rows = await session.db.unsafeQuery(
       '''
       SELECT notification_id, user_id, title, message, is_read, created_at
@@ -49,7 +52,7 @@ class NotificationEndpoint extends Endpoint {
       ORDER BY created_at DESC
       LIMIT @lim
       ''',
-      parameters: QueryParameters.named({'uid': userId, 'lim': limit}),
+      parameters: QueryParameters.named({'uid': resolvedUserId, 'lim': limit}),
     );
 
     return rows.map((r) {
@@ -67,9 +70,10 @@ class NotificationEndpoint extends Endpoint {
 
   // 3. Get Counts (Accepts userId)
   Future<Map<String, int>> getMyNotificationCounts(
-      Session session, {
-        required int userId, // <--- Added parameter
-      }) async {
+    Session session, {
+    required int userId, // <--- Added parameter
+  }) async {
+    final resolvedUserId = requireAuthenticatedUserId(session);
     final rows = await session.db.unsafeQuery(
       '''
       SELECT
@@ -78,7 +82,7 @@ class NotificationEndpoint extends Endpoint {
       FROM notifications
       WHERE user_id = @uid
       ''',
-      parameters: QueryParameters.named({'uid': userId}),
+      parameters: QueryParameters.named({'uid': resolvedUserId}),
     );
 
     if (rows.isEmpty) return {'unread': 0, 'read': 0};
@@ -92,10 +96,11 @@ class NotificationEndpoint extends Endpoint {
 
   // 4. Get By ID (Accepts userId for security check)
   Future<NotificationInfo?> getNotificationById(
-      Session session, {
-        required int notificationId,
-        required int userId, // <--- Added parameter
-      }) async {
+    Session session, {
+    required int notificationId,
+    required int userId, // <--- Added parameter
+  }) async {
+    final resolvedUserId = requireAuthenticatedUserId(session);
     final rows = await session.db.unsafeQuery(
       '''
       SELECT notification_id, user_id, title, message, is_read, created_at
@@ -103,7 +108,8 @@ class NotificationEndpoint extends Endpoint {
       WHERE notification_id = @nid AND user_id = @uid
       LIMIT 1
       ''',
-      parameters: QueryParameters.named({'nid': notificationId, 'uid': userId}),
+      parameters:
+          QueryParameters.named({'nid': notificationId, 'uid': resolvedUserId}),
     );
 
     if (rows.isEmpty) return null;
@@ -121,10 +127,11 @@ class NotificationEndpoint extends Endpoint {
 
   // 5. Mark One Read (Accepts userId)
   Future<bool> markAsRead(
-      Session session, {
-        required int notificationId,
-        required int userId, // <--- Added parameter
-      }) async {
+    Session session, {
+    required int notificationId,
+    required int userId, // <--- Added parameter
+  }) async {
+    final resolvedUserId = requireAuthenticatedUserId(session);
     try {
       await session.db.unsafeExecute(
         '''
@@ -132,7 +139,8 @@ class NotificationEndpoint extends Endpoint {
         SET is_read = TRUE
         WHERE notification_id = @nid AND user_id = @uid
         ''',
-        parameters: QueryParameters.named({'nid': notificationId, 'uid': userId}),
+        parameters: QueryParameters.named(
+            {'nid': notificationId, 'uid': resolvedUserId}),
       );
       return true;
     } catch (e, st) {
@@ -147,9 +155,10 @@ class NotificationEndpoint extends Endpoint {
 
   // 6. Mark All Read (Accepts userId)
   Future<bool> markAllAsRead(
-      Session session, {
-        required int userId, // <--- Added parameter
-      }) async {
+    Session session, {
+    required int userId, // <--- Added parameter
+  }) async {
+    final resolvedUserId = requireAuthenticatedUserId(session);
     try {
       await session.db.unsafeExecute(
         '''
@@ -157,7 +166,7 @@ class NotificationEndpoint extends Endpoint {
         SET is_read = TRUE
         WHERE user_id = @uid AND is_read = FALSE
         ''',
-        parameters: QueryParameters.named({'uid': userId}),
+        parameters: QueryParameters.named({'uid': resolvedUserId}),
       );
       return true;
     } catch (e, st) {
