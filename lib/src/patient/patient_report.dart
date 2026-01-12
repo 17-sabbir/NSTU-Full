@@ -57,9 +57,14 @@ class _PatientReportsState extends State<PatientReports> {
   Future<void> downloadReportFromLink(String url) async {
     String downloadUrl = url;
 
-    // ✅ Only apply fl_attachment for IMAGES
-    if (!url.toLowerCase().endsWith('.pdf') &&
-        url.contains('/image/upload/')) {
+    if (url.contains('/raw/upload/')) {
+      //  PDF / raw → attachment allowed
+      downloadUrl = url.replaceFirst(
+        '/raw/upload/',
+        '/raw/upload/fl_attachment/',
+      );
+    } else if (url.contains('/image/upload/')) {
+      //  image → attachment
       downloadUrl = url.replaceFirst(
         '/image/upload/',
         '/image/upload/fl_attachment/',
@@ -71,6 +76,7 @@ class _PatientReportsState extends State<PatientReports> {
       mode: LaunchMode.externalApplication,
     );
   }
+
 
 
   @override

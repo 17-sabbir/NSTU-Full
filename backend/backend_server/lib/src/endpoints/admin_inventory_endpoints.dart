@@ -1,7 +1,6 @@
 import 'package:serverpod/database.dart';
 import 'package:serverpod/protocol.dart';
 import 'package:serverpod/server.dart';
-
 import '../generated/InventoryCategory.dart';
 import '../generated/InventoryItemInfo.dart';
 import '../generated/inventory_audit_log.dart';
@@ -388,7 +387,7 @@ class AdminInventoryEndpoints extends Endpoint{
       return result.map((r) {
         final m = r.toColumnMap();
         return InventoryTransactionInfo(
-          itemId: m['item_id'] as int,                // ✅ Now it exists in query
+          itemId: m['item_id'] as int,
           transactionType: m['transaction_type'] as String,
           quantity: m['quantity'] as int,
           createdAt: m['created_at'] as DateTime,
@@ -436,14 +435,14 @@ class AdminInventoryEndpoints extends Endpoint{
         return InventoryAuditLog(
           id: m['audit_id'] as int,
           action: m['action'] as String,
-          oldQuantity: m['old_quantity'] as int?, // YAML এ যোগ করার পর কাজ করবে
-          newQuantity: m['new_quantity'] as int?, // YAML এ যোগ করার পর কাজ করবে
+          oldQuantity: m['old_quantity'] as int?,
+          newQuantity: m['new_quantity'] as int?,
           userName: m['user_name'] as String? ?? 'System',
-          timestamp: changedAt ?? DateTime.now(), // String এর বদলে DateTime দিন
+          timestamp: changedAt ?? DateTime.now(),
         );
       }).toList();
 
-    } catch (e) { // 'st' সরিয়ে দেওয়া হয়েছে কারণ এটি ব্যবহৃত হচ্ছিল না
+    } catch (e) { //
       session.log('getInventoryAuditLogs failed: $e', level: LogLevel.error);
       return [];
     }

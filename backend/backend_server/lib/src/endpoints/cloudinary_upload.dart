@@ -16,7 +16,7 @@ class CloudinaryUpload {
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-      // সিগনেচার জেনারেশন
+      // সিগনেচার জেনারেশন for
       final params = 'folder=$folder&timestamp=$timestamp$apiSecret';
       final signature = sha1.convert(utf8.encode(params)).toString();
 
@@ -24,7 +24,7 @@ class CloudinaryUpload {
       final String filePrefix =
           isPdf ? 'data:application/pdf;base64,' : 'data:image/png;base64,';
 
-      // এপিআই ইউআরএল (/auto/ দিলে ইমেজ ও পিডিএফ দুইটাই কাজ করবে)
+      // এপিআই ইউআরএল
       final url =
           Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/auto/upload');
 
@@ -41,8 +41,7 @@ class CloudinaryUpload {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final secureUrl = data['secure_url']; // <-- এখানে define করতে হবে
-        // print('Cloudinary returned: $secureUrl');
+        final secureUrl = data['secure_url'];
         return secureUrl;
       } else {
         // print('Cloudinary upload failed: ${response.body}');
