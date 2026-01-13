@@ -1,13 +1,12 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:backend_client/backend_client.dart';
+
+import '../cloudinary_upload.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -165,7 +164,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
       _doctorId = id;
 
-      final DoctorProfile? profile = await client.doctor.getDoctorProfile(id);
+      // Backend resolves doctorId from authenticated session
+      final DoctorProfile? profile = await client.doctor.getDoctorProfile(0);
       if (profile != null) {
         initialName = profile.name ?? '';
         initialEmail = profile.email ?? '';
@@ -204,33 +204,19 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<String?> _uploadToCloudinary(Uint8List bytes) async {
-    const String cloudName = 'dfrzizwb1';
-    const String uploadPreset = 'sabbir';
-
-    final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/upload');
-    final request = http.MultipartRequest('POST', uri)
-      ..fields['upload_preset'] = uploadPreset
-      ..files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          bytes,
-          filename: 'upload_${DateTime.now().millisecondsSinceEpoch}.jpg',
-          contentType: MediaType('image', 'jpeg'),
-        ),
-      );
-
-    try {
-      final streamed = await request.send();
-      final resp = await http.Response.fromStream(streamed);
-      if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        final json = jsonDecode(resp.body);
-        return json['secure_url'] as String?;
-      }
-    } catch (e) {
-      // ignore - caller will show snackbar
-    }
-    return null;
+  Future<String?> _uploadDoctorImageToCloudinary({
+    required Uint8List bytes,
+    required String folder,
+    required String filePrefix,
+  }) {
+    final fileName =
+        '${filePrefix}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    return CloudinaryUpload.uploadBytes(
+      bytes: bytes,
+      folder: folder,
+      fileName: fileName,
+      isPdf: false,
+    );
   }
 
   Future<void> _pickImage() async {
@@ -348,7 +334,11 @@ class _ProfilePageState extends State<ProfilePage> {
       // Profile upload
       if (_profileImage != null) {
         final bytes = await _profileImage!.readAsBytes();
-        profileUrl = await _uploadToCloudinary(bytes);
+        profileUrl = await _uploadDoctorImageToCloudinary(
+          bytes: bytes,
+          folder: 'doctor_profiles',
+          filePrefix: 'doctor_profile',
+        );
         if (profileUrl == null) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -360,7 +350,11 @@ class _ProfilePageState extends State<ProfilePage> {
           return;
         }
       } else if (_webProfileImageBytes != null) {
-        profileUrl = await _uploadToCloudinary(_webProfileImageBytes!);
+        profileUrl = await _uploadDoctorImageToCloudinary(
+          bytes: _webProfileImageBytes!,
+          folder: 'doctor_profiles',
+          filePrefix: 'doctor_profile',
+        );
         if (profileUrl == null) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -376,7 +370,11 @@ class _ProfilePageState extends State<ProfilePage> {
       // Signature upload
       if (_signatureImage != null) {
         final bytes = await _signatureImage!.readAsBytes();
-        signatureUrl = await _uploadToCloudinary(bytes);
+        signatureUrl = await _uploadDoctorImageToCloudinary(
+          bytes: bytes,
+          folder: 'doctor_signatures',
+          filePrefix: 'doctor_signature',
+        );
         if (signatureUrl == null) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -388,7 +386,11 @@ class _ProfilePageState extends State<ProfilePage> {
           return;
         }
       } else if (_webSignatureImageBytes != null) {
-        signatureUrl = await _uploadToCloudinary(_webSignatureImageBytes!);
+        signatureUrl = await _uploadDoctorImageToCloudinary(
+          bytes: _webSignatureImageBytes!,
+          folder: 'doctor_signatures',
+          filePrefix: 'doctor_signature',
+        );
         if (signatureUrl == null) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -553,18 +555,12 @@ class _ProfilePageState extends State<ProfilePage> {
           "Doctor Profile",
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
-        centerTitle: true,
+
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.blue,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () async {
-              await Navigator.pushNamed(context, '/notifications');
-            },
-          ),
-        ],
+        automaticallyImplyLeading: false,
+        centerTitle: true,
       ),
       body: SafeArea(
         child: SingleChildScrollView(

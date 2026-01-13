@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -112,30 +111,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
     setState(() => _loading = true);
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-
-      final rawId = prefs.getString('user_id');
-      final email =
-          prefs.getString('email') ?? prefs.getString('user_email') ?? '';
-
-      debugPrint('🧪 RAW user_id from prefs: $rawId');
-      debugPrint('🧪 RAW email from prefs: $email');
-
-      final userId = int.tryParse(rawId ?? '') ?? 0;
-
-      debugPrint('🧪 PARSED userId: $userId');
-
-      if (userId == 0 || email.trim().isEmpty) {
-        _show(
-          'Session Error',
-          'Invalid user session.\nID: $userId\nEmail: $email',
-        );
-        return;
-      }
-
-      final res = await client.password.changePasswordByUserIdEmail(
-        userId: 0,
-        email: email.trim(),
+      final res = await client.password.changePassword(
         currentPassword: current,
         newPassword: newPass,
       );

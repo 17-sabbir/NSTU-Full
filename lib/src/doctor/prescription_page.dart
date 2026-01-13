@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
+import 'package:bangla_pdf_fixer/bangla_pdf_fixer.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 // DESIGN: central theme colors and typography for this page
 const Color _accent = Color(0xFF0EA5A5); // teal-ish
@@ -46,9 +49,21 @@ class Medicine {
   String durationUnit = 'দিন';
 }
 
-
 class PrescriptionPage extends StatefulWidget {
-  const PrescriptionPage({super.key});
+  final String? initialPatientName;
+  final String? initialPatientNumber;
+  final String? initialPatientGender;
+  final int? initialPatientAge;
+  final List<PatientPrescribedItem>? initialPrescribedItems;
+
+  const PrescriptionPage({
+    super.key,
+    this.initialPatientName,
+    this.initialPatientNumber,
+    this.initialPatientGender,
+    this.initialPatientAge,
+    this.initialPrescribedItems,
+  });
 
   @override
   State<PrescriptionPage> createState() => _PrescriptionPageState();
@@ -95,10 +110,51 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
   bool _isOutside = false;
   DateTime selectedDate = DateTime.now();
 
+  // PDF assets/cache (used by print)
+  Uint8List? _pdfLogoBytes;
+  pw.Font? _pdfEnglishFont;
+  bool _pdfAssetsReady = false;
+
   @override
   void initState() {
     super.initState();
-    _addMedicineRow();
+
+    // Build medicine rows first (either from existing record, or at least one empty row)
+    if (widget.initialPrescribedItems != null &&
+        widget.initialPrescribedItems!.isNotEmpty) {
+      _seedMedicinesFromExisting(widget.initialPrescribedItems!);
+    } else {
+      _addMedicineRow();
+    }
+
+    // Optional prefill (used when creating prescription from patient records)
+    final name = widget.initialPatientName?.trim();
+    if (name != null && name.isNotEmpty) {
+      _nameController.text = name;
+    }
+
+    final number = widget.initialPatientNumber?.trim();
+    if (number != null && number.isNotEmpty) {
+      _rollController.text = number;
+    }
+
+    final age = widget.initialPatientAge;
+    if (age != null) {
+      _ageController.text = age.toString();
+    }
+
+    final genderRaw = widget.initialPatientGender?.trim();
+    if (genderRaw != null && genderRaw.isNotEmpty) {
+      final g = genderRaw.toLowerCase();
+      if (g == 'male' || g == 'm' || g.startsWith('male')) {
+        _selectedGender = 'Male';
+        _genderController.text = 'Male';
+      } else if (g == 'female' || g == 'f' || g.startsWith('female')) {
+        _selectedGender = 'Female';
+        _genderController.text = 'Female';
+      }
+    }
+
     // mark unsaved when any main field changes
     _nameController.addListener(_markUnsaved);
     _rollController.addListener(_markUnsaved);
@@ -115,16 +171,76 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     });
   }
 
+  void _seedMedicinesFromExisting(List<PatientPrescribedItem> items) {
+    // Avoid setState inside initState; just initialize lists.
+    _medicineRows.clear();
+    _medicineNameErrors.clear();
+    _medicineDurationErrors.clear();
+    _medicineMealErrors.clear();
+
+    for (final it in items) {
+      final m = Medicine();
+      m.nameController.text = it.medicineName;
+      if (it.duration != null) {
+        m.durationController.text = it.duration.toString();
+      }
+
+      final dosageRaw = (it.dosageTimes ?? '').toString();
+      if (dosageRaw.isNotEmpty) {
+        final normalized = dosageRaw.toLowerCase();
+        m.times = {
+          'সকাল': normalized.contains('সকাল') || normalized.contains('morning'),
+          'দুপুর': normalized.contains('দুপুর') || normalized.contains('noon'),
+          'রাত': normalized.contains('রাত') || normalized.contains('night'),
+        };
+        // If nothing matched, keep defaults
+        if (!m.times.values.any((v) => v)) {
+          m.times = {'সকাল': true, 'দুপুর': true, 'রাত': true};
+        }
+      }
+
+      final mealRaw = (it.mealTiming ?? '').toString().trim();
+      if (mealRaw.isNotEmpty) {
+        final lower = mealRaw.toLowerCase();
+        if (lower.contains('before') || mealRaw.contains('আগে')) {
+          m.mealTiming = 'খাবার আগে';
+        } else if (lower.contains('after') || mealRaw.contains('পরে')) {
+          m.mealTiming = 'খাবার পরে';
+        }
+
+        // Best-effort: keep any time portion in the UI field
+        var timePart = mealRaw
+            .replaceAll('before', '')
+            .replaceAll('after', '')
+            .replaceAll('খাবার আগে', '')
+            .replaceAll('খাবার পরে', '')
+            .replaceAll('আগে', '')
+            .replaceAll('পরে', '')
+            .trim();
+        if (timePart.isNotEmpty) {
+          m.mealTimeController.text = timePart;
+        }
+      }
+
+      _medicineRows.add(m);
+      _medicineNameErrors.add(null);
+      _medicineDurationErrors.add(null);
+      _medicineMealErrors.add(null);
+
+      m.nameController.addListener(_markUnsaved);
+      m.durationController.addListener(_markUnsaved);
+      m.mealTimeController.addListener(_markUnsaved);
+    }
+
+    if (_medicineRows.isEmpty) {
+      _addMedicineRow();
+    }
+  }
+
   Future<void> _loadDoctorInfo() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final stored = prefs.getString('user_id');
-      final id = int.tryParse(stored ?? '');
-      if (id == null) {
-        setState(() => _loadingDoctorInfo = false);
-        return;
-      }
-      final info = await client.doctor.getDoctorInfo(id);
+      // Backend resolves doctorId from authenticated session
+      final info = await client.doctor.getDoctorInfo();
       setState(() {
         _doctorName = info['name'] ?? '';
         // server returns signature under key 'signature' (prescription_page.dart uses this)
@@ -212,6 +328,421 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     });
   }
 
+  bool _hasBangla(String? s) =>
+      s != null && RegExp(r'[\u0980-\u09FF]').hasMatch(s);
+
+  Future<void> _ensurePdfAssetsReady() async {
+    if (_pdfAssetsReady) return;
+    await BanglaFontManager().initialize();
+
+    try {
+      final logo = await rootBundle.load('assets/images/nstu_logo.jpg');
+      _pdfLogoBytes = logo.buffer.asUint8List();
+    } catch (_) {
+      _pdfLogoBytes = null;
+    }
+
+    try {
+      final fontData = await rootBundle.load(
+        'assets/fonts/OpenSans-VariableFont.ttf',
+      );
+      _pdfEnglishFont = pw.Font.ttf(fontData);
+    } catch (_) {
+      _pdfEnglishFont = null;
+    }
+
+    _pdfAssetsReady = true;
+  }
+
+  pw.Widget _pdfSectionTitle(String title, pw.TextStyle style) =>
+      pw.Text(title, style: style.copyWith(fontWeight: pw.FontWeight.bold));
+
+  pw.Widget _pdfContentBox(String? text, pw.TextStyle style) {
+    if (text == null || text.trim().isEmpty) return pw.SizedBox(height: 10);
+    if (_hasBangla(text)) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 10, left: 4),
+        child: BanglaText(text, fontSize: 11),
+      );
+    }
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 10, left: 4),
+      child: pw.Text(text, style: style.copyWith(fontSize: 11)),
+    );
+  }
+
+  pw.Widget _pdfHeader(pw.TextStyle style) {
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.center,
+      children: [
+        if (_pdfLogoBytes != null)
+          pw.Image(pw.MemoryImage(_pdfLogoBytes!), width: 70, height: 70),
+        pw.SizedBox(width: 10),
+        pw.Column(
+          children: [
+            BanglaText('মেডিকেল সেন্টার', fontSize: 12),
+            BanglaText(
+              'নোয়াখালী বিজ্ঞান ও প্রযুক্তি বিশ্ববিদ্যালয়',
+              fontSize: 14,
+            ),
+            pw.Text(
+              'Noakhali Science and Technology University',
+              style: style.copyWith(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _pdfPatientInfo(pw.TextStyle style) {
+    final dateStr =
+        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}';
+
+    final name = _nameController.text.trim();
+    final age = _ageController.text.trim();
+    final gender = _selectedGender ?? '';
+    final mobile = _rollController.text.trim();
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'Name: $name',
+              style: style.copyWith(fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Text('Date: $dateStr', style: style),
+          ],
+        ),
+        pw.SizedBox(height: 4),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'Mobile: +88$mobile',
+              style: style.copyWith(fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Text('Age: $age', style: style),
+            pw.Text('Gender: $gender', style: style),
+          ],
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _pdfLeftSection(pw.TextStyle style) {
+    final sections = <pw.Widget>[];
+
+    void addSection(String title, String? value) {
+      if (value != null && value.trim().isNotEmpty) {
+        sections.add(_pdfSectionTitle(title, style));
+        sections.add(_pdfContentBox(value, style));
+      }
+    }
+
+    addSection('C/C:', _complainController.text.trim());
+    addSection('O/E:', _examinationController.text.trim());
+    addSection('Advice:', _adviceController.text.trim());
+    addSection('Inv:', _testsController.text.trim());
+
+    return pw.Expanded(
+      flex: 2,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: sections,
+      ),
+    );
+  }
+
+  pw.Widget _pdfRxSection(pw.TextStyle style) {
+    String mealTimingToDisplay(String? mealTiming) {
+      final raw = (mealTiming ?? '').trim();
+      if (raw.isEmpty) return '';
+      if (raw == 'before') return 'খাবার আগে';
+      if (raw == 'after') return 'খাবার পরে';
+      return raw;
+    }
+
+    return pw.Expanded(
+      flex: 5,
+      child: pw.Padding(
+        padding: const pw.EdgeInsets.only(left: 10),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              'Rx:',
+              style: style.copyWith(
+                fontSize: 18,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 10),
+            ..._medicineRows.asMap().entries.map((entry) {
+              final m = entry.value;
+              final medName = m.nameController.text.trim();
+              final dosageRaw = m.times.entries
+                  .where((e) => e.value)
+                  .map((e) => e.key)
+                  .join(', ');
+              final dosage = dosageRaw.isNotEmpty
+                  ? dosageRaw
+                  : '${m.timesPerDay} times daily';
+
+              final timePart = m.mealTimeController.text.trim();
+              final timing = mealTimingToDisplay(m.mealTiming);
+              final meal = [
+                if (timePart.isNotEmpty) timePart,
+                if (timing.isNotEmpty) timing,
+              ].join(' ');
+
+              final durationVal = m.durationController.text.trim();
+              final durationDays = durationVal.isEmpty
+                  ? ''
+                  : durationVal; // keep same as patient format => show as Days
+
+              pw.Widget t(String value) {
+                if (value.trim().isEmpty) return pw.SizedBox();
+                if (_hasBangla(value)) return BanglaText(value, fontSize: 11);
+                return pw.Text(value, style: style.copyWith(fontSize: 11));
+              }
+
+              return pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 8),
+                child: pw.Row(
+                  children: [
+                    pw.Expanded(child: t(medName)),
+                    pw.Expanded(child: t(dosage)),
+                    pw.Expanded(child: t(meal)),
+                    pw.Expanded(
+                      child: () {
+                        if (durationDays.isEmpty) return pw.SizedBox();
+                        final display = '$durationDays Days';
+                        return t(display);
+                      }(),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<Uint8List> _buildPrescriptionPdfBytesLikePatient() async {
+    await _ensurePdfAssetsReady();
+
+    Uint8List? signatureBytes;
+    final sig = _doctorSignatureUrl;
+    if (sig != null && sig.startsWith('http')) {
+      try {
+        signatureBytes = (await networkImage(sig)) as Uint8List?;
+      } catch (_) {
+        signatureBytes = null;
+      }
+    }
+
+    final pdf = pw.Document();
+    final baseTextStyle = pw.TextStyle(
+      fontSize: 12,
+      font: _pdfEnglishFont ?? pw.Font.helvetica(),
+    );
+
+    final nextVisit = _nextVisitController.text.trim();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              _pdfHeader(baseTextStyle),
+              pw.Divider(thickness: 1, color: PdfColors.grey400),
+              _pdfPatientInfo(baseTextStyle),
+              pw.Divider(thickness: 1, color: PdfColors.grey400),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _pdfLeftSection(baseTextStyle),
+                  pw.VerticalDivider(thickness: 1, color: PdfColors.black),
+                  _pdfRxSection(baseTextStyle),
+                ],
+              ),
+              pw.Spacer(),
+              pw.Padding(
+                padding: const pw.EdgeInsets.only(top: 20),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    if (nextVisit.isNotEmpty)
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.lightBlue100,
+                          borderRadius: pw.BorderRadius.circular(4),
+                        ),
+                        child: _hasBangla(nextVisit)
+                            ? BanglaText(
+                                'পরবর্তী সাক্ষাৎ: $nextVisit',
+                                fontSize: 11,
+                                color: PdfColors.blue900,
+                              )
+                            : pw.Text(
+                                'Next Visit: $nextVisit',
+                                style: baseTextStyle.copyWith(
+                                  fontSize: 11,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColors.blue900,
+                                ),
+                              ),
+                      ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        if (signatureBytes != null)
+                          pw.Image(
+                            pw.MemoryImage(signatureBytes),
+                            width: 120,
+                            height: 50,
+                          ),
+                        pw.SizedBox(height: 4),
+                        pw.Container(
+                          width: 120,
+                          height: 1,
+                          color: PdfColors.grey700,
+                        ),
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          'Doctor Name: ${_doctorName ?? ''}',
+                          style: baseTextStyle.copyWith(
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  Future<int> _submitPrescriptionToServer() async {
+    if (!_validateForm()) return 0;
+
+    // 1. Process Next Visit Text
+    final rawNext = _nextVisitController.text.trim();
+    String? formattedNextVisit = rawNext.isEmpty ? null : rawNext;
+
+    // 2. Create Prescription Object
+    final prescription = Prescription(
+      // Backend takes doctor id from authenticated session
+      doctorId: 0,
+      name: _nameController.text.trim(),
+      age: int.tryParse(_ageController.text.trim()),
+      mobileNumber: '+88${_rollController.text.trim()}',
+      gender: _selectedGender,
+      prescriptionDate: DateTime.now(),
+      cc: _complainController.text.trim(),
+      oe: _examinationController.text.trim(),
+      advice: _adviceController.text.trim(),
+      test: _testsController.text.trim(),
+      nextVisit: formattedNextVisit,
+      isOutside: _isOutside,
+    );
+
+    // 3. Process Medicine Items
+    final items = <PrescribedItem>[];
+    for (var m in _medicineRows) {
+      if (m.nameController.text.trim().isEmpty) continue;
+
+      // Combine time and timing (e.g., "30 min before")
+      String? mealTiming;
+      if (m.mealTiming != null) {
+        final timeVal = m.mealTimeController.text.trim();
+        mealTiming = timeVal.isEmpty
+            ? m.mealTiming
+            : '$timeVal ${m.mealTiming}';
+      }
+
+      // Calculate duration in days (DB expects INTEGER)
+      int? durationInDays = int.tryParse(m.durationController.text.trim());
+      if (durationInDays != null && m.durationUnit == 'মাস') {
+        durationInDays = durationInDays * 30;
+      }
+
+      // Format Dosage
+      String dosage = m.times.entries
+          .where((e) => e.value)
+          .map((e) => e.key)
+          .join(', ');
+      if (dosage.isEmpty) dosage = '${m.timesPerDay} times daily';
+
+      items.add(
+        PrescribedItem(
+          prescriptionId: 0,
+          medicineName: m.nameController.text.trim(),
+          dosageTimes: dosage,
+          mealTiming: mealTiming,
+          duration: durationInDays,
+        ),
+      );
+    }
+
+    // 4. Send to Backend
+    return client.doctor.createPrescription(
+      prescription,
+      items,
+      _rollController.text.trim(),
+    );
+  }
+
+  Future<void> _handlePrint() async {
+    try {
+      // 1) Save first
+      final resultId = await _submitPrescriptionToServer();
+      if (resultId <= 0) return;
+
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Saved. Opening print...')));
+
+      // 2) Build PDF (patient_prescriptions.dart format)
+      final bytes = await _buildPrescriptionPdfBytesLikePatient();
+      await Printing.layoutPdf(
+        onLayout: (_) async => bytes,
+        name: 'Prescription_$resultId.pdf',
+      );
+
+      // 3) Clear after print
+      _clearForm();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Print failed: $e')));
+    }
+  }
+
   void _markUnsaved() {
     if (_isSaved) {
       setState(() {
@@ -220,13 +751,6 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     }
   }
 
-  void _markSaved() {
-    if (!_isSaved) {
-      setState(() {
-        _isSaved = true;
-      });
-    }
-  }
 
   /// Validate the form. Returns true if valid, otherwise sets error messages and returns false.
   bool _validateForm() {
@@ -311,89 +835,26 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
   }
 
   void _savePrescription() async {
-    if (!_validateForm()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all required fields')),
-      );
-      return;
-    }
-
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final doctorId = int.tryParse(prefs.getString('user_id') ?? '');
-
-      if (doctorId == null) {
-        // ignore: use_build_context_synchronously
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Doctor ID not found')));
-        return;
-      }
-
-      // 1. Process Next Visit Text
-      final rawNext = _nextVisitController.text.trim();
-      String? formattedNextVisit = rawNext.isEmpty ? null : rawNext;
-
-      // 2. Create Prescription Object
-      final prescription = Prescription(
-        doctorId: doctorId,
-        name: _nameController.text.trim(),
-        age: int.tryParse(_ageController.text.trim()),
-        mobileNumber: "+88${_rollController.text.trim()}",
-        gender: _selectedGender,
-        prescriptionDate: DateTime.now(),
-        cc: _complainController.text.trim(),
-        oe: _examinationController.text.trim(),
-        advice: _adviceController.text.trim(),
-        test: _testsController.text.trim(),
-        nextVisit: formattedNextVisit,
-        isOutside: _isOutside,
-      );
-
-      // 3. Process Medicine Items
-      final items = <PrescribedItem>[];
-      for (var m in _medicineRows) {
-        if (m.nameController.text.trim().isEmpty) continue;
-
-        // Combine time and timing (e.g., "30 min before")
-        String? mealTiming;
-        if (m.mealTiming != null) {
-          final timeVal = m.mealTimeController.text.trim();
-          mealTiming = timeVal.isEmpty ? m.mealTiming : "$timeVal ${m.mealTiming}";
-        }
-
-        // Calculate duration in days (DB expects INTEGER)
-        int? durationInDays = int.tryParse(m.durationController.text.trim());
-        if (durationInDays != null && m.durationUnit == 'মাস') {
-          durationInDays = durationInDays * 30; // Convert months to days for DB int
-        }
-
-        // Format Dosage
-        String dosage = m.times.entries.where((e) => e.value).map((e) => e.key).join(', ');
-        if (dosage.isEmpty) dosage = '${m.timesPerDay} times daily';
-
-        items.add(PrescribedItem(
-          prescriptionId: 0, // Placeholder
-          medicineName: m.nameController.text.trim(),
-          dosageTimes: dosage, // Ensure this matches your generated model field name
-          mealTiming: mealTiming,
-          duration: durationInDays,
-        ));
-      }
-
-      // 4. Send to Backend
-      final resultId = await client.doctor.createPrescription(
-        prescription,
-        items,
-        _rollController.text.trim(), // Backend handles the +88 normalization
-      );
+      final resultId = await _submitPrescriptionToServer();
 
       if (resultId > 0) {
         // ignore: use_build_context_synchronously
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Prescription saved successfully!')));
-        _markSaved();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Prescription saved successfully!')),
+        );
+        _clearForm();
+      } else {
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please fill in all required fields')),
+        );
       }
     } catch (e) {
       // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -514,10 +975,10 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                   items: List.generate(6, (i) => i + 3)
                       .map(
                         (n) => DropdownMenuItem(
-                      value: n,
-                      child: Text(n.toString()),
-                    ),
-                  )
+                          value: n,
+                          child: Text(n.toString()),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() {
                     medicine.timesPerDay = v ?? 3;
@@ -569,7 +1030,10 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                     hintText: 'time',
                     filled: true,
                     fillColor: Colors.grey.shade50,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(color: Colors.grey.shade300),
@@ -704,14 +1168,9 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
         elevation: 1,
         actions: [
           IconButton(
-            onPressed: _addMedicineRow,
-            icon: Icon(Icons.add, color: _accent),
-            tooltip: 'Add medicine',
-          ),
-          IconButton(
-            onPressed: _clearForm,
-            icon: Icon(Icons.clear_all, color: Colors.red.shade400),
-            tooltip: 'Clear form',
+            onPressed: _handlePrint,
+            icon: const Icon(Icons.print),
+            tooltip: 'Print',
           ),
         ],
       ),
@@ -734,7 +1193,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                     width: screenWidth * 0.098,
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) =>
-                    const Icon(Icons.local_hospital, size: 40),
+                        const Icon(Icons.local_hospital, size: 40),
                   ),
                   const SizedBox(width: 8),
 
@@ -813,7 +1272,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                         child: TextField(
                           controller: TextEditingController(
                             text:
-                            "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
+                                "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
                           ),
                           enabled: false, // make the date non-editable
                           decoration: const InputDecoration(
@@ -899,81 +1358,49 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                           spacing: 12,
                           runSpacing: 6,
                           children: [
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  if (_selectedGender == 'Male') {
-                                    _selectedGender = null;
-                                    _genderController.text = '';
-                                  } else {
-                                    _selectedGender = 'Male';
-                                    _genderController.text = 'Male';
-                                  }
-                                });
-                              },
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: Checkbox(
-                                      value: _selectedGender == 'Male',
-                                      onChanged: (v) {
-                                        setState(() {
-                                          if (v == true) {
-                                            _selectedGender = 'Male';
-                                            _genderController.text = 'Male';
-                                          } else {
-                                            _selectedGender = null;
-                                            _genderController.text = '';
-                                          }
-                                        });
-                                      },
-                                    ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: Radio<String>(
+                                    value: 'Male',
+                                    groupValue: _selectedGender,
+                                    onChanged: (v) {
+                                      setState(() {
+                                        _selectedGender = v;
+                                        _genderController.text = v ?? '';
+                                        _markUnsaved();
+                                      });
+                                    },
                                   ),
-                                  const SizedBox(width: 6),
-                                  const Text('M'),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Text('M'),
+                              ],
                             ),
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  if (_selectedGender == 'Female') {
-                                    _selectedGender = null;
-                                    _genderController.text = '';
-                                  } else {
-                                    _selectedGender = 'Female';
-                                    _genderController.text = 'Female';
-                                  }
-                                });
-                              },
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: Checkbox(
-                                      value: _selectedGender == 'Female',
-                                      onChanged: (v) {
-                                        setState(() {
-                                          if (v == true) {
-                                            _selectedGender = 'Female';
-                                            _genderController.text = 'Female';
-                                          } else {
-                                            _selectedGender = null;
-                                            _genderController.text = '';
-                                          }
-                                        });
-                                      },
-                                    ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: Radio<String>(
+                                    value: 'Female',
+                                    groupValue: _selectedGender,
+                                    onChanged: (v) {
+                                      setState(() {
+                                        _selectedGender = v;
+                                        _genderController.text = v ?? '';
+                                        _markUnsaved();
+                                      });
+                                    },
                                   ),
-                                  const SizedBox(width: 6),
-                                  const Text('F'),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Text('F'),
+                              ],
                             ),
                           ],
                         ),
@@ -1095,7 +1522,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                   ),
                   const SizedBox(height: 8),
                   Align(
-                    alignment: Alignment.centerRight,
+                    alignment: Alignment.centerLeft,
                     child: ElevatedButton.icon(
                       onPressed: _addMedicineRow,
                       icon: const Icon(Icons.add_circle_outline),
@@ -1170,24 +1597,24 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                       height: 60,
                       child: _loadingDoctorInfo
                           ? const Center(
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
-                        ),
-                      )
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
                           : (_doctorSignatureUrl != null &&
-                          _doctorSignatureUrl!.startsWith('http'))
+                                _doctorSignatureUrl!.startsWith('http'))
                           ? Image.network(
-                        _doctorSignatureUrl!,
-                        fit: BoxFit.contain,
-                        // ignore: unnecessary_underscores
-                        errorBuilder: (_, __, ___) => const Center(
-                          child: Text('Invalid signature'),
-                        ),
-                      )
+                              _doctorSignatureUrl!,
+                              fit: BoxFit.contain,
+                              // ignore: unnecessary_underscores
+                              errorBuilder: (_, __, ___) => const Center(
+                                child: Text('Invalid signature'),
+                              ),
+                            )
                           : const Center(child: Text('No signature uploaded')),
                     ),
                     const SizedBox(height: 6),

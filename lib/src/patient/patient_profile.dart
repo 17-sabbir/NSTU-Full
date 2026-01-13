@@ -1,12 +1,10 @@
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+
+import '../cloudinary_upload.dart';
 
 class PatientProfilePage extends StatefulWidget {
   final String? userId;
@@ -64,7 +62,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   Future<void> _loadProfileData() async {
     setState(() => _isLoading = true);
     try {
-      final profile = await client.patient.getPatientProfile(0);
+      final profile = await client.patient.getPatientProfile();
       if (profile != null) {
         _initialName = profile.name;
         _initialPhone = profile.phone;
@@ -113,30 +111,13 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     _checkChanges();
   }
 
-  Future<String?> _uploadProfileToCloudinary(Uint8List bytes) async {
-    const cloudName = "dfrzizwb1";
-    const uploadPreset = "sabbir";
-    final request =
-        http.MultipartRequest(
-            'POST',
-            Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/upload'),
-          )
-          ..fields['upload_preset'] = uploadPreset
-          ..files.add(
-            http.MultipartFile.fromBytes(
-              'file',
-              bytes,
-              filename: 'profile.jpg',
-              contentType: MediaType('image', 'jpeg'),
-            ),
-          );
-
-    final response = await request.send();
-    if (response.statusCode == 200) {
-      final body = await response.stream.bytesToString();
-      return jsonDecode(body)['secure_url'];
-    }
-    return null;
+  Future<String?> _uploadProfileToCloudinary(Uint8List bytes) {
+    return CloudinaryUpload.uploadBytes(
+      bytes: bytes,
+      folder: 'patient_profiles',
+      fileName: 'patient_profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      isPdf: false,
+    );
   }
 
   Future<void> _saveProfile() async {

@@ -1,9 +1,8 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../cloudinary_upload.dart';
 import 'package:flutter/services.dart';
 
 class LabTesterProfile extends StatefulWidget {
@@ -184,9 +183,13 @@ class _LabTesterProfileState extends State<LabTesterProfile>
       // ১. যদি নতুন ইমেজ পিক করা থাকে (মোবাইল বা ওয়েব যেটাই হোক)
       if (_imageBytes != null && _pickedFile != null) {
         try {
-          final String base64String = base64Encode(_imageBytes!);
-          final uploadedUrl = await client.lab.uploadProfileImage(base64String);
-
+          final uploadedUrl = await CloudinaryUpload.uploadBytes(
+            bytes: _imageBytes!,
+            folder: 'staff_profiles',
+            fileName:
+                'staff_profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
+            isPdf: false,
+          );
           if (uploadedUrl == null || uploadedUrl.isEmpty) {
             throw Exception('Cloudinary upload failed');
           }
@@ -282,6 +285,37 @@ class _LabTesterProfileState extends State<LabTesterProfile>
     }
   }
 
+  Future<void> _performLogout() async {
+    try {
+      // 1. Server logout
+      try {
+        await client.auth.logout();
+      } catch (_) {}
+
+      // 2. Destroy session locally
+      await client.authenticationKeyManager?.remove();
+
+      // 3. Clear shared preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      if (!mounted) return;
+
+      // 4. Navigate to login/root
+      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+
+      // 5. Feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Logged out successfully"),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Logout error: $e');
+    }
+  }
+
   void _logout() {
     showDialog(
       context: context,
@@ -294,40 +328,9 @@ class _LabTesterProfileState extends State<LabTesterProfile>
             child: const Text("Cancel"),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context); // close dialog
-              () async {
-                try {
-                  try {
-                    await client.auth.logout();
-                  } catch (_) {}
-                  // ignore: deprecated_member_use
-                  await client.authenticationKeyManager?.remove();
-                } catch (_) {}
-
-                try {
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.remove('user_id');
-                  await prefs.remove('user_email');
-                  await prefs.remove('user_role');
-                } catch (_) {}
-
-                if (!mounted) return;
-                // ignore: use_build_context_synchronously
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Logged out successfully"),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-
-                Navigator.pushNamedAndRemoveUntil(
-                  // ignore: use_build_context_synchronously
-                  context,
-                  '/',
-                  (route) => false,
-                );
-              }();
+            onPressed: () async {
+              Navigator.pop(context); // close dialog first
+              await _performLogout();
             },
             child: const Text("Logout", style: TextStyle(color: Colors.red)),
           ),

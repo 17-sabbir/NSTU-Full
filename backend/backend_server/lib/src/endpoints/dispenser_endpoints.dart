@@ -1,8 +1,6 @@
 import 'package:serverpod/serverpod.dart';
 import 'package:backend_server/src/generated/protocol.dart';
 
-import 'cloudinary_upload.dart';
-
 import '../utils/auth_user.dart';
 
 class DispenserEndpoint extends Endpoint {
@@ -63,19 +61,15 @@ class DispenserEndpoint extends Endpoint {
     required String phone,
     required String qualification,
     required String designation,
-    String? base64Image,
+    String? profilePictureUrl,
   }) async {
     try {
       final resolvedUserId = requireAuthenticatedUserId(session);
-      String? imageUrl;
-
-      // 🔹 Upload image if exists
-      if (base64Image != null && base64Image.isNotEmpty) {
-        imageUrl = await CloudinaryUpload.uploadFile(
-          base64Data: base64Image,
-          folder: 'dispenser_profiles',
-        );
-      }
+      final imageUrl = (profilePictureUrl != null &&
+              (profilePictureUrl.startsWith('http://') ||
+                  profilePictureUrl.startsWith('https://')))
+          ? profilePictureUrl
+          : null;
 
       return await session.db.transaction((transaction) async {
         await session.db.unsafeExecute(

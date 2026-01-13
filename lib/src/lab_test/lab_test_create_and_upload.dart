@@ -4,9 +4,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:convert';
-
 import 'package:url_launcher/url_launcher.dart';
+
+import '../cloudinary_upload.dart';
 
 class LabTestCreateAndUpload extends StatefulWidget {
   const LabTestCreateAndUpload({super.key});
@@ -18,14 +18,12 @@ class LabTestCreateAndUpload extends StatefulWidget {
 class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload> {
   List<TestResult> results = [];
   bool loading = true;
-// key: resultId, value: picked file data
+  // key: resultId, value: picked file data
   Map<int, Uint8List> pickedFiles = {};
   Map<int, String> pickedFileNames = {};
 
-
   // List of available lab tests fetched from backend
   List<LabTests> availableTests = [];
-
 
   Future<void> fetchTests() async {
     try {
@@ -74,15 +72,23 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload> {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
       child: ListTile(
-        title: Text("${r.patientName} (${r.mobileNumber}) — ${_displayType(r.patientType)}"),
+        title: Text(
+          "${r.patientName} (${r.mobileNumber}) — ${_displayType(r.patientType)}",
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(r.submittedAt != null
-                ? "Result submitted"
-                : (r.isUploaded ? "File uploaded" : "No file selected")),
-            Text("Created: ${fmt(r.createdAt)}", style: const TextStyle(fontSize: 10)),
-            if (fileName != null) Text("Selected: $fileName", style: const TextStyle(fontSize: 12)),
+            Text(
+              r.submittedAt != null
+                  ? "Result submitted"
+                  : (r.isUploaded ? "File uploaded" : "No file selected"),
+            ),
+            Text(
+              "Created: ${fmt(r.createdAt)}",
+              style: const TextStyle(fontSize: 10),
+            ),
+            if (fileName != null)
+              Text("Selected: $fileName", style: const TextStyle(fontSize: 12)),
           ],
         ),
         trailing: Row(
@@ -102,7 +108,7 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload> {
                 onPressed: () async {
                   final res = await FilePicker.platform.pickFiles(
                     type: FileType.custom,
-                    allowedExtensions: ['jpg','jpeg','png','pdf'],
+                    allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
                     withData: true,
                   );
                   if (res != null && res.files.isNotEmpty) {
@@ -123,28 +129,47 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload> {
                   if (r.resultId == null) return;
                   setState(() => loading = true);
 
-                  final base64Data = base64Encode(bytes);
+                  final pickedName =
+                      fileName ??
+                      'lab_report_${DateTime.now().millisecondsSinceEpoch}';
+                  final isPdf = pickedName.toLowerCase().endsWith('.pdf');
+                  final uploadedUrl = await CloudinaryUpload.uploadBytes(
+                    bytes: bytes,
+                    folder: 'lab_reports',
+                    fileName: pickedName,
+                    isPdf: isPdf,
+                  );
 
-                  final ok = await client.lab.submitResultWithFile(
+                  if (uploadedUrl == null) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Cloudinary upload failed')),
+                    );
+                    setState(() => loading = false);
+                    return;
+                  }
+
+                  final ok = await client.lab.submitResultWithUrl(
                     resultId: r.resultId!,
-                    base64Data: base64Data,
-                    fileName: fileName!,
+                    attachmentUrl: uploadedUrl,
                   );
 
                   if (ok) {
                     setState(() {
                       r.submittedAt = DateTime.now();
                       r.isUploaded = true;
-                      r.attachmentPath = fileName; // or Cloudinary URL if returned
+                      r.attachmentPath = uploadedUrl;
                       pickedFiles.remove(r.resultId);
                       pickedFileNames.remove(r.resultId);
                     });
                     // ignore: use_build_context_synchronously
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(const SnackBar(content: Text('Result submitted')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Result submitted')),
+                    );
                   } else {
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(const SnackBar(content: Text('Submit failed')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Submit failed')),
+                    );
                   }
 
                   setState(() => loading = false);
@@ -173,51 +198,54 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload> {
         insetPadding: const EdgeInsets.all(16), // screen margin
         child: isPdf
             ? Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min, // 🔴 no extra height
-            children: [
-              const Icon(Icons.picture_as_pdf,
-                  size: 80, color: Colors.red),
-              const SizedBox(height: 12),
-              const Text(
-                "PDF Document",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.open_in_new),
-                label: const Text("Open PDF"),
-                onPressed: () => _launchURL(url),
-              ),
-            ],
-          ),
-        )
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min, // 🔴 no extra height
+                  children: [
+                    const Icon(
+                      Icons.picture_as_pdf,
+                      size: 80,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      "PDF Document",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.open_in_new),
+                      label: const Text("Open PDF"),
+                      onPressed: () => _launchURL(url),
+                    ),
+                  ],
+                ),
+              )
             : InteractiveViewer(
-          minScale: 0.5,
-          maxScale: 4,
-          child: Image.network(
-            url,
-            fit: BoxFit.contain, // 🔥 exact image size
-            loadingBuilder: (context, child, progress) {
-              if (progress == null) return child;
-              return const Padding(
-                padding: EdgeInsets.all(40),
-                child: CircularProgressIndicator(),
-              );
-            },
-            errorBuilder: (_, __, ___) =>
-            const Padding(
-              padding: EdgeInsets.all(40),
-              child: Text("Failed to load image"),
-            ),
-          ),
-        ),
-
+                minScale: 0.5,
+                maxScale: 4,
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain, // 🔥 exact image size
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return const Padding(
+                      padding: EdgeInsets.all(40),
+                      child: CircularProgressIndicator(),
+                    );
+                  },
+                  errorBuilder: (_, __, ___) => const Padding(
+                    padding: EdgeInsets.all(40),
+                    child: Text("Failed to load image"),
+                  ),
+                ),
+              ),
       ),
     );
   }
-
 
   Future<void> _launchURL(String urlPath) async {
     final Uri url = Uri.parse(urlPath);

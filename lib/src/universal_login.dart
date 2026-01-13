@@ -622,8 +622,9 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 20),
 
                 // Forget Password Row
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     const Text('Forget Password?'),
                     TextButton(
@@ -636,8 +637,9 @@ class _HomePageState extends State<HomePage> {
                 ),
 
                 // SignUp Row
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     const Text('Not yet registered?'),
                     TextButton(

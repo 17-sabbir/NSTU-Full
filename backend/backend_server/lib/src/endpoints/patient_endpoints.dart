@@ -3,8 +3,6 @@ import 'package:backend_server/src/generated/protocol.dart';
 
 import '../utils/auth_user.dart';
 
-import 'cloudinary_upload.dart';
-
 class PatientEndpoint extends Endpoint {
   @override
   bool get requireLogin => true;
@@ -38,13 +36,14 @@ class PatientEndpoint extends Endpoint {
     if (value == null) return null;
     if (value is DateTime) return value;
     if (value is String) return DateTime.tryParse(value);
-    if (value is List<int>)
+    if (value is List<int>) {
       return DateTime.tryParse(String.fromCharCodes(value));
+    }
     return DateTime.tryParse(value.toString());
   }
 
   // Fetch patient profile
-  Future<PatientProfile?> getPatientProfile(Session session, int userId) async {
+  Future<PatientProfile?> getPatientProfile(Session session) async {
     try {
       await _ensurePatientProfileDobColumn(session);
       final resolvedUserId = requireAuthenticatedUserId(session);
@@ -224,16 +223,6 @@ class PatientEndpoint extends Endpoint {
     }
   }
 
-  int? _safeInt(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value);
-    if (value is List<int>) return int.tryParse(String.fromCharCodes(value));
-    return int.tryParse(value.toString());
-  }
-
-  /// Fetch logged-in patient's lab reports using phone number
   /// Fetch logged-in patient's lab reports using phone number
   Future<List<PatientReportDto>> getMyLabReports(
     Session session,
@@ -314,22 +303,14 @@ class PatientEndpoint extends Endpoint {
     required int patientId,
     required int prescriptionId,
     required String reportType,
-    required String base64Data,
-    required String fileName,
+    required String fileUrl,
   }) async {
     try {
       final int resolvedPatientId = requireAuthenticatedUserId(session);
-      final bool isPdf = fileName.toLowerCase().endsWith('.pdf');
 
-      // ক্লাউডিনারিতে আপলোড
-      final String? secureUrl = await CloudinaryUpload.uploadFile(
-        base64Data:
-            base64Data, // নিশ্চিত করুন cloudinary_upload.dart এ এই নামই আছে
-        folder: 'patient_external_reports',
-        isPdf: isPdf,
-      );
-
-      if (secureUrl == null) return false;
+      final secureUrl = fileUrl.trim();
+      if (!(secureUrl.startsWith('http://') ||
+          secureUrl.startsWith('https://'))) return false;
 
       // ১২ ঘণ্টা রিপ্লেস লজিক: চেক করুন এই প্রেসক্রিপশনের জন্য কোনো রিপোর্ট অলরেডি আছে কি না
       final existing = await session.db.unsafeQuery(

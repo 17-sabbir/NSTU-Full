@@ -649,14 +649,9 @@ class _LabTesterHomeState extends State<LabTesterHome> {
             backgroundColor: Colors.white,
             foregroundColor: Colors.blueAccent,
             centerTitle: true,
+            automaticallyImplyLeading: false,
             elevation: 0,
             actions: [
-              IconButton(
-                icon: const Icon(Icons.notifications),
-                onPressed: () async {
-                  await Navigator.pushNamed(context, '/notifications');
-                },
-              ),
 
               if (_selectedIndex == 2) ...[
                 IconButton(

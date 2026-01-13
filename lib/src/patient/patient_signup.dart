@@ -196,8 +196,8 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
         phoneToSend,
       );
 
-      if (challenge == null || challenge.success != true) {
-        final msg = challenge?.error?.toString() ?? 'Unknown error';
+      if (challenge.success != true) {
+        final msg = challenge.error?.toString() ?? 'Unknown error';
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Failed to start phone OTP: $msg')),
@@ -268,10 +268,10 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
           dob,
         );
 
-        if (res == null || res.success != true) {
+        if (res.success != true) {
           _showErrorDialog(
             'Signup Failed',
-            res?.error?.toString() ?? 'Unknown error',
+            res.error?.toString() ?? 'Unknown error',
           );
           return;
         }

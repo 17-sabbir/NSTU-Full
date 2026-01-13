@@ -66,6 +66,7 @@ dependencies:
   image_cropper_for_web: ^7.0.0
   sign_in_with_apple_web: ^3.0.0
   dio: ^5.9.0
+  universal_io: ^2.3.1
 
 
 dev_dependencies:

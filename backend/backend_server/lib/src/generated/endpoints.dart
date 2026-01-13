@@ -1405,8 +1405,8 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<String>(),
               nullable: false,
             ),
-            'base64Image': _i1.ParameterDescription(
-              name: 'base64Image',
+            'profilePictureUrl': _i1.ParameterDescription(
+              name: 'profilePictureUrl',
               type: _i1.getType<String?>(),
               nullable: true,
             ),
@@ -1423,7 +1423,7 @@ class Endpoints extends _i1.EndpointDispatch {
                     phone: params['phone'],
                     qualification: params['qualification'],
                     designation: params['designation'],
-                    base64Image: params['base64Image'],
+                    profilePictureUrl: params['profilePictureUrl'],
                   ),
         ),
         'listInventoryItems': _i1.MethodConnector(
@@ -1590,24 +1590,25 @@ class Endpoints extends _i1.EndpointDispatch {
       name: 'doctor',
       endpoint: endpoints['doctor']!,
       methodConnectors: {
-        'getDoctorInfo': _i1.MethodConnector(
-          name: 'getDoctorInfo',
-          params: {
-            'doctorId': _i1.ParameterDescription(
-              name: 'doctorId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-          },
+        'getDoctorHomeData': _i1.MethodConnector(
+          name: 'getDoctorHomeData',
+          params: {},
           call:
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async =>
-                  (endpoints['doctor'] as _i7.DoctorEndpoint).getDoctorInfo(
-                    session,
-                    params['doctorId'],
-                  ),
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
+                  .getDoctorHomeData(session),
+        ),
+        'getDoctorInfo': _i1.MethodConnector(
+          name: 'getDoctorInfo',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
+                  .getDoctorInfo(session),
         ),
         'getDoctorProfile': _i1.MethodConnector(
           name: 'getDoctorProfile',
@@ -1927,37 +1928,6 @@ class Endpoints extends _i1.EndpointDispatch {
                 params['test'],
               ),
         ),
-        'attachResultFileCloudinary': _i1.MethodConnector(
-          name: 'attachResultFileCloudinary',
-          params: {
-            'resultId': _i1.ParameterDescription(
-              name: 'resultId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-            'base64Data': _i1.ParameterDescription(
-              name: 'base64Data',
-              type: _i1.getType<String>(),
-              nullable: false,
-            ),
-            'fileName': _i1.ParameterDescription(
-              name: 'fileName',
-              type: _i1.getType<String>(),
-              nullable: false,
-            ),
-          },
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-              ) async => (endpoints['lab'] as _i8.LabEndpoint)
-                  .attachResultFileCloudinary(
-                    session,
-                    resultId: params['resultId'],
-                    base64Data: params['base64Data'],
-                    fileName: params['fileName'],
-                  ),
-        ),
         'sendDummySms': _i1.MethodConnector(
           name: 'sendDummySms',
           params: {
@@ -2000,21 +1970,16 @@ class Endpoints extends _i1.EndpointDispatch {
                 resultId: params['resultId'],
               ),
         ),
-        'submitResultWithFile': _i1.MethodConnector(
-          name: 'submitResultWithFile',
+        'submitResultWithUrl': _i1.MethodConnector(
+          name: 'submitResultWithUrl',
           params: {
             'resultId': _i1.ParameterDescription(
               name: 'resultId',
               type: _i1.getType<int>(),
               nullable: false,
             ),
-            'base64Data': _i1.ParameterDescription(
-              name: 'base64Data',
-              type: _i1.getType<String>(),
-              nullable: false,
-            ),
-            'fileName': _i1.ParameterDescription(
-              name: 'fileName',
+            'attachmentUrl': _i1.ParameterDescription(
+              name: 'attachmentUrl',
               type: _i1.getType<String>(),
               nullable: false,
             ),
@@ -2024,11 +1989,10 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['lab'] as _i8.LabEndpoint).submitResultWithFile(
+                  (endpoints['lab'] as _i8.LabEndpoint).submitResultWithUrl(
                     session,
                     resultId: params['resultId'],
-                    base64Data: params['base64Data'],
-                    fileName: params['fileName'],
+                    attachmentUrl: params['attachmentUrl'],
                   ),
         ),
         'getAllTestResults': _i1.MethodConnector(
@@ -2112,25 +2076,6 @@ class Endpoints extends _i1.EndpointDispatch {
                     designation: params['designation'],
                     qualification: params['qualification'],
                     profilePictureUrl: params['profilePictureUrl'],
-                  ),
-        ),
-        'uploadProfileImage': _i1.MethodConnector(
-          name: 'uploadProfileImage',
-          params: {
-            'base64Data': _i1.ParameterDescription(
-              name: 'base64Data',
-              type: _i1.getType<String>(),
-              nullable: false,
-            ),
-          },
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-              ) async =>
-                  (endpoints['lab'] as _i8.LabEndpoint).uploadProfileImage(
-                    session,
-                    params['base64Data'],
                   ),
         ),
         'getLabHomeTwoDaySummary': _i1.MethodConnector(
@@ -2309,19 +2254,9 @@ class Endpoints extends _i1.EndpointDispatch {
       name: 'password',
       endpoint: endpoints['password']!,
       methodConnectors: {
-        'changePasswordByUserIdEmail': _i1.MethodConnector(
-          name: 'changePasswordByUserIdEmail',
+        'changePassword': _i1.MethodConnector(
+          name: 'changePassword',
           params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-            'email': _i1.ParameterDescription(
-              name: 'email',
-              type: _i1.getType<String>(),
-              nullable: false,
-            ),
             'currentPassword': _i1.ParameterDescription(
               name: 'currentPassword',
               type: _i1.getType<String>(),
@@ -2338,10 +2273,8 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async => (endpoints['password'] as _i10.PasswordEndpoint)
-                  .changePasswordByUserIdEmail(
+                  .changePassword(
                     session,
-                    userId: params['userId'],
-                    email: params['email'],
                     currentPassword: params['currentPassword'],
                     newPassword: params['newPassword'],
                   ),
@@ -2354,22 +2287,13 @@ class Endpoints extends _i1.EndpointDispatch {
       methodConnectors: {
         'getPatientProfile': _i1.MethodConnector(
           name: 'getPatientProfile',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-          },
+          params: {},
           call:
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async => (endpoints['patient'] as _i11.PatientEndpoint)
-                  .getPatientProfile(
-                    session,
-                    params['userId'],
-                  ),
+                  .getPatientProfile(session),
         ),
         'listTests': _i1.MethodConnector(
           name: 'listTests',
@@ -2505,13 +2429,8 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<String>(),
               nullable: false,
             ),
-            'base64Data': _i1.ParameterDescription(
-              name: 'base64Data',
-              type: _i1.getType<String>(),
-              nullable: false,
-            ),
-            'fileName': _i1.ParameterDescription(
-              name: 'fileName',
+            'fileUrl': _i1.ParameterDescription(
+              name: 'fileUrl',
               type: _i1.getType<String>(),
               nullable: false,
             ),
@@ -2526,8 +2445,7 @@ class Endpoints extends _i1.EndpointDispatch {
                     patientId: params['patientId'],
                     prescriptionId: params['prescriptionId'],
                     reportType: params['reportType'],
-                    base64Data: params['base64Data'],
-                    fileName: params['fileName'],
+                    fileUrl: params['fileUrl'],
                   ),
         ),
         'getMyExternalReports': _i1.MethodConnector(

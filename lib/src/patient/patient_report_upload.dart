@@ -1,9 +1,10 @@
 import 'dart:io';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:backend_client/backend_client.dart';
+
+import '../cloudinary_upload.dart';
 
 enum UploadStatus { idle, success, failure }
 
@@ -149,8 +150,6 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
         setState(() => _isUploading = false);
         return;
       }
-      String base64Data = base64Encode(bytes);
-
       // Determine file name: prefer picked filename (works on web), else file path
       String fileName;
       if (_selectedFileName != null && _selectedFileName!.isNotEmpty) {
@@ -165,6 +164,26 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
       }
       fileName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9.]'), '_');
 
+      final isPdf = fileName.toLowerCase().endsWith('.pdf');
+      final uploadedUrl = await CloudinaryUpload.uploadBytes(
+        bytes: bytes,
+        folder: 'patient_external_reports',
+        fileName: fileName,
+        isPdf: isPdf,
+      );
+      if (uploadedUrl == null) {
+        setState(() => _uploadStatus = UploadStatus.failure);
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Upload failed: Cloudinary upload error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isUploading = false);
+        return;
+      }
+
       // এপিআই কল
       dynamic success;
       try {
@@ -173,8 +192,7 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
           patientId: 0,
           prescriptionId: replacePrescriptionId ?? _selectedPrescriptionId!,
           reportType: _selectedType ?? "Other",
-          base64Data: base64Data,
-          fileName: fileName,
+          fileUrl: uploadedUrl,
         );
       } catch (e) {
         // network/backend error

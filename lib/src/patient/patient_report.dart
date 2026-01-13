@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../download_pdf_image_from_link.dart';
+
 class PatientReports extends StatefulWidget {
   const PatientReports({super.key});
 
@@ -52,27 +54,54 @@ class _PatientReportsState extends State<PatientReports> {
     }
   }
 
-  Future<void> downloadReportFromLink(String url) async {
-    String downloadUrl = url;
-
-    if (url.contains('/raw/upload/')) {
-      //  PDF / raw → attachment allowed
-      downloadUrl = url.replaceFirst(
-        '/raw/upload/',
-        '/raw/upload/fl_attachment/',
-      );
-    } else if (url.contains('/image/upload/')) {
-      //  image → attachment
-      downloadUrl = url.replaceFirst(
-        '/image/upload/',
-        '/image/upload/fl_attachment/',
-      );
+  String _inferExtensionFromUrl(String url) {
+    try {
+      final last = Uri.parse(url).pathSegments.isEmpty
+          ? ''
+          : Uri.parse(url).pathSegments.last;
+      final i = last.lastIndexOf('.');
+      if (i > 0 && i < last.length - 1) {
+        return last.substring(i + 1).toLowerCase();
+      }
+    } catch (_) {
+      // ignore
     }
+    return 'pdf';
+  }
 
-    await launchUrl(
-      Uri.parse(downloadUrl),
-      mode: LaunchMode.externalApplication,
-    );
+  Future<void> downloadReportFromLink({
+    required String url,
+    required String suggestedBaseName,
+  }) async {
+    try {
+      final ext = _inferExtensionFromUrl(url);
+      final safeBase = suggestedBaseName.trim().isEmpty
+          ? 'report_${DateTime.now().millisecondsSinceEpoch}'
+          : suggestedBaseName.trim();
+      final fileName = safeBase.contains('.') ? safeBase : '$safeBase.$ext';
+
+      await downloadPdfImageFromLink(
+        url: url,
+        fileName: fileName,
+        context: context,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Saved to Downloads (or browser downloads).'),
+        ),
+      );
+    } catch (e) {
+      // Fallback: open in external app/browser.
+      final dl = buildCloudinaryAttachmentUrl(url);
+      await launchUrl(Uri.parse(dl), mode: LaunchMode.externalApplication);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Download fallback used: $e')));
+    }
   }
 
   @override
@@ -157,7 +186,9 @@ class _PatientReportsState extends State<PatientReports> {
                                 onPressed:
                                     report.isUploaded && report.fileUrl != null
                                     ? () => downloadReportFromLink(
-                                        report.fileUrl!,
+                                        url: report.fileUrl!,
+                                        suggestedBaseName:
+                                            'Report_${report.testName}_${DateFormat('yyyyMMdd').format(report.date)}',
                                       )
                                     : null,
                                 icon: const Icon(Icons.download, size: 18),

@@ -2,8 +2,6 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:serverpod/serverpod.dart';
 import 'dart:async'; // added for fire-and-forget scheduling
-// added for Cloudinary uploads
-import 'cloudinary_upload.dart';
 import 'auth_endpoint.dart';
 import '../generated/protocol.dart';
 
@@ -83,12 +81,9 @@ class AdminEndpoints extends Endpoint {
   /// returns normalized form like '+88XXXXXXXXXXX' where X... is 11 digits.
   /// Returns null if invalid.
 
-
   /// Create a new user record. Expects passwordHash to already be hashed by the caller.
   Future<String> createUser(Session session, String name, String email,
       String passwordHash, String role, String? phone) async {
-
-
     final existing = await session.db.unsafeQuery(
       'SELECT email, phone FROM users WHERE email = @e OR phone = @ph LIMIT 1',
       parameters: QueryParameters.named({'e': email, 'ph': phone}),
@@ -141,12 +136,8 @@ class AdminEndpoints extends Endpoint {
   Future<String> createUserWithPassword(Session session, String name,
       String email, String password, String role, String? phone) async {
     try {
-
-
-
       final hashed = sha256.convert(utf8.encode(password)).toString();
-      final res =
-          await createUser(session, name, email, hashed, role, phone);
+      final res = await createUser(session, name, email, hashed, role, phone);
 
       final newUserId = int.tryParse(res);
       if (newUserId != null) {
@@ -178,7 +169,6 @@ class AdminEndpoints extends Endpoint {
       return 'Internal error';
     }
   }
-
 
   // ------------------ Rosters ------------------
   Future<bool> _initRostersTable(Session session) async {
@@ -485,28 +475,8 @@ class AdminEndpoints extends Endpoint {
         if (data.startsWith('http://') || data.startsWith('https://')) {
           profilePictureUrl = data;
         } else {
-          var b64 = data;
-          if (b64.contains(',')) {
-            b64 = b64.split(',').last;
-          }
-          b64 = b64.replaceAll(RegExp(r"\s+"), '');
-
-          try {
-            // রিফ্যাক্টরড অংশ: CloudinaryService কল করা
-            final String? uploadedUrl = await CloudinaryUpload.uploadFile(
-                base64Data: b64, // এখানে b64 হবে
-                folder: 'admin_uploads',
-                isPdf: false);
-
-            if (uploadedUrl == null) {
-              await session.db.unsafeExecute('ROLLBACK');
-              return 'Failed to upload profile image';
-            }
-            profilePictureUrl = uploadedUrl;
-          } catch (e) {
-            await session.db.unsafeExecute('ROLLBACK');
-            return 'Invalid profile picture data';
-          }
+          await session.db.unsafeExecute('ROLLBACK');
+          return 'Invalid profile picture URL';
         }
       }
 
@@ -566,7 +536,7 @@ class AdminEndpoints extends Endpoint {
         storedHash = '';
       } else if (ph is List<int>) {
         storedHash = String.fromCharCodes(ph);
-      }else {
+      } else {
         storedHash = ph.toString();
       }
       final currHash = sha256.convert(utf8.encode(currentPassword)).toString();

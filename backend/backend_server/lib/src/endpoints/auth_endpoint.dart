@@ -199,13 +199,6 @@ class AuthEndpoint extends Endpoint {
     return int.tryParse(value.toString());
   }
 
-  DateTime? _decodeDbDateTime(dynamic value) {
-    if (value == null) return null;
-    if (value is DateTime) return value;
-    if (value is List<int>) return DateTime.tryParse(utf8.decode(value));
-    if (value is String) return DateTime.tryParse(value);
-    return DateTime.tryParse(value.toString());
-  }
 
   int? _calculateAgeFromDob(DateTime? dob) {
     if (dob == null) return null;
@@ -893,7 +886,7 @@ class AuthEndpoint extends Endpoint {
 
     final authToken = JWT(
       {
-        'uid': generatedId!,
+        'uid': generatedId,
         'role': role.toUpperCase(),
         'tv': tokenVersion,
         'jti': _uuid.v4(),
@@ -908,7 +901,7 @@ class AuthEndpoint extends Endpoint {
     return LoginResponse(
       success: true,
       role: role.toUpperCase(),
-      userId: generatedId!.toString(),
+      userId: generatedId.toString(),
       userName: name,
       phone: phone,
       bloodGroup: bloodGroup,

@@ -1,9 +1,10 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:backend_client/backend_client.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../cloudinary_upload.dart';
 
 class DispenserProfile extends StatefulWidget {
   const DispenserProfile({super.key});
@@ -143,8 +144,25 @@ class _DispenserProfileState extends State<DispenserProfile> {
     if (!_isChanged) return;
     setState(() => _isSaving = true);
 
-    String? base64Image;
-    if (_imageBytes != null) base64Image = base64Encode(_imageBytes!);
+    String? profileUrl = profileImageUrl.isEmpty ? null : profileImageUrl;
+    if (_imageBytes != null) {
+      final uploadedUrl = await CloudinaryUpload.uploadBytes(
+        bytes: _imageBytes!,
+        folder: 'dispenser_profiles',
+        fileName:
+            'dispenser_profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        isPdf: false,
+      );
+      if (uploadedUrl == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to upload profile image')),
+        );
+        setState(() => _isSaving = false);
+        return;
+      }
+      profileUrl = uploadedUrl;
+    }
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -157,7 +175,7 @@ class _DispenserProfileState extends State<DispenserProfile> {
         phone: _phoneCtrl.text.trim(),
         qualification: _qualificationCtrl.text.trim(),
         designation: _designationCtrl.text.trim(), // ✅ Pass designation
-        base64Image: base64Image,
+        profilePictureUrl: profileUrl,
       );
 
       await _loadProfile();

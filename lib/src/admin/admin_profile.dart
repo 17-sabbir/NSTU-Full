@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:flutter/services.dart';
+
+import '../cloudinary_upload.dart';
 
 class AdminProfile extends StatefulWidget {
   const AdminProfile({super.key});
@@ -194,7 +195,25 @@ class _AdminProfileState extends State<AdminProfile> {
 
       String? profileData;
       if (_imageBytes != null) {
-        profileData = 'data:image/jpeg;base64,' + base64Encode(_imageBytes!);
+        final uploadedUrl = await CloudinaryUpload.uploadBytes(
+          bytes: _imageBytes!,
+          folder: 'admin_profiles',
+          fileName:
+              'admin_profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          isPdf: false,
+        );
+        if (uploadedUrl == null) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to upload profile image'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() => _isSaving = false);
+          return;
+        }
+        profileData = uploadedUrl;
       }
 
       // Call backend update using generated client endpoint

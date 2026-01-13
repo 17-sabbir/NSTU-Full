@@ -1,5 +1,5 @@
-import 'package:dishari/src/doctor/prescription_page.dart';
 import 'package:flutter/material.dart';
+import 'package:dishari/src/doctor/doctor_home.dart';
 import 'doctor_profile.dart';
 import 'patient_records.dart';
 import 'test_reports_view.dart';
@@ -19,10 +19,10 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   // keep track of visited page history
   final List<int> _navigationHistory = [];
 
-  // Reordered pages: Patients -> Create Prescription -> Review Reports -> Profile
-  late final List<Widget> _pages = [
+  // Pages are generated dynamically so we always pass the latest doctorId.
+  List<Widget> get _pages => [
+    DoctorHomePage(doctorId: _doctorId),
     const PatientRecordsPage(),
-    const PrescriptionPage(),
     TestReportsView(doctorId: _doctorId),
     const ProfilePage(),
   ];
@@ -154,12 +154,12 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
           },
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.people),
-              label: "Patients",
+              icon: Icon(Icons.home_rounded),
+              label: "Home",
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.emergency),
-              label: "Create Prescription",
+              icon: Icon(Icons.people),
+              label: "Patients",
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.upload_file),

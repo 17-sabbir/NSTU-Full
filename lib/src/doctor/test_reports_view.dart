@@ -1,12 +1,13 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart'; // kIsWeb
 import 'package:flutter/material.dart';
 // Clipboard
 import 'package:backend_client/backend_client.dart'; // আপনার ক্লায়েন্ট ইমপোর্ট করুন
 import 'package:flutter_pdfview/flutter_pdfview.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+
+import '../download_pdf_image_from_link.dart';
+import '../platform_temp_file.dart';
 
 class TestReportsView extends StatefulWidget {
   final int doctorId;
@@ -71,9 +72,10 @@ class _TestReportsViewState extends State<TestReportsView> {
         throw Exception('Failed to load PDF');
       }
 
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/report.pdf');
-      await file.writeAsBytes(response.bodyBytes);
+      final filePath = await writeTempFile(
+        response.bodyBytes,
+        fileName: 'report.pdf',
+      );
 
       if (!mounted) return;
 
@@ -81,7 +83,7 @@ class _TestReportsViewState extends State<TestReportsView> {
         MaterialPageRoute(
           builder: (_) => Scaffold(
             appBar: AppBar(title: const Text('Report PDF')),
-            body: PDFView(filePath: file.path),
+            body: PDFView(filePath: filePath),
           ),
         ),
       );
@@ -100,7 +102,8 @@ class _TestReportsViewState extends State<TestReportsView> {
     });
 
     try {
-      final list = await client.doctor.getReportsForDoctor(widget.doctorId);
+      // Backend resolves doctorId from authenticated session
+      final list = await client.doctor.getReportsForDoctor(0);
       if (!mounted) return;
       setState(() {
         _reports = list;
@@ -219,30 +222,6 @@ class _TestReportsViewState extends State<TestReportsView> {
       }
 
       return items;
-    }
-
-    String buildCloudinaryDownloadUrl(String url) {
-      if (url.isEmpty) return url;
-
-      // image urls
-      if (url.contains('/image/upload/')) {
-        return url.replaceFirst(
-          '/image/upload/',
-          '/image/upload/fl_attachment/',
-        );
-      }
-
-      // raw urls (pdf usually)
-      if (url.contains('/raw/upload/')) {
-        return url.replaceFirst('/raw/upload/', '/raw/upload/fl_attachment/');
-      }
-
-      // fallback: general /upload/
-      if (url.contains('/upload/')) {
-        return url.replaceFirst('/upload/', '/upload/fl_attachment/');
-      }
-
-      return url;
     }
 
     Future<void> prefillFromExisting(StateSetter setSheetState) async {
@@ -532,10 +511,28 @@ class _TestReportsViewState extends State<TestReportsView> {
                       alignment: Alignment.centerRight,
                       child: TextButton.icon(
                         onPressed: () async {
-                          final dl = buildCloudinaryDownloadUrl(previewUrl!);
-                          await launchUrl(
-                            Uri.parse(dl),
-                            mode: LaunchMode.externalApplication,
+                          final raw = previewUrl!;
+                          final suggestedName =
+                              Uri.tryParse(
+                                    raw,
+                                  )?.pathSegments.last.trim().isNotEmpty ==
+                                  true
+                              ? Uri.parse(raw).pathSegments.last
+                              : 'report_${DateTime.now().millisecondsSinceEpoch}';
+
+                          await downloadPdfImageFromLink(
+                            url: raw,
+                            fileName: suggestedName,
+                            context: context,
+                          );
+
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Saved to Downloads (or browser downloads).',
+                              ),
+                            ),
                           );
                         },
                         icon: const Icon(Icons.download),
@@ -1015,15 +1012,9 @@ class _TestReportsViewState extends State<TestReportsView> {
         ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.blue,
-        centerTitle: true,
+        automaticallyImplyLeading: false,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () async {
-              await Navigator.pushNamed(context, '/notifications');
-            },
-          ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: _fetchReports,

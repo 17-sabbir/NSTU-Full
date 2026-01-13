@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:backend_client/backend_client.dart';
+import 'package:dishari/src/doctor/prescription_page.dart';
 
 class PatientRecordsPage extends StatefulWidget {
   const PatientRecordsPage({super.key});
@@ -11,73 +15,145 @@ class PatientRecordsPage extends StatefulWidget {
 class _PatientRecordsPageState extends State<PatientRecordsPage> {
   final TextEditingController _searchController = TextEditingController();
 
+  Timer? _searchDebounce;
+  int _fetchToken = 0;
+  bool _searching = false;
+
   bool _loading = false;
   String? _error;
 
   List<PatientPrescriptionListItem> _patients = [];
   List<PatientPrescriptionListItem> _filteredPatients = [];
 
+  final TextEditingController _newPatientPhoneController =
+      TextEditingController();
+
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_filterPatients);
-    _fetchPatients();
+    _searchController.addListener(_onSearchChanged);
+    // Don't show any records until user searches.
+    _patients = [];
+    _filteredPatients = [];
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_filterPatients);
-    _searchController.dispose();
+    try {
+      _searchController.removeListener(_onSearchChanged);
+    } catch (_) {}
+    try {
+      _searchController.dispose();
+    } catch (_) {}
+    try {
+      _searchDebounce?.cancel();
+    } catch (_) {}
+    try {
+      _newPatientPhoneController.dispose();
+    } catch (_) {}
     super.dispose();
   }
 
-  Future<void> _fetchPatients() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  String _digitsOnly(String input) => input.replaceAll(RegExp(r'[^0-9]'), '');
+
+  bool _phonesMatchByLast11(String? a, String? b) {
+    final da = _digitsOnly(a ?? '');
+    final db = _digitsOnly(b ?? '');
+    if (da.isEmpty || db.isEmpty) return false;
+    final lastA = da.length >= 11 ? da.substring(da.length - 11) : da;
+    final lastB = db.length >= 11 ? db.substring(db.length - 11) : db;
+    return lastA == lastB;
+  }
+
+  int _calculateAgeFromDob(DateTime dob, DateTime now) {
+    var age = now.year - dob.year;
+    final hasHadBirthdayThisYear =
+        (now.month > dob.month) ||
+        (now.month == dob.month && now.day >= dob.day);
+    if (!hasHadBirthdayThisYear) age -= 1;
+    if (age < 0) return 0;
+    return age;
+  }
+
+  Future<void> _fetchPatients({
+    String? queryOverride,
+    bool showSpinner = true,
+  }) async {
+    final token = ++_fetchToken;
+
+    if (showSpinner) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    } else {
+      setState(() {
+        _searching = true;
+        _error = null;
+      });
+    }
 
     try {
       final data = await client.doctor.getPatientPrescriptionList(
-        query: _searchController.text.trim(),
+        query: (queryOverride ?? _searchController.text).trim(),
         limit: 200,
         offset: 0,
       );
 
       if (!mounted) return;
+      if (token != _fetchToken) return; // ignore stale responses
 
       setState(() {
         _patients = data;
-        _filteredPatients = data; // initial
+        _filterPatients();
         _loading = false;
+        _searching = false;
       });
     } catch (e) {
       if (!mounted) return;
+      if (token != _fetchToken) return;
       setState(() {
         _error = e.toString();
         _loading = false;
+        _searching = false;
       });
     }
+  }
+
+  void _onSearchChanged() {
+    if (!mounted) return;
+    _filterPatients();
+
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      // Live server-side search so number-based search works beyond initial 200.
+      _fetchPatients(
+        queryOverride: _searchController.text.trim(),
+        showSpinner: false,
+      );
+    });
   }
 
   void _filterPatients() {
     if (!mounted) return;
     final query = _searchController.text.toLowerCase().trim();
 
+    final queryDigits = _digitsOnly(query);
+
     // backend search already supported, কিন্তু UI instant filter রাখলাম
     setState(() {
       if (query.isEmpty) {
-        _filteredPatients = _patients;
+        _filteredPatients = [];
       } else {
         _filteredPatients = _patients.where((p) {
-          final name = p.name.toLowerCase();
-          final mobile = (p.mobileNumber ?? '').toLowerCase();
-          return name.contains(query) || mobile.contains(query);
+          final mobileDigits = _digitsOnly(p.mobileNumber ?? '');
+          if (queryDigits.isEmpty) return false;
+          return mobileDigits.contains(queryDigits);
         }).toList();
       }
     });
   }
-
 
   Future<void> _viewPatientDetails(PatientPrescriptionListItem patient) async {
     try {
@@ -92,6 +168,74 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
         isScrollControlled: true,
         builder: (context) => PatientDetailsSheet(details: details),
       );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed: $e')));
+    }
+  }
+
+  Future<void> _continueFromSearchNumber() async {
+    final raw = _searchController.text.trim();
+    if (raw.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a phone number first')),
+      );
+      return;
+    }
+
+    try {
+      final res = await client.doctor.getPatientByPhone(raw);
+      final nameFromAccount = (res['name'] ?? '').trim();
+
+      // Backend returns these keys when patient exists:
+      // - age: computed integer age (string)
+      // - dateOfBirth: ISO date string (optional)
+      final ageStr = (res['age'] ?? '').trim();
+      final dobStr = (res['dateOfBirth'] ?? '').trim();
+
+      int? ageFromBackend;
+      if (ageStr.isNotEmpty) {
+        ageFromBackend = int.tryParse(ageStr);
+      }
+
+      int? ageFromDob;
+      if (ageFromBackend == null && dobStr.isNotEmpty) {
+        final dob = DateTime.tryParse(dobStr);
+        if (dob != null) {
+          ageFromDob = _calculateAgeFromDob(dob, DateTime.now());
+        }
+      }
+
+      // Try to auto-fill gender/age from the most recent record (if any)
+      PatientPrescriptionListItem? bestRecord;
+      for (final r in _patients) {
+        if (_phonesMatchByLast11(r.mobileNumber, raw)) {
+          bestRecord = r;
+          break;
+        }
+      }
+
+      if (!mounted) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PrescriptionPage(
+            initialPatientName: nameFromAccount.isNotEmpty
+                ? nameFromAccount
+                : (bestRecord?.name.isNotEmpty == true
+                      ? bestRecord!.name
+                      : null),
+            initialPatientNumber: raw,
+            initialPatientGender: bestRecord?.gender,
+            initialPatientAge: ageFromBackend ?? ageFromDob,
+          ),
+        ),
+      );
+
+      if (!mounted) return;
+      await _fetchPatients();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -120,13 +264,8 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
               await Navigator.pushNamed(context, '/notifications');
             },
           ),
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchPatients,
-          ),
         ],
-        centerTitle: true,
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.blueAccent),
       ),
@@ -136,16 +275,39 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
             padding: const EdgeInsets.all(16.0),
             child: TextField(
               controller: _searchController,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9+ -]')),
+              ],
               decoration: InputDecoration(
-                hintText: 'Search by Patient Name or Number...',
+                hintText: 'Search by phone number...',
                 prefixIcon: const Icon(Icons.search),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_searching)
+                      const Padding(
+                        padding: EdgeInsets.only(right: 4),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    IconButton(
+                      tooltip: 'Next',
+                      icon: const Icon(Icons.keyboard_return),
+                      onPressed: _continueFromSearchNumber,
+                    ),
+                  ],
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
                 fillColor: Colors.grey[50],
               ),
-              onSubmitted: (_) => _fetchPatients(), // server-side search
+              onSubmitted: (_) => _continueFromSearchNumber(),
             ),
           ),
 
@@ -155,6 +317,15 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
             Expanded(
               child: Center(
                 child: Text(_error!, style: const TextStyle(color: Colors.red)),
+              ),
+            )
+          else if (query.isEmpty)
+            const Expanded(
+              child: Center(
+                child: Text(
+                  'Search by phone number to see records',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
               ),
             )
           else if (_filteredPatients.isEmpty && query.isNotEmpty)
@@ -200,7 +371,12 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
                           ),
                         ],
                       ),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.arrow_forward_ios, size: 16),
+                        ],
+                      ),
                       onTap: () => _viewPatientDetails(patient),
                     ),
                   );
@@ -209,11 +385,10 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
             ),
         ],
       ),
+      floatingActionButton: null,
     );
   }
 }
-
-
 
 class PatientDetailsSheet extends StatelessWidget {
   final PatientPrescriptionDetails details;
@@ -283,7 +458,11 @@ class PatientDetailsSheet extends StatelessWidget {
                           CircleAvatar(
                             radius: 30,
                             backgroundColor: Colors.blue.shade100,
-                            child: const Icon(Icons.person, size: 30, color: Colors.blue),
+                            child: const Icon(
+                              Icons.person,
+                              size: 30,
+                              color: Colors.blue,
+                            ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -292,12 +471,19 @@ class PatientDetailsSheet extends StatelessWidget {
                               children: [
                                 Text(
                                   details.name,
-                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                                Text('Number: ${details.mobileNumber ?? '-'}',
-                                    style: const TextStyle(color: Colors.grey)),
-                                Text('Gender: ${details.gender ?? '-'} • Age: ${details.age ?? '-'}',
-                                    style: const TextStyle(color: Colors.grey)),
+                                Text(
+                                  'Number: ${details.mobileNumber ?? '-'}',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                                Text(
+                                  'Gender: ${details.gender ?? '-'} • Age: ${details.age ?? '-'}',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
                               ],
                             ),
                           ),
@@ -315,7 +501,10 @@ class PatientDetailsSheet extends StatelessWidget {
                       const SizedBox(height: 12),
                       const Text(
                         'Medicine',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 8),
 
@@ -335,14 +524,18 @@ class PatientDetailsSheet extends StatelessWidget {
                               child: ListTile(
                                 title: Text(
                                   m.medicineName,
-                                  style: const TextStyle(fontWeight: FontWeight.w700),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text('Dosage: ${m.dosageTimes ?? '-'}'),
                                     Text('Meal: ${m.mealTiming ?? '-'}'),
-                                    Text('Duration: ${m.duration?.toString() ?? '-'}'),
+                                    Text(
+                                      'Duration: ${m.duration?.toString() ?? '-'}',
+                                    ),
                                   ],
                                 ),
                               ),

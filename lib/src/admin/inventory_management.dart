@@ -31,7 +31,6 @@ class _InventoryManagementState extends State<InventoryManagement> {
       );
     }
   }
-
   List<Map<String, dynamic>> products = [];
   bool loading = true;
 
@@ -47,8 +46,8 @@ class _InventoryManagementState extends State<InventoryManagement> {
         products = result
             .map(
               (item) => {
-                'id': item.itemId, // Corrected: dot notation
-                'name': item.itemName, // Corrected: dot notation
+                'id': item.itemId,
+                'name': item.itemName,
                 'unit': item.unit,
                 'minThreshold': item.minimumStock,
                 'stock': item.currentQuantity,
@@ -195,7 +194,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
-            Future<void> _fetchTransactions() async {
+            Future<void> fetchTransactions() async {
               final data = await _loadTransactions(product['id']);
               setStateDialog(() {
                 product['transactions'] = data;
@@ -205,7 +204,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
 
             // 👉 dialog build হওয়ার সাথে সাথে একবার call
             if (txLoading) {
-              _fetchTransactions();
+              fetchTransactions();
             }
 
             final status = _getStockStatus(product);

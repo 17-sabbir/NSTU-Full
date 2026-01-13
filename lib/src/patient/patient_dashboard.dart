@@ -143,7 +143,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
         return;
       }
 
-      final profile = await client.patient.getPatientProfile(0);
+      final profile = await client.patient.getPatientProfile();
 
       if (profile != null) {
         setState(() {
@@ -573,7 +573,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                       ),
                       buildActionCard(
                         icon: Icons.local_hospital,
-                        label: "See Ambulance & Staff",
+                        label: "Ambulance & Staff",
                         onTap: () {
                           Navigator.pushNamed(context, '/patient/ambulance');
                         },

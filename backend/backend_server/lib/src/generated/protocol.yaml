@@ -53,6 +53,7 @@ dispenser:
   - searchInventoryItems:
   - dispensePrescription:
 doctor:
+  - getDoctorHomeData:
   - getDoctorInfo:
   - getDoctorProfile:
   - updateDoctorProfile:
@@ -67,14 +68,12 @@ lab:
   - createTestResult:
   - createLabTest:
   - updateLabTest:
-  - attachResultFileCloudinary:
   - sendDummySms:
   - submitResult:
-  - submitResultWithFile:
+  - submitResultWithUrl:
   - getAllTestResults:
   - getStaffProfile:
   - updateStaffProfile:
-  - uploadProfileImage:
   - getLabHomeTwoDaySummary:
   - getLast10TestHistory:
 notification:
@@ -85,7 +84,7 @@ notification:
   - markAsRead:
   - markAllAsRead:
 password:
-  - changePasswordByUserIdEmail:
+  - changePassword:
 patient:
   - getPatientProfile:
   - listTests:

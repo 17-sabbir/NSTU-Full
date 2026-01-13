@@ -3,8 +3,6 @@ import 'package:backend_server/src/generated/protocol.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'cloudinary_upload.dart';
-
 import '../utils/auth_user.dart';
 
 class LabEndpoint extends Endpoint {
@@ -122,51 +120,6 @@ class LabEndpoint extends Endpoint {
     }
   }
 
-  /// Uploads lab result (PDF or Image) to Cloudinary and updates DB
-  Future<String?> attachResultFileCloudinary(
-    Session session, {
-    required int resultId,
-    required String base64Data,
-    required String fileName,
-  }) async {
-    try {
-      // ফাইল এক্সটেনশন চেক করে PDF কি না তা নির্ধারণ করা
-      final bool isPdf = fileName.toLowerCase().endsWith('.pdf');
-
-      // CloudinaryUpload ক্লাস ব্যবহার করে আপলোড
-      final String? secureUrl = await CloudinaryUpload.uploadFile(
-        base64Data: base64Data,
-        folder: 'lab_reports',
-        isPdf: isPdf,
-      );
-
-      if (secureUrl == null) {
-        session.log('Cloudinary upload returned null', level: LogLevel.error);
-        return null;
-      }
-
-      // ডাটাবেসে অনলাইন URL আপডেট করা
-      await session.db.unsafeExecute(
-        '''
-        UPDATE test_results
-        SET is_uploaded = TRUE,
-            attachment_path = @url
-        WHERE result_id = @id
-        ''',
-        parameters: QueryParameters.named({
-          'id': resultId,
-          'url': secureUrl,
-        }),
-      );
-
-      return secureUrl;
-    } catch (e, st) {
-      session.log('Attach file to Cloudinary failed: $e',
-          level: LogLevel.error, stackTrace: st);
-      return null;
-    }
-  }
-
   /// Dummy SMS sender: logs message to server logs (no real SMS)
   Future<bool> sendDummySms(Session session,
       {required String mobileNumber, required String message}) async {
@@ -202,25 +155,16 @@ class LabEndpoint extends Endpoint {
     }
   }
 
-  /// Submit or resubmit result + dummy SMS notification
-  /// Submit result: upload file to Cloudinary, save URL and timestamp
-  Future<bool> submitResultWithFile(
+  /// Submit or resubmit result + dummy SMS notification.
+  /// Upload happens on frontend; backend only stores the URL.
+  Future<bool> submitResultWithUrl(
     Session session, {
     required int resultId,
-    required String base64Data,
-    required String fileName,
+    required String attachmentUrl,
   }) async {
     try {
-      // Upload file to Cloudinary
-      final bool isPdf = fileName.toLowerCase().endsWith('.pdf');
-      final String? secureUrl = await CloudinaryUpload.uploadFile(
-        base64Data: base64Data,
-        folder: 'lab_reports',
-        isPdf: isPdf,
-      );
-
-      if (secureUrl == null) {
-        session.log('Cloudinary upload failed', level: LogLevel.error);
+      final url = attachmentUrl.trim();
+      if (!(url.startsWith('http://') || url.startsWith('https://'))) {
         return false;
       }
 
@@ -235,7 +179,7 @@ class LabEndpoint extends Endpoint {
       ''',
         parameters: QueryParameters.named({
           'id': resultId,
-          'url': secureUrl,
+          'url': url,
         }),
       );
 
@@ -388,19 +332,6 @@ class LabEndpoint extends Endpoint {
           level: LogLevel.error, stackTrace: stack);
       return false;
     }
-  }
-
-  /// স্টাফ প্রোফাইল ইমেজ আপলোড
-  Future<String?> uploadProfileImage(
-    Session session,
-    String base64Data,
-  ) async {
-    // সরাসরি ক্লাউডিনারি সার্ভিস কল
-    return await CloudinaryUpload.uploadFile(
-      base64Data: base64Data,
-      folder: 'staff_profiles',
-      isPdf: false,
-    );
   }
 
   // --- Type Safety Helpers ---
