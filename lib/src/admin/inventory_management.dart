@@ -31,6 +31,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
       );
     }
   }
+
   List<Map<String, dynamic>> products = [];
   bool loading = true;
 
@@ -128,11 +129,20 @@ class _InventoryManagementState extends State<InventoryManagement> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Edit Threshold for ${product['name']}'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'New Minimum Level'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'New Minimum Level',
+              hintText: 'e.g. 10',
+              border: OutlineInputBorder(),
+            ),
+          ),
         ),
         actions: [
           TextButton(
@@ -141,7 +151,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final newMin = int.tryParse(controller.text);
+              final newMin = int.tryParse(controller.text.trim());
               if (newMin == null) return;
 
               final adminUserId = await _getAdminUserIdFromPrefs();
@@ -180,22 +190,25 @@ class _InventoryManagementState extends State<InventoryManagement> {
   /// Shows detailed item dialog where user can increase/decrease stock
   /// Function renamed to be clearer for beginners.
   void _showItemDetails(Map<String, dynamic> product) {
+    final rootContext = context;
     final TextEditingController quantityController = TextEditingController();
     String? errorText;
 
     // Ensure transactions list exists on the product
     product['transactions'] ??= <Map<String, dynamic>>[];
     bool txLoading = true;
+    bool txFetchStarted = false;
     bool canRestockDispenser = product['canRestockDispenser'] ?? false;
     bool originalRestockFlag = canRestockDispenser; // store original value
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setStateDialog) {
+          builder: (dialogContext, setStateDialog) {
             Future<void> fetchTransactions() async {
               final data = await _loadTransactions(product['id']);
+              if (!context.mounted) return;
               setStateDialog(() {
                 product['transactions'] = data;
                 txLoading = false;
@@ -203,7 +216,8 @@ class _InventoryManagementState extends State<InventoryManagement> {
             }
 
             // 👉 dialog build হওয়ার সাথে সাথে একবার call
-            if (txLoading) {
+            if (!txFetchStarted) {
+              txFetchStarted = true;
               fetchTransactions();
             }
 
@@ -217,7 +231,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
               }
               final adminUserId = await _getAdminUserIdFromPrefs();
               if (adminUserId == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(rootContext).showSnackBar(
                   const SnackBar(
                     content: Text(
                       'Error: Admin user ID not found. Please sign in again.',
@@ -236,7 +250,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
                   );
 
               if (!success) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(rootContext).showSnackBar(
                   const SnackBar(content: Text('Stock update failed')),
                 );
                 return;
@@ -244,15 +258,18 @@ class _InventoryManagementState extends State<InventoryManagement> {
 
               // Update canRestockDispenser only if it changed
               if (canRestockDispenser != originalRestockFlag) {
-                final restockSuccess = await client.adminInventoryEndpoints.updateDispenserRestockFlag(
-                  itemId: product['id'],
-                  canRestock: canRestockDispenser,
-                  adminUserId: adminUserId,
-                );
+                final restockSuccess = await client.adminInventoryEndpoints
+                    .updateDispenserRestockFlag(
+                      itemId: product['id'],
+                      canRestock: canRestockDispenser,
+                      adminUserId: adminUserId,
+                    );
 
                 if (!restockSuccess) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to update dispenser flag')),
+                  ScaffoldMessenger.of(rootContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to update dispenser flag'),
+                    ),
                   );
                   return;
                 }
@@ -264,8 +281,9 @@ class _InventoryManagementState extends State<InventoryManagement> {
               // Refresh list from backend
               await _loadInventory();
 
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
+              FocusScope.of(dialogContext).unfocus();
+              Navigator.pop(dialogContext);
+              ScaffoldMessenger.of(rootContext).showSnackBar(
                 SnackBar(
                   content: Text(delta > 0 ? 'Stock added' : 'Stock removed'),
                   backgroundColor: delta > 0 ? Colors.green : Colors.orange,
@@ -280,266 +298,274 @@ class _InventoryManagementState extends State<InventoryManagement> {
               ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 560),
-                child: Padding(
-                  padding: const EdgeInsets.all(18.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Header row with title and close
-                      Row(
-                        children: [
-                          Icon(Icons.inventory_2, color: primaryColor),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              product['name'] ?? 'Item',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.85,
+                  child: Padding(
+                    padding: const EdgeInsets.all(18.0),
+                    child: Column(
+                      children: [
+                        // Header row with title and close
+                        Row(
+                          children: [
+                            Icon(Icons.inventory_2, color: primaryColor),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                product['name'] ?? 'Item',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close),
-                            tooltip: 'Close',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Info card
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Status',
-                                  style: TextStyle(color: Colors.grey[700]),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: status['color'].withAlpha(
-                                      (0.12 * 255).round(),
-                                    ),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    status['text'],
-                                    style: TextStyle(
-                                      color: status['color'],
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Current Stock',
-                                  style: TextStyle(color: Colors.grey[700]),
-                                ),
-                                Text(
-                                  '${_getTotalStock(product)} ${product['unit'] ?? ''}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Minimum Threshold',
-                                  style: TextStyle(color: Colors.grey[700]),
-                                ),
-                                Text(
-                                  '${product['minThreshold'] ?? 0} ${product['unit'] ?? ''}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Category',
-                                  style: TextStyle(color: Colors.grey[700]),
-                                ),
-                                Text(
-                                  product['category'] ?? 'Unassigned',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                            IconButton(
+                              onPressed: () => Navigator.pop(dialogContext),
+                              icon: const Icon(Icons.close),
+                              tooltip: 'Close',
                             ),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 8),
 
-                      const SizedBox(height: 14),
-                      CheckboxListTile(
-                        title: const Text("Dispenser can restock"),
-                        value: canRestockDispenser,
-                        activeColor: primaryColor,
-                        contentPadding: EdgeInsets.zero,
-                        onChanged: (val) {
-                          setStateDialog(() {
-                            canRestockDispenser = val ?? false;
-                          });
-                        },
-                        controlAffinity: ListTileControlAffinity.leading,
-                      ),
-                      const SizedBox(height: 8),
-                      // Quantity input
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Update Stock Quantity',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[800],
+                        // Info card
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: quantityController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          hintText: 'Enter quantity (e.g. 10)',
-                          labelText: 'Quantity',
-                          helperText: 'Enter a positive whole number',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          errorText: errorText,
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Buttons row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _applyStockChange(1),
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text('Add Stock'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _applyStockChange(-1),
-                              icon: const Icon(Icons.remove, size: 18),
-                              label: const Text('Remove Stock'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange.shade700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      // Recent transactions
-                      // Recent transactions
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Recent Transactions',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[800],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: txLoading
-                            ? const Center(child: CircularProgressIndicator())
-                            : (product['transactions'] as List).isEmpty
-                            ? const Center(
-                                child: Text('No recent transactions'),
-                              )
-                            : ListView.builder(
-                                // shrinkWrap: true, // Expanded এর ভেতর থাকলে এটি না দিলেও চলে
-                                itemCount:
-                                    (product['transactions']
-                                            as List<InventoryTransactionInfo>)
-                                        .length,
-                                itemBuilder: (context, index) {
-                                  final t =
-                                      (product['transactions']
-                                          as List<
-                                            InventoryTransactionInfo
-                                          >)[index];
-                                  final qty = t.quantity;
-                                  final type = t.transactionType;
-                                  final dt = t.createdAt;
-                                  final signedQty = type == 'OUT' ? -qty : qty;
-
-                                  return Padding(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Status',
+                                    style: TextStyle(color: Colors.grey[700]),
+                                  ),
+                                  Container(
                                     padding: const EdgeInsets.symmetric(
-                                      vertical: 4,
+                                      horizontal: 10,
+                                      vertical: 6,
                                     ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                        Text(
-                                          signedQty > 0
-                                              ? '+$signedQty'
-                                              : signedQty.toString(),
-                                          style: TextStyle(
-                                            color: signedQty < 0
-                                                ? Colors.red
-                                                : Colors.green,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
+                                    decoration: BoxDecoration(
+                                      color: status['color'].withAlpha(
+                                        (0.12 * 255).round(),
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
                                     ),
-                                  );
-                                },
+                                    child: Text(
+                                      status['text'],
+                                      style: TextStyle(
+                                        color: status['color'],
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                      ),
-                    ],
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Current Stock',
+                                    style: TextStyle(color: Colors.grey[700]),
+                                  ),
+                                  Text(
+                                    '${_getTotalStock(product)} ${product['unit'] ?? ''}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Minimum Threshold',
+                                    style: TextStyle(color: Colors.grey[700]),
+                                  ),
+                                  Text(
+                                    '${product['minThreshold'] ?? 0} ${product['unit'] ?? ''}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Category',
+                                    style: TextStyle(color: Colors.grey[700]),
+                                  ),
+                                  Text(
+                                    product['category'] ?? 'Unassigned',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+                        CheckboxListTile(
+                          title: const Text("Dispenser can restock"),
+                          value: canRestockDispenser,
+                          activeColor: primaryColor,
+                          contentPadding: EdgeInsets.zero,
+                          onChanged: (val) {
+                            setStateDialog(() {
+                              canRestockDispenser = val ?? false;
+                            });
+                          },
+                          controlAffinity: ListTileControlAffinity.leading,
+                        ),
+                        const SizedBox(height: 8),
+                        // Quantity input
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Update Stock Quantity',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[800],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: quantityController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: 'Enter quantity (e.g. 10)',
+                            labelText: 'Quantity',
+                            helperText: 'Enter a positive whole number',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            errorText: errorText,
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Buttons row
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _applyStockChange(1),
+                                icon: const Icon(Icons.add, size: 18),
+                                label: const Text('Add Stock'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _applyStockChange(-1),
+                                icon: const Icon(Icons.remove, size: 18),
+                                label: const Text('Remove Stock'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // Recent transactions
+                        // Recent transactions
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Recent Transactions',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[800],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: txLoading
+                              ? const Center(child: CircularProgressIndicator())
+                              : (product['transactions'] as List).isEmpty
+                              ? const Center(
+                                  child: Text('No recent transactions'),
+                                )
+                              : ListView.builder(
+                                  // shrinkWrap: true, // Expanded এর ভেতর থাকলে এটি না দিলেও চলে
+                                  itemCount:
+                                      (product['transactions']
+                                              as List<InventoryTransactionInfo>)
+                                          .length,
+                                  itemBuilder: (context, index) {
+                                    final t =
+                                        (product['transactions']
+                                            as List<
+                                              InventoryTransactionInfo
+                                            >)[index];
+                                    final qty = t.quantity;
+                                    final type = t.transactionType;
+                                    final dt = t.createdAt;
+                                    final signedQty = type == 'OUT'
+                                        ? -qty
+                                        : qty;
+
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 4,
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                          Text(
+                                            signedQty > 0
+                                                ? '+$signedQty'
+                                                : signedQty.toString(),
+                                            style: TextStyle(
+                                              color: signedQty < 0
+                                                  ? Colors.red
+                                                  : Colors.green,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -547,36 +573,48 @@ class _InventoryManagementState extends State<InventoryManagement> {
           },
         );
       },
-    ).then((_) {
-      quantityController.dispose();
-    });
+    );
   }
 
   void _showAddCategoryDialog() {
+    final rootContext = context;
     final TextEditingController nameController = TextEditingController();
     final TextEditingController descController = TextEditingController(); // NEW
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Add Category'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                hintText: 'Enter category name',
-              ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Category name',
+                    hintText: 'e.g. Medicine',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: descController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (optional)',
+                    hintText: 'Short note about this category',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: descController, // NEW
-              decoration: const InputDecoration(
-                hintText: 'Enter description (optional)',
-              ),
-            ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
@@ -598,11 +636,11 @@ class _InventoryManagementState extends State<InventoryManagement> {
               if (success) {
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(
-                  context,
+                  rootContext,
                 ).showSnackBar(const SnackBar(content: Text('Category added')));
                 await _loadCategories(); // <-- refresh categories dynamically
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(rootContext).showSnackBar(
                   const SnackBar(content: Text('Failed to add category')),
                 );
               }
@@ -611,10 +649,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
           ),
         ],
       ),
-    ).then((_) {
-      nameController.dispose();
-      descController.dispose(); // NEW
-    });
+    );
   }
 
   @override
@@ -653,63 +688,91 @@ class _InventoryManagementState extends State<InventoryManagement> {
                 isMinStockValid;
 
             return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: const Text('Add New Item'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: nameController,
-                      onChanged: (_) =>
-                          setStateDialog(() {}), // Refresh validation
-                      decoration: const InputDecoration(labelText: 'Item Name'),
-                    ),
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<int>(
-                      value: selectedCategoryId,
-                      items: categories
-                          .map(
-                            (cat) => DropdownMenuItem(
-                              value: cat.categoryId,
-                              child: Text(cat.categoryName),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) {
-                        setStateDialog(() => selectedCategoryId = v);
-                      },
-                      decoration: const InputDecoration(labelText: 'Category'),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: unitController,
-                      onChanged: (_) => setStateDialog(() {}),
-                      decoration: const InputDecoration(labelText: 'Unit'),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: minStockController,
-                      onChanged: (_) => setStateDialog(() {}),
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Minimum Stock Level',
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: nameController,
+                        onChanged: (_) => setStateDialog(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Item Name',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    // ✅ Checkbox এখানে content এর ভিতরে
-                    CheckboxListTile(
-                      title: const Text("Dispenser can restock"),
-                      value: canRestockDispenser,
-                      activeColor: primaryColor,
-                      contentPadding: EdgeInsets.zero,
-                      onChanged: (val) {
-                        setStateDialog(() {
-                          canRestockDispenser = val ?? false;
-                        });
-                      },
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
-                  ],
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<int>(
+                        value: selectedCategoryId,
+                        items: categories
+                            .map(
+                              (cat) => DropdownMenuItem(
+                                value: cat.categoryId,
+                                child: Text(cat.categoryName),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) {
+                          setStateDialog(() => selectedCategoryId = v);
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'Category',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: unitController,
+                        onChanged: (_) => setStateDialog(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Unit',
+                          hintText: 'e.g. pcs / strip / ml',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: minStockController,
+                        onChanged: (_) => setStateDialog(() {}),
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Minimum Stock Level',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: CheckboxListTile(
+                          title: const Text('Dispenser can restock'),
+                          value: canRestockDispenser,
+                          activeColor: primaryColor,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                          ),
+                          onChanged: (val) {
+                            setStateDialog(() {
+                              canRestockDispenser = val ?? false;
+                            });
+                          },
+                          controlAffinity: ListTileControlAffinity.leading,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -892,6 +955,125 @@ class _InventoryManagementState extends State<InventoryManagement> {
     final bgColor = highlight
         ? status['color'].withAlpha((0.08 * 255).round())
         : Colors.white;
+
+    final isNarrow = MediaQuery.of(context).size.width < 520;
+
+    if (isNarrow) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Container(
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              const BoxShadow(
+                color: Colors.black12,
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: status['color'].withAlpha(
+                        (0.12 * 255).round(),
+                      ),
+                      child: Text(
+                        '${index + 1}',
+                        style: TextStyle(
+                          color: status['color'],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        product['name'] ?? 'Unnamed',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: status['color'].withAlpha((0.12 * 255).round()),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        status['text'],
+                        style: TextStyle(
+                          color: status['color'],
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Min Stock: ${product['minThreshold']}    Category: ${product['category']}',
+                  style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${_getTotalStock(product)} ${product['unit']}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => _showEditThresholdDialog(product),
+                      icon: const Icon(
+                        Icons.settings_backup_restore,
+                        color: Colors.blueGrey,
+                      ),
+                      tooltip: 'Update threshold',
+                    ),
+                    IconButton(
+                      onPressed: () => _showItemDetails(product),
+                      icon: const Icon(
+                        Icons.info_outline,
+                        color: Colors.blueGrey,
+                      ),
+                      tooltip: 'View details & update stock',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -1079,12 +1261,11 @@ class _InventoryManagementState extends State<InventoryManagement> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: SizedBox(),
-                  ), // keep header spacing (no dropdown)
-                  ElevatedButton.icon(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 520;
+
+                  final addCategoryBtn = ElevatedButton.icon(
                     onPressed: _showAddCategoryDialog,
                     icon: const Icon(Icons.add),
                     label: const Text('Add Category'),
@@ -1092,9 +1273,9 @@ class _InventoryManagementState extends State<InventoryManagement> {
                       backgroundColor: Colors.grey.shade200,
                       foregroundColor: Colors.black,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
+                  );
+
+                  final addItemBtn = ElevatedButton.icon(
                     onPressed: _showAddItemDialog,
                     icon: const Icon(Icons.add_box_outlined),
                     label: const Text('Add Item'),
@@ -1102,8 +1283,28 @@ class _InventoryManagementState extends State<InventoryManagement> {
                       backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
                     ),
-                  ),
-                ],
+                  );
+
+                  if (isNarrow) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        addCategoryBtn,
+                        const SizedBox(height: 8),
+                        addItemBtn,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      const Expanded(child: SizedBox()),
+                      addCategoryBtn,
+                      const SizedBox(width: 8),
+                      addItemBtn,
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -1115,11 +1316,9 @@ class _InventoryManagementState extends State<InventoryManagement> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   // Calculate a column-aware width. Keep all summary cards same width/height.
-                  // Try 4 columns when enough width, fallback to 2 or 1 column on small screens.
                   final double maxWidth = constraints.maxWidth;
-                  int columns = 4;
-                  if (maxWidth < 700) columns = 2;
-                  if (maxWidth < 420) columns = 1;
+                  // Prefer 2 cards per row on small screens, 4 on wide screens.
+                  int columns = maxWidth >= 900 ? 4 : 2;
                   final double totalSpacing = (columns - 1) * 12;
                   double cardWidth = (maxWidth - totalSpacing) / columns;
                   // Clamp to reasonable bounds so cards look consistent

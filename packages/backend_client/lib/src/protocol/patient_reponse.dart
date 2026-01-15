@@ -19,6 +19,7 @@ abstract class PatientProfile implements _i1.SerializableModel {
     required this.phone,
     this.bloodGroup,
     this.dateOfBirth,
+    this.gender,
     this.profilePictureUrl,
   });
 
@@ -28,6 +29,7 @@ abstract class PatientProfile implements _i1.SerializableModel {
     required String phone,
     String? bloodGroup,
     DateTime? dateOfBirth,
+    String? gender,
     String? profilePictureUrl,
   }) = _PatientProfileImpl;
 
@@ -42,6 +44,7 @@ abstract class PatientProfile implements _i1.SerializableModel {
           : _i1.DateTimeJsonExtension.fromJson(
               jsonSerialization['dateOfBirth'],
             ),
+      gender: jsonSerialization['gender'] as String?,
       profilePictureUrl: jsonSerialization['profilePictureUrl'] as String?,
     );
   }
@@ -56,6 +59,8 @@ abstract class PatientProfile implements _i1.SerializableModel {
 
   DateTime? dateOfBirth;
 
+  String? gender;
+
   String? profilePictureUrl;
 
   /// Returns a shallow copy of this [PatientProfile]
@@ -67,6 +72,7 @@ abstract class PatientProfile implements _i1.SerializableModel {
     String? phone,
     String? bloodGroup,
     DateTime? dateOfBirth,
+    String? gender,
     String? profilePictureUrl,
   });
   @override
@@ -78,6 +84,7 @@ abstract class PatientProfile implements _i1.SerializableModel {
       'phone': phone,
       if (bloodGroup != null) 'bloodGroup': bloodGroup,
       if (dateOfBirth != null) 'dateOfBirth': dateOfBirth?.toJson(),
+      if (gender != null) 'gender': gender,
       if (profilePictureUrl != null) 'profilePictureUrl': profilePictureUrl,
     };
   }
@@ -97,6 +104,7 @@ class _PatientProfileImpl extends PatientProfile {
     required String phone,
     String? bloodGroup,
     DateTime? dateOfBirth,
+    String? gender,
     String? profilePictureUrl,
   }) : super._(
          name: name,
@@ -104,6 +112,7 @@ class _PatientProfileImpl extends PatientProfile {
          phone: phone,
          bloodGroup: bloodGroup,
          dateOfBirth: dateOfBirth,
+         gender: gender,
          profilePictureUrl: profilePictureUrl,
        );
 
@@ -117,6 +126,7 @@ class _PatientProfileImpl extends PatientProfile {
     String? phone,
     Object? bloodGroup = _Undefined,
     Object? dateOfBirth = _Undefined,
+    Object? gender = _Undefined,
     Object? profilePictureUrl = _Undefined,
   }) {
     return PatientProfile(
@@ -125,6 +135,7 @@ class _PatientProfileImpl extends PatientProfile {
       phone: phone ?? this.phone,
       bloodGroup: bloodGroup is String? ? bloodGroup : this.bloodGroup,
       dateOfBirth: dateOfBirth is DateTime? ? dateOfBirth : this.dateOfBirth,
+      gender: gender is String? ? gender : this.gender,
       profilePictureUrl: profilePictureUrl is String?
           ? profilePictureUrl
           : this.profilePictureUrl,

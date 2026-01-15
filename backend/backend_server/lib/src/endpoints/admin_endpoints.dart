@@ -616,6 +616,57 @@ class AdminEndpoints extends Endpoint {
     }
   }
 
+  /// Fetch recent audit logs within the last [hours] hours.
+  /// Used by Admin Dashboard Recent Activity (last 24h).
+  Future<List<AuditEntry>> getRecentAuditLogs(
+    Session session,
+    int hours,
+    int limit,
+  ) async {
+    try {
+      final safeHours = hours <= 0 ? 24 : hours.clamp(1, 168);
+      final safeLimit = limit <= 0 ? 20 : limit.clamp(1, 200);
+
+      final result = await session.db.unsafeQuery(
+        '''
+      SELECT 
+        al.audit_id, 
+        al.action, 
+        al.target_id, 
+        al.created_at, 
+        u1.name as admin_name,
+        u2.name as target_name
+      FROM audit_log al
+      JOIN users u1 ON CAST(al.user_id AS bigint) = u1.user_id 
+      LEFT JOIN users u2 ON CAST(al.target_id AS bigint) = u2.user_id
+      WHERE al.created_at >= NOW() - (@h * INTERVAL '1 hour')
+      ORDER BY al.created_at DESC
+      LIMIT @lim
+      ''',
+        parameters: QueryParameters.named({'h': safeHours, 'lim': safeLimit}),
+      );
+
+      return result.map((row) {
+        final map = row.toColumnMap();
+        return AuditEntry(
+          auditId: map['audit_id'] as int,
+          action: map['action'] as String,
+          targetName:
+              map['target_name']?.toString() ?? map['target_id']?.toString(),
+          createdAt: map['created_at'] as DateTime,
+          adminName: map['admin_name']?.toString() ?? 'Unknown Admin',
+        );
+      }).toList();
+    } catch (e, st) {
+      session.log(
+        'getRecentAuditLogs failed: $e',
+        level: LogLevel.error,
+        stackTrace: st,
+      );
+      return [];
+    }
+  }
+
   // Add new ambulance contact
   Future<bool> addAmbulanceContact(Session session, String title,
       String phoneBn, String phoneEn, bool isPrimary) async {

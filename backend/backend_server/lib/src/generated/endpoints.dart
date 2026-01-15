@@ -502,6 +502,31 @@ class Endpoints extends _i1.EndpointDispatch {
               ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
                   .getAuditLogs(session),
         ),
+        'getRecentAuditLogs': _i1.MethodConnector(
+          name: 'getRecentAuditLogs',
+          params: {
+            'hours': _i1.ParameterDescription(
+              name: 'hours',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'limit': _i1.ParameterDescription(
+              name: 'limit',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .getRecentAuditLogs(
+                    session,
+                    params['hours'],
+                    params['limit'],
+                  ),
+        ),
         'addAmbulanceContact': _i1.MethodConnector(
           name: 'addAmbulanceContact',
           params: {
@@ -855,6 +880,18 @@ class Endpoints extends _i1.EndpointDispatch {
       name: 'adminReportEndpoints',
       endpoint: endpoints['adminReportEndpoints']!,
       methodConnectors: {
+        'getAdminDashboardOverview': _i1.MethodConnector(
+          name: 'getAdminDashboardOverview',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminReportEndpoints']
+                          as _i4.AdminReportEndpoints)
+                      .getAdminDashboardOverview(session),
+        ),
         'getDashboardAnalytics': _i1.MethodConnector(
           name: 'getDashboardAnalytics',
           params: {},
@@ -1131,6 +1168,11 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<DateTime?>(),
               nullable: true,
             ),
+            'gender': _i1.ParameterDescription(
+              name: 'gender',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
           },
           call:
               (
@@ -1148,6 +1190,7 @@ class Endpoints extends _i1.EndpointDispatch {
                     params['role'],
                     params['bloodGroup'],
                     params['dateOfBirth'],
+                    params['gender'],
                   ),
         ),
         'sendWelcomeEmailViaResend': _i1.MethodConnector(
@@ -1360,31 +1403,17 @@ class Endpoints extends _i1.EndpointDispatch {
       methodConnectors: {
         'getDispenserProfile': _i1.MethodConnector(
           name: 'getDispenserProfile',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-          },
+          params: {},
           call:
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
-                  .getDispenserProfile(
-                    session,
-                    params['userId'],
-                  ),
+                  .getDispenserProfile(session),
         ),
         'updateDispenserProfile': _i1.MethodConnector(
           name: 'updateDispenserProfile',
           params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
             'name': _i1.ParameterDescription(
               name: 'name',
               type: _i1.getType<String>(),
@@ -1418,7 +1447,6 @@ class Endpoints extends _i1.EndpointDispatch {
               ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
                   .updateDispenserProfile(
                     session,
-                    userId: params['userId'],
                     name: params['name'],
                     phone: params['phone'],
                     qualification: params['qualification'],
@@ -1439,11 +1467,6 @@ class Endpoints extends _i1.EndpointDispatch {
         'restockItem': _i1.MethodConnector(
           name: 'restockItem',
           params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
             'itemId': _i1.ParameterDescription(
               name: 'itemId',
               type: _i1.getType<int>(),
@@ -1462,29 +1485,19 @@ class Endpoints extends _i1.EndpointDispatch {
               ) async =>
                   (endpoints['dispenser'] as _i6.DispenserEndpoint).restockItem(
                     session,
-                    userId: params['userId'],
                     itemId: params['itemId'],
                     quantity: params['quantity'],
                   ),
         ),
         'getDispenserHistory': _i1.MethodConnector(
           name: 'getDispenserHistory',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-          },
+          params: {},
           call:
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
-                  .getDispenserHistory(
-                    session,
-                    params['userId'],
-                  ),
+                  .getDispenserHistory(session),
         ),
         'getPendingPrescriptions': _i1.MethodConnector(
           name: 'getPendingPrescriptions',
@@ -2352,6 +2365,11 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<DateTime?>(),
               nullable: true,
             ),
+            'gender': _i1.ParameterDescription(
+              name: 'gender',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
             'profileImageUrl': _i1.ParameterDescription(
               name: 'profileImageUrl',
               type: _i1.getType<String?>(),
@@ -2370,6 +2388,7 @@ class Endpoints extends _i1.EndpointDispatch {
                     params['phone'],
                     params['bloodGroup'],
                     params['dateOfBirth'],
+                    params['gender'],
                     params['profileImageUrl'],
                   ),
         ),

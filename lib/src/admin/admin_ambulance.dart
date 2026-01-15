@@ -11,6 +11,8 @@ class AdminAmbulance extends StatefulWidget {
 class _AdminAmbulanceState extends State<AdminAmbulance> {
   late Future<List<AmbulanceContact>> _ambulances;
 
+  final Color _primaryTeal = const Color(0xFF00695C);
+
   @override
   void initState() {
     super.initState();
@@ -20,10 +22,17 @@ class _AdminAmbulanceState extends State<AdminAmbulance> {
   void _loadAmbulances() {
     _ambulances = client.patient.getAmbulanceContacts();
   }
+
   void _showAddEditDialog({AmbulanceContact? contact}) {
-    final titleController = TextEditingController(text: contact?.contactTitle ?? '');
-    final phoneBnController = TextEditingController(text: contact?.phoneBn ?? '');
-    final phoneEnController = TextEditingController(text: contact?.phoneEn ?? '');
+    final titleController = TextEditingController(
+      text: contact?.contactTitle ?? '',
+    );
+    final phoneBnController = TextEditingController(
+      text: contact?.phoneBn ?? '',
+    );
+    final phoneEnController = TextEditingController(
+      text: contact?.phoneEn ?? '',
+    );
     bool isPrimary = contact?.isPrimary ?? false;
 
     showDialog(
@@ -40,11 +49,15 @@ class _AdminAmbulanceState extends State<AdminAmbulance> {
                 ),
                 TextField(
                   controller: phoneBnController,
-                  decoration: const InputDecoration(labelText: "Phone (Bangla)"),
+                  decoration: const InputDecoration(
+                    labelText: "Phone (Bangla)",
+                  ),
                 ),
                 TextField(
                   controller: phoneEnController,
-                  decoration: const InputDecoration(labelText: "Phone (English)"),
+                  decoration: const InputDecoration(
+                    labelText: "Phone (English)",
+                  ),
                 ),
                 Row(
                   children: [
@@ -76,9 +89,20 @@ class _AdminAmbulanceState extends State<AdminAmbulance> {
                 if (title.isEmpty || phoneBn.isEmpty || phoneEn.isEmpty) return;
 
                 if (contact == null) {
-                  await client.adminEndpoints.addAmbulanceContact(title, phoneBn, phoneEn, isPrimary);
+                  await client.adminEndpoints.addAmbulanceContact(
+                    title,
+                    phoneBn,
+                    phoneEn,
+                    isPrimary,
+                  );
                 } else {
-                  await client.adminEndpoints.updateAmbulanceContact(contact.contactId, title, phoneBn, phoneEn, isPrimary);
+                  await client.adminEndpoints.updateAmbulanceContact(
+                    contact.contactId,
+                    title,
+                    phoneBn,
+                    phoneEn,
+                    isPrimary,
+                  );
                 }
 
                 Navigator.pop(context);
@@ -91,7 +115,6 @@ class _AdminAmbulanceState extends State<AdminAmbulance> {
       ),
     );
   }
-
 
   Widget _buildAmbulanceTile(AmbulanceContact contact) {
     return Card(
@@ -111,18 +134,6 @@ class _AdminAmbulanceState extends State<AdminAmbulance> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Ambulances"),
-        foregroundColor: Colors.blue,
-        backgroundColor: Colors.white,
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddEditDialog(),
-          ),
-        ],
-      ),
       body: FutureBuilder<List<AmbulanceContact>>(
         future: _ambulances,
         builder: (context, snapshot) {
@@ -141,6 +152,13 @@ class _AdminAmbulanceState extends State<AdminAmbulance> {
             children: ambulances.map(_buildAmbulanceTile).toList(),
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddEditDialog(),
+        backgroundColor: _primaryTeal,
+        foregroundColor: Colors.white,
+        tooltip: 'Add ambulance',
+        child: const Icon(Icons.add),
       ),
     );
   }

@@ -7,31 +7,6 @@ class PatientEndpoint extends Endpoint {
   @override
   bool get requireLogin => true;
 
-  Future<void> _ensurePatientProfileDobColumn(Session session) async {
-    try {
-      final res = await session.db.unsafeQuery(
-        '''
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name = 'patient_profiles'
-          AND column_name = 'date_of_birth'
-        LIMIT 1
-        ''',
-      );
-      if (res.isNotEmpty) return;
-
-      await session.db.unsafeExecute(
-        '''
-        ALTER TABLE patient_profiles
-        ADD COLUMN date_of_birth DATE
-        ''',
-      );
-    } catch (e) {
-      session.log('Could not ensure patient_profiles.date_of_birth: $e',
-          level: LogLevel.warning);
-    }
-  }
-
   DateTime? _safeDateTime(dynamic value) {
     if (value == null) return null;
     if (value is DateTime) return value;
@@ -45,7 +20,6 @@ class PatientEndpoint extends Endpoint {
   // Fetch patient profile
   Future<PatientProfile?> getPatientProfile(Session session) async {
     try {
-      await _ensurePatientProfileDobColumn(session);
       final resolvedUserId = requireAuthenticatedUserId(session);
 
       final result = await session.db.unsafeQuery(
@@ -56,7 +30,8 @@ class PatientEndpoint extends Endpoint {
         u.phone,
         u.profile_picture_url,
         p.blood_group,
-        p.date_of_birth
+        p.date_of_birth,
+        p.gender
       FROM users u
       LEFT JOIN patient_profiles p
         ON p.user_id = u.user_id
@@ -76,6 +51,7 @@ class PatientEndpoint extends Endpoint {
         phone: _safeString(row['phone']),
         bloodGroup: row['blood_group']?.toString(),
         dateOfBirth: _safeDateTime(row['date_of_birth']),
+        gender: row['gender']?.toString(),
         profilePictureUrl: row['profile_picture_url']?.toString(),
       );
     } catch (e, stack) {
@@ -170,10 +146,11 @@ class PatientEndpoint extends Endpoint {
     String phone,
     String? bloodGroup,
     DateTime? dateOfBirth,
+    String? gender,
     String? profileImageUrl,
   ) async {
     try {
-      await _ensurePatientProfileDobColumn(session);
+
       final resolvedUserId = requireAuthenticatedUserId(session);
 
       return await session.db.transaction((transaction) async {
@@ -196,18 +173,20 @@ class PatientEndpoint extends Endpoint {
         await session.db.unsafeExecute(
           '''
         INSERT INTO patient_profiles
-          (user_id, blood_group, date_of_birth)
+          (user_id, blood_group, date_of_birth, gender)
         VALUES
-          (@id, NULLIF(@bg, ''), @dob)
+          (@id, NULLIF(@bg, ''), @dob, @gender)
         ON CONFLICT (user_id)
         DO UPDATE SET
           blood_group = COALESCE(EXCLUDED.blood_group, patient_profiles.blood_group),
-          date_of_birth = EXCLUDED.date_of_birth
+          date_of_birth = EXCLUDED.date_of_birth,
+          gender = COALESCE(EXCLUDED.gender, patient_profiles.gender)
         ''',
           parameters: QueryParameters.named({
             'id': resolvedUserId,
             'bg': bloodGroup,
             'dob': dateOfBirth,
+            'gender': gender,
           }),
         );
 

@@ -359,6 +359,7 @@ class DoctorEndpoint extends Endpoint {
         SELECT
           u.user_id,
           u.name,
+          p.gender,
           p.date_of_birth,
           EXTRACT(YEAR FROM age(CURRENT_DATE, p.date_of_birth))::int AS age
         FROM users u
@@ -377,8 +378,10 @@ class DoctorEndpoint extends Endpoint {
       );
 
       if (res.isEmpty) {
-        session.log('Patient not found with phone: $phone (last11: $last11)',
-            level: LogLevel.warning);
+        session.log(
+          'Patient not found with phone: $phone (last11: $last11)',
+          level: LogLevel.warning,
+        );
         return {'id': null, 'name': null};
       }
 
@@ -387,10 +390,12 @@ class DoctorEndpoint extends Endpoint {
       final name = _decode(row['name']);
 
       final dob = row['date_of_birth'];
-      final dobStr = dob == null ? null : dob.toString();
+      final dobStr = dob?.toString();
+
+      final genderStr = row['gender']?.toString();
 
       final ageVal = row['age'];
-      final ageStr = ageVal == null ? null : ageVal.toString();
+      final ageStr = ageVal?.toString();
 
       session.log('Patient found: ID=$userId, Name=$name',
           level: LogLevel.info);
@@ -398,6 +403,7 @@ class DoctorEndpoint extends Endpoint {
       return {
         'id': userId,
         'name': name,
+        'gender': genderStr,
         'dateOfBirth': dobStr,
         'age': ageStr,
       };

@@ -137,7 +137,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
         }
       },
       child: Scaffold(
-        body: _pages[_currentIndex],
+        body: IndexedStack(index: _currentIndex, children: _pages),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
           selectedItemColor: Colors.blue.shade700,

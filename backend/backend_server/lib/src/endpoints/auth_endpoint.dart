@@ -159,32 +159,6 @@ class AuthEndpoint extends Endpoint {
     await _ensureTrustedDeviceTable(session);
   }
 
-  Future<void> _ensurePatientProfileDobColumn(Session session) async {
-    // Best-effort (unmanaged SQL tables).
-    try {
-      final res = await session.db.unsafeQuery(
-        '''
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name = 'patient_profiles'
-          AND column_name = 'date_of_birth'
-        LIMIT 1
-        ''',
-      );
-      if (res.isNotEmpty) return;
-
-      await session.db.unsafeExecute(
-        '''
-        ALTER TABLE patient_profiles
-        ADD COLUMN date_of_birth DATE
-        ''',
-      );
-    } catch (e) {
-      session.log('Could not ensure patient_profiles.date_of_birth: $e',
-          level: LogLevel.warning);
-    }
-  }
-
   String _decodeDbValue(dynamic value) {
     if (value == null) return '';
     if (value is List<int>) return utf8.decode(value);
@@ -323,7 +297,7 @@ class AuthEndpoint extends Endpoint {
 
     try {
       await _ensureSecurityColumns(session);
-      await _ensurePatientProfileDobColumn(session);
+
 
       final result = await session.db.unsafeQuery(
         '''
@@ -762,6 +736,7 @@ class AuthEndpoint extends Endpoint {
     String role,
     String? bloodGroup,
     DateTime? dateOfBirth,
+    String? gender,
   ) async {
     final rateKey = 'completeSignup_$email';
     if (_isRateLimited(rateKey)) {
@@ -772,7 +747,6 @@ class AuthEndpoint extends Endpoint {
     }
 
     await _ensureSecurityColumns(session);
-    await _ensurePatientProfileDobColumn(session);
 
     final err = await _validateOtpToken(
       session: session,
@@ -840,13 +814,14 @@ class AuthEndpoint extends Endpoint {
       if (role == 'STUDENT' || role == 'TEACHER' || role == 'STAFF') {
         await session.db.unsafeExecute(
           '''
-          INSERT INTO patient_profiles (user_id, blood_group, date_of_birth)
-          VALUES (@uid, @bg, @dob)
+          INSERT INTO patient_profiles (user_id, blood_group, date_of_birth, gender)
+          VALUES (@uid, @bg, @dob, @gender)
           ''',
           parameters: QueryParameters.named({
             'uid': generatedId,
             'bg': bloodGroup,
             'dob': dateOfBirth,
+            'gender': gender,
           }),
         );
       }
@@ -1071,7 +1046,6 @@ class AuthEndpoint extends Endpoint {
     );
     if (err != null) return err;
 
-    await _ensurePatientProfileDobColumn(session);
 
     // Ensure phone uniqueness if phone provided
     try {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:dishari/src/doctor/prescription_page.dart';
+import 'dosage_times.dart';
 
 class PatientRecordsPage extends StatefulWidget {
   const PatientRecordsPage({super.key});
@@ -194,6 +195,7 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
       // - dateOfBirth: ISO date string (optional)
       final ageStr = (res['age'] ?? '').trim();
       final dobStr = (res['dateOfBirth'] ?? '').trim();
+      final genderFromBackend = (res['gender'] ?? '').trim();
 
       int? ageFromBackend;
       if (ageStr.isNotEmpty) {
@@ -228,7 +230,9 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
                       ? bestRecord!.name
                       : null),
             initialPatientNumber: raw,
-            initialPatientGender: bestRecord?.gender,
+            initialPatientGender: genderFromBackend.isNotEmpty
+                ? genderFromBackend
+                : bestRecord?.gender,
             initialPatientAge: ageFromBackend ?? ageFromDob,
           ),
         ),
@@ -520,6 +524,9 @@ class PatientDetailsSheet extends StatelessWidget {
                           itemCount: details.items.length,
                           itemBuilder: (context, i) {
                             final m = details.items[i];
+                            final dt = dosageTimesDisplayBangla(
+                              m.dosageTimes ?? '',
+                            );
                             return Card(
                               child: ListTile(
                                 title: Text(
@@ -531,7 +538,7 @@ class PatientDetailsSheet extends StatelessWidget {
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Dosage: ${m.dosageTimes ?? '-'}'),
+                                    Text('Dosage: ${dt.isEmpty ? '-' : dt}'),
                                     Text('Meal: ${m.mealTiming ?? '-'}'),
                                     Text(
                                       'Duration: ${m.duration?.toString() ?? '-'}',

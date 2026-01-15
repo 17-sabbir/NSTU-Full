@@ -148,18 +148,15 @@ class _LabTesterHomeState extends State<LabTesterHome> {
   }
 
   Widget _getBody() {
-    switch (_selectedIndex) {
-      case 0:
-        return _homeUI();
-      case 1:
-        return const LabTestCreateAndUpload(); // Upload
-      case 2:
-        return ManageTest(key: _manageTestKey);
-      case 3:
-        return const LabTesterProfile();
-      default:
-        return const SizedBox.shrink();
-    }
+    return IndexedStack(
+      index: _selectedIndex,
+      children: [
+        _homeUI(),
+        const LabTestCreateAndUpload(),
+        ManageTest(key: _manageTestKey),
+        const LabTesterProfile(),
+      ],
+    );
   }
 
   Widget _homeUI() {
@@ -362,7 +359,7 @@ class _LabTesterHomeState extends State<LabTesterHome> {
                           return '${dt.day}/${dt.month}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
                         }
 
-                        final dateText =fmt(item.createdAt);
+                        final dateText = fmt(item.createdAt);
                         final statusText = isPending
                             ? 'Pending'
                             : (isSubmitted ? 'Submitted' : 'Uploaded');
@@ -652,7 +649,6 @@ class _LabTesterHomeState extends State<LabTesterHome> {
             automaticallyImplyLeading: false,
             elevation: 0,
             actions: [
-
               if (_selectedIndex == 2) ...[
                 IconButton(
                   tooltip: "Add New Test",

@@ -22,6 +22,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   late final TextEditingController _bloodGroupController;
 
   DateTime? _dateOfBirth;
+  String? _gender;
   String? _initialName;
   String? _initialPhone;
   DateTime? _initialDob;
@@ -33,7 +34,6 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   bool _isChanged = false;
   bool _isLoading = true;
   bool _isSaving = false;
-  bool _showSavedMessage = false;
 
   @override
   void initState() {
@@ -74,6 +74,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
           _phoneController.text = profile.phone;
           _bloodGroupController.text = profile.bloodGroup ?? '';
           _dateOfBirth = profile.dateOfBirth;
+          _gender = profile.gender;
           _profileImageBase64 = profile.profilePictureUrl;
           _isLoading = false;
         });
@@ -135,6 +136,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
         _phoneController.text.trim(),
         _bloodGroupController.text.isEmpty ? null : _bloodGroupController.text,
         _dateOfBirth,
+        _gender,
         imageUrl,
       );
 
@@ -142,12 +144,12 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
       await _loadProfileData();
       setState(() {
         _isChanged = false;
-        _showSavedMessage = true;
       });
-      Future.delayed(
-        const Duration(seconds: 3),
-        () => setState(() => _showSavedMessage = false),
-      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile saved')));
     } catch (e) {
       _showDialog('Error', 'Update failed: $e');
     } finally {
@@ -202,12 +204,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.black),
-            onPressed: _confirmLogout,
-          ),
-        ],
+        actions: const [],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -249,11 +246,10 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                         icon: Icons.water_drop_outlined,
                         readOnly: true,
                       ),
+                      _buildGenderDisplay(),
                       _buildDobDisplay(),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  _buildStatusIndicator(),
                   const SizedBox(height: 20),
                   _buildActionButtons(),
                   const SizedBox(height: 30),
@@ -328,9 +324,9 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
 
   Widget _buildAvatarStack() {
     ImageProvider? image;
-    if (_profileImageBytes != null)
+    if (_profileImageBytes != null) {
       image = MemoryImage(_profileImageBytes!);
-    else if (_profileImageBase64 != null &&
+    } else if (_profileImageBase64 != null &&
         _profileImageBase64!.startsWith('http'))
       image = NetworkImage(_profileImageBase64!);
 
@@ -388,13 +384,18 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
         const SizedBox(height: 6),
         TextField(
           controller: controller,
+          enabled: !readOnly,
           readOnly: readOnly,
           onChanged: (_) => _checkChanges(),
           keyboardType: keyboardType,
           decoration: InputDecoration(
             filled: true,
-            fillColor: Colors.white,
-            prefixIcon: Icon(icon, color: const Color(0xFF4A86F7), size: 20),
+            fillColor: readOnly ? const Color(0xFFF3F4F7) : Colors.white,
+            prefixIcon: Icon(
+              icon,
+              color: readOnly ? Colors.grey : const Color(0xFF4A86F7),
+              size: 20,
+            ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 12,
@@ -454,6 +455,47 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     );
   }
 
+  Widget _buildGenderDisplay() {
+    final gender = (_gender ?? '').trim();
+    final label = gender.isEmpty
+        ? 'Not set'
+        : (gender.toLowerCase() == 'male'
+              ? 'Male'
+              : (gender.toLowerCase() == 'female' ? 'Female' : gender));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Gender',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.wc_outlined, color: Color(0xFF4A86F7), size: 20),
+              const SizedBox(width: 12),
+              Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
   Widget _buildSectionCard({
     required String title,
     required List<Widget> children,
@@ -492,37 +534,17 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
         children: [
           Icon(icon, size: 12, color: Colors.white),
           const SizedBox(width: 4),
-          Text(text, style: const TextStyle(color: Colors.white, fontSize: 11)),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: const TextStyle(color: Colors.white, fontSize: 11),
+            ),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStatusIndicator() {
-    Color color = _isChanged
-        ? Colors.orange
-        : (_showSavedMessage ? Colors.green : Colors.grey);
-    String text = _isChanged
-        ? "Unsaved changes"
-        : (_showSavedMessage ? "All changes saved" : "Up to date");
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          text,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-          ),
-        ),
-      ],
     );
   }
 
@@ -531,39 +553,108 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
       children: [
         SizedBox(
           width: double.infinity,
-          height: 56,
-          child: ElevatedButton(
+          child: OutlinedButton.icon(
             onPressed: _isChanged ? _saveProfile : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF5722),
-              disabledBackgroundColor: Colors.grey.shade300,
+            icon: const Icon(Icons.save_outlined),
+            label: _isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text(
+                    'Save Changes',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF4A86F7),
+              disabledForegroundColor: Colors.grey,
+              side: BorderSide(
+                color: _isChanged ? const Color(0xFF4A86F7) : Colors.grey,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
+              minimumSize: const Size.fromHeight(48),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             ),
-            child: _isSaving
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text(
-                    'Save Changes',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
           ),
         ),
         const SizedBox(height: 12),
-        TextButton.icon(
-          onPressed: () => Navigator.pushNamed(context, '/change-password'),
-          icon: const Icon(Icons.lock_reset, color: Color(0xFF4A86F7)),
-          label: const Text(
-            'Change Password',
-            style: TextStyle(
-              color: Color(0xFF4A86F7),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 420;
+
+            final changePasswordButton = OutlinedButton.icon(
+              onPressed: () => Navigator.pushNamed(context, '/change-password'),
+              icon: const Icon(Icons.lock_reset, color: Color(0xFF4A86F7)),
+              label: const Text(
+                'Change Password',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Color(0xFF4A86F7),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF4A86F7)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                minimumSize: const Size.fromHeight(48),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+              ),
+            );
+
+            final logoutButton = OutlinedButton.icon(
+              onPressed: _confirmLogout,
+              icon: const Icon(Icons.logout_rounded, color: Colors.red),
+              label: const Text(
+                'Logout',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                minimumSize: const Size.fromHeight(48),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+              ),
+            );
+
+            if (isNarrow) {
+              return Column(
+                children: [
+                  SizedBox(width: double.infinity, child: changePasswordButton),
+                  const SizedBox(height: 12),
+                  SizedBox(width: double.infinity, child: logoutButton),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: changePasswordButton),
+                const SizedBox(width: 12),
+                Expanded(child: logoutButton),
+              ],
+            );
+          },
         ),
       ],
     );

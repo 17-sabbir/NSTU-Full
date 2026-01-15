@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:backend_client/backend_client.dart';
@@ -5,6 +7,7 @@ import 'package:bangla_pdf_fixer/bangla_pdf_fixer.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'dosage_times.dart';
 
 // DESIGN: central theme colors and typography for this page
 const Color _accent = Color(0xFF0EA5A5); // teal-ish
@@ -40,10 +43,10 @@ class Medicine {
   TextEditingController mealTimeController = TextEditingController();
 
   Map<String, bool> times = {'সকাল': true, 'দুপুর': true, 'রাত': true};
-  int timesPerDay = 3;
+  bool isFourTimes = false;
 
   // only before / after
-  String? mealTiming;
+  String? mealTiming = 'after';
 
   // UI only
   String durationUnit = 'দিন';
@@ -77,6 +80,10 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
   final TextEditingController _genderController = TextEditingController();
   String? _selectedGender;
 
+  Timer? _autoFillDebounce;
+  String? _lastAutoFilledLast11;
+  bool _autoFillLoading = false;
+
   // whether the current prescription has been successfully saved
   bool _isSaved = false;
 
@@ -89,6 +96,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
   // Per-medicine validation errors (parallel to _medicineRows)
   List<String?> _medicineNameErrors = [];
   List<String?> _medicineDurationErrors = [];
+  List<String?> _medicineDosageErrors = [];
   List<String?> _medicineMealErrors = [];
 
   // Doctor info for signature display
@@ -158,6 +166,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     // mark unsaved when any main field changes
     _nameController.addListener(_markUnsaved);
     _rollController.addListener(_markUnsaved);
+    _rollController.addListener(_maybeAutoFillPatientByPhone);
     _ageController.addListener(_markUnsaved);
     _genderController.addListener(_markUnsaved);
     _complainController.addListener(_markUnsaved);
@@ -171,11 +180,94 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     });
   }
 
+  String _digitsOnly(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
+
+  String _last11Digits(String raw) {
+    final d = _digitsOnly(raw);
+    if (d.length <= 11) return d;
+    return d.substring(d.length - 11);
+  }
+
+  void _applyGenderFromRaw(String raw) {
+    final g = raw.trim().toLowerCase();
+    if (g.isEmpty) return;
+
+    if (g == 'male' || g == 'm' || g.startsWith('male')) {
+      _selectedGender = 'Male';
+      _genderController.text = 'Male';
+    } else if (g == 'female' || g == 'f' || g.startsWith('female')) {
+      _selectedGender = 'Female';
+      _genderController.text = 'Female';
+    }
+  }
+
+  void _maybeAutoFillPatientByPhone() {
+    final last11 = _last11Digits(_rollController.text);
+    if (last11.length != 11) return;
+    if (_lastAutoFilledLast11 == last11) return;
+
+    _autoFillDebounce?.cancel();
+    _autoFillDebounce = Timer(const Duration(milliseconds: 450), () {
+      _autoFillPatientByPhone();
+    });
+  }
+
+  Future<void> _autoFillPatientByPhone() async {
+    if (_autoFillLoading) return;
+    final last11 = _last11Digits(_rollController.text);
+    if (last11.length != 11) return;
+
+    setState(() {
+      _autoFillLoading = true;
+    });
+
+    try {
+      final res = await client.doctor.getPatientByPhone(last11);
+
+      if (kDebugMode) {
+        debugPrint('doctor.getPatientByPhone($last11) -> $res');
+      }
+
+      final id = (res['id'] ?? '').trim();
+      if (id.isEmpty) {
+        return; // only auto-fill from an existing account
+      }
+
+      final name = (res['name'] ?? '').trim();
+      final ageStr = (res['age'] ?? '').trim();
+      final genderRaw = (res['gender'] ?? '').trim();
+
+      setState(() {
+        // only fill if doctor hasn't typed yet
+        if (_nameController.text.trim().isEmpty && name.isNotEmpty) {
+          _nameController.text = name;
+        }
+        if (_ageController.text.trim().isEmpty && ageStr.isNotEmpty) {
+          _ageController.text = ageStr;
+        }
+        if ((_selectedGender == null || _selectedGender!.isEmpty) &&
+            genderRaw.isNotEmpty) {
+          _applyGenderFromRaw(genderRaw);
+        }
+        _lastAutoFilledLast11 = last11;
+      });
+    } catch (e) {
+      // ignore - we don't want to block the doctor form
+    } finally {
+      if (mounted) {
+        setState(() {
+          _autoFillLoading = false;
+        });
+      }
+    }
+  }
+
   void _seedMedicinesFromExisting(List<PatientPrescribedItem> items) {
     // Avoid setState inside initState; just initialize lists.
     _medicineRows.clear();
     _medicineNameErrors.clear();
     _medicineDurationErrors.clear();
+    _medicineDosageErrors.clear();
     _medicineMealErrors.clear();
 
     for (final it in items) {
@@ -187,14 +279,19 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
 
       final dosageRaw = (it.dosageTimes ?? '').toString();
       if (dosageRaw.isNotEmpty) {
-        final normalized = dosageRaw.toLowerCase();
-        m.times = {
-          'সকাল': normalized.contains('সকাল') || normalized.contains('morning'),
-          'দুপুর': normalized.contains('দুপুর') || normalized.contains('noon'),
-          'রাত': normalized.contains('রাত') || normalized.contains('night'),
-        };
-        // If nothing matched, keep defaults
-        if (!m.times.values.any((v) => v)) {
+        if (isDosageFourTimes(dosageRaw)) {
+          m.isFourTimes = true;
+          m.times = {'সকাল': false, 'দুপুর': false, 'রাত': false};
+        } else {
+          m.times = decodeDosageTimesToBanglaMap(dosageRaw);
+        }
+        // If nothing matched:
+        // - for numeric patterns like 0+0+0: keep as-is (so validation can catch it)
+        // - for legacy/free-text patterns: default to all true
+        final looksNumeric = RegExp(
+          r'^\s*[01]\s*\+\s*[01]\s*\+\s*[01]\s*$',
+        ).hasMatch(dosageRaw.trim());
+        if (!m.isFourTimes && !m.times.values.any((v) => v) && !looksNumeric) {
           m.times = {'সকাল': true, 'দুপুর': true, 'রাত': true};
         }
       }
@@ -203,9 +300,9 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
       if (mealRaw.isNotEmpty) {
         final lower = mealRaw.toLowerCase();
         if (lower.contains('before') || mealRaw.contains('আগে')) {
-          m.mealTiming = 'খাবার আগে';
+          m.mealTiming = 'before';
         } else if (lower.contains('after') || mealRaw.contains('পরে')) {
-          m.mealTiming = 'খাবার পরে';
+          m.mealTiming = 'after';
         }
 
         // Best-effort: keep any time portion in the UI field
@@ -225,6 +322,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
       _medicineRows.add(m);
       _medicineNameErrors.add(null);
       _medicineDurationErrors.add(null);
+      _medicineDosageErrors.add(null);
       _medicineMealErrors.add(null);
 
       m.nameController.addListener(_markUnsaved);
@@ -256,6 +354,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
 
   @override
   void dispose() {
+    _autoFillDebounce?.cancel();
     _nameController.dispose();
     _rollController.dispose();
     _ageController.dispose();
@@ -279,6 +378,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
       // keep error arrays in sync
       _medicineNameErrors.add(null);
       _medicineDurationErrors.add(null);
+      _medicineDosageErrors.add(null);
       _medicineMealErrors.add(null);
       // listen to medicine fields to mark unsaved
       final m = _medicineRows.last;
@@ -310,8 +410,8 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
         m.nameController.clear();
         m.durationController.clear();
         m.times = {'সকাল': true, 'দুপুর': true, 'রাত': true};
-        m.timesPerDay = 3;
-        m.mealTiming = null;
+        m.isFourTimes = false;
+        m.mealTiming = 'after';
         m.mealTimeController.clear();
         m.durationUnit = 'দিন';
       }
@@ -321,6 +421,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
         _medicineRows.length,
         null,
       );
+      _medicineDosageErrors = List<String?>.filled(_medicineRows.length, null);
       _medicineMealErrors = List<String?>.filled(_medicineRows.length, null);
       if (_medicineRows.isEmpty) _addMedicineRow();
       // clearing makes the form unsaved
@@ -487,13 +588,14 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
             ..._medicineRows.asMap().entries.map((entry) {
               final m = entry.value;
               final medName = m.nameController.text.trim();
+              final four = m.isFourTimes;
               final dosageRaw = m.times.entries
                   .where((e) => e.value)
                   .map((e) => e.key)
                   .join(', ');
-              final dosage = dosageRaw.isNotEmpty
-                  ? dosageRaw
-                  : '${m.timesPerDay} times daily';
+              final dosage = four
+                  ? '4'
+                  : (dosageRaw.isNotEmpty ? dosageRaw : '-');
 
               final timePart = m.mealTimeController.text.trim();
               final timing = mealTimingToDisplay(m.mealTiming);
@@ -689,12 +791,8 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
         durationInDays = durationInDays * 30;
       }
 
-      // Format Dosage
-      String dosage = m.times.entries
-          .where((e) => e.value)
-          .map((e) => e.key)
-          .join(', ');
-      if (dosage.isEmpty) dosage = '${m.timesPerDay} times daily';
+      // Format Dosage (DB storage format: 1+0+1)
+      final dosage = encodeDosageTimes(times: m.times, four: m.isFourTimes);
 
       items.add(
         PrescribedItem(
@@ -751,7 +849,6 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     }
   }
 
-
   /// Validate the form. Returns true if valid, otherwise sets error messages and returns false.
   bool _validateForm() {
     bool ok = true;
@@ -763,6 +860,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     _genderError = null;
     _medicineNameErrors = List<String?>.filled(_medicineRows.length, null);
     _medicineDurationErrors = List<String?>.filled(_medicineRows.length, null);
+    _medicineDosageErrors = List<String?>.filled(_medicineRows.length, null);
     _medicineMealErrors = List<String?>.filled(_medicineRows.length, null);
 
     final name = _nameController.text.trim();
@@ -818,6 +916,13 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
       // meal timing required (khabar age/por)
       if (m.mealTiming == null || m.mealTiming!.isEmpty) {
         _medicineMealErrors[i] = 'Select খাবার আগে/পরে';
+        ok = false;
+      }
+
+      // dosage times required: either 4-times selected OR at least one of সকাল/দুপুর/রাত
+      final hasAnyDose = m.isFourTimes || m.times.values.any((v) => v == true);
+      if (!hasAnyDose) {
+        _medicineDosageErrors[i] = 'Select সকাল/দুপুর/রাত';
         ok = false;
       }
     }
@@ -961,65 +1066,73 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
           const SizedBox(height: 10),
           Text('Dosage Times', style: _sectionLabel),
           const SizedBox(height: 6),
-          Row(
+          Wrap(
+            spacing: 14,
+            runSpacing: 6,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: DropdownButton<int>(
-                  value: medicine.timesPerDay,
-                  underline: const SizedBox.shrink(),
-                  items: List.generate(6, (i) => i + 3)
-                      .map(
-                        (n) => DropdownMenuItem(
-                          value: n,
-                          child: Text(n.toString()),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setState(() {
-                    medicine.timesPerDay = v ?? 3;
-                    _markUnsaved();
-                  }),
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: Checkbox(
+                      value: medicine.isFourTimes,
+                      onChanged: (v) => setState(() {
+                        medicine.isFourTimes = v ?? false;
+                        if (medicine.isFourTimes) {
+                          medicine.times = {
+                            'সকাল': false,
+                            'দুপুর': false,
+                            'রাত': false,
+                          };
+                        }
+                        _markUnsaved();
+                      }),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text('4', style: TextStyle(color: _muted)),
+                ],
               ),
-              const SizedBox(width: 12),
-              if (medicine.timesPerDay == 3)
-                Wrap(
-                  spacing: 10,
-                  children: medicine.times.keys.map((key) {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: Checkbox(
-                            value: medicine.times[key],
-                            onChanged: (v) => setState(() {
-                              medicine.times[key] = v ?? false;
-                              _markUnsaved();
-                            }),
-                          ),
+              ...medicine.times.keys.map((key) {
+                final enabled = !medicine.isFourTimes;
+                return Opacity(
+                  opacity: enabled ? 1 : 0.45,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 18,
+                        height: 15,
+                        child: Checkbox(
+                          value: medicine.times[key],
+                          onChanged: enabled
+                              ? (v) => setState(() {
+                                  medicine.isFourTimes = false;
+                                  medicine.times[key] = v ?? false;
+                                  _markUnsaved();
+                                })
+                              : null,
                         ),
-                        const SizedBox(width: 6),
-                        Text(key, style: const TextStyle(color: _muted)),
-                      ],
-                    );
-                  }).toList(),
-                )
-              else
-                Text(
-                  'Every ${(24 / medicine.timesPerDay).round()} hours',
-                  style: const TextStyle(color: _muted),
-                ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(key, style: const TextStyle(color: _muted)),
+                    ],
+                  ),
+                );
+              }),
             ],
           ),
+          if (_medicineDosageErrors[index ?? 0] != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _medicineDosageErrors[index ?? 0]!,
+              style: TextStyle(color: Colors.red.shade600, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 10),
-          // Insert a small "time" input field (hint: "time") before the meal timing checkboxes
+          // Insert a small "time" input field (hint: "time") before meal timing radios
           Row(
             children: [
               SizedBox(
@@ -1046,33 +1159,33 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 5),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Checkbox(
-                    value: medicine.mealTiming == 'before',
+                  Radio<String>(
+                    value: 'before',
+                    groupValue: medicine.mealTiming,
                     onChanged: (v) => setState(() {
-                      medicine.mealTiming = v == true ? 'before' : null;
+                      medicine.mealTiming = v;
                       _markUnsaved();
                     }),
                   ),
-                  const SizedBox(width: 6),
                   const Text('খাবার আগে'),
                 ],
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 5),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Checkbox(
-                    value: medicine.mealTiming == 'after',
+                  Radio<String>(
+                    value: 'after',
+                    groupValue: medicine.mealTiming,
                     onChanged: (v) => setState(() {
-                      medicine.mealTiming = v == true ? 'after' : null;
+                      medicine.mealTiming = v;
                       _markUnsaved();
                     }),
                   ),
-                  const SizedBox(width: 6),
                   const Text('খাবার পরে'),
                 ],
               ),
@@ -1102,37 +1215,31 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: Checkbox(
-                          value: medicine.durationUnit == 'দিন',
-                          onChanged: (v) => setState(() {
-                            medicine.durationUnit = v == true ? 'দিন' : 'মাস';
-                            _markUnsaved();
-                          }),
-                        ),
+                      Radio<String>(
+                        value: 'দিন',
+                        groupValue: medicine.durationUnit,
+                        onChanged: (v) => setState(() {
+                          medicine.durationUnit = v ?? 'দিন';
+                          _markUnsaved();
+                        }),
                       ),
-                      const SizedBox(width: 6),
                       const Text('দিন'),
                     ],
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: Checkbox(
-                          value: medicine.durationUnit == 'মাস',
-                          onChanged: (v) => setState(() {
-                            medicine.durationUnit = v == true ? 'মাস' : 'দিন';
-                            _markUnsaved();
-                          }),
-                        ),
+                      Radio<String>(
+                        value: 'মাস',
+                        groupValue: medicine.durationUnit,
+                        onChanged: (v) => setState(() {
+                          medicine.durationUnit = v ?? 'দিন';
+                          _markUnsaved();
+                        }),
                       ),
-                      const SizedBox(width: 6),
                       const Text('মাস'),
                     ],
                   ),
@@ -1155,6 +1262,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final isMobileLayout = !kIsWeb && screenWidth < 600;
 
     return Scaffold(
       appBar: AppBar(
@@ -1288,125 +1396,286 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
 
                   const SizedBox(height: 15),
 
-                  // 🔹 Row 2: Number + Age + Gender
-                  Row(
-                    children: [
-                      const Text(
-                        'Number:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        flex: 3,
-                        child: TextField(
-                          controller: _rollController,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(11),
-                          ],
-                          decoration: const InputDecoration(
-                            prefixText: "+88 ",
-                            prefixStyle: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            border: UnderlineInputBorder(),
-                            isDense: true,
-                            contentPadding: EdgeInsets.only(bottom: 4),
+                  // Mobile: row2 number, row3 age+gender
+                  // Web/desktop: keep existing one-row layout
+                  if (isMobileLayout) ...[
+                    // 🔹 Row 2 (Mobile): Number
+                    Row(
+                      children: [
+                        const Text(
+                          'Number:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
                           ),
-                          style: const TextStyle(fontSize: 14),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Age:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        flex: 1,
-                        child: TextField(
-                          controller: _ageController,
-                          decoration: const InputDecoration(
-                            hintText: 'Age',
-                            border: UnderlineInputBorder(),
-                            contentPadding: EdgeInsets.only(bottom: 4),
-                            isDense: true,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _rollController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(11),
+                            ],
+                            decoration: InputDecoration(
+                              prefixText: "+88 ",
+                              prefixStyle: const TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              suffixIcon: _autoFillLoading
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(10),
+                                      child: SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    )
+                                  : IconButton(
+                                      tooltip: 'Auto-fill from account',
+                                      icon: const Icon(Icons.search),
+                                      onPressed: _autoFillPatientByPhone,
+                                    ),
+                              border: const UnderlineInputBorder(),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.only(bottom: 4),
+                            ),
+                            style: const TextStyle(fontSize: 14),
                           ),
-                          style: const TextStyle(fontSize: 14),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Gender:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                      ],
+                    ),
+
+                    const SizedBox(height: 15),
+
+                    // 🔹 Row 3 (Mobile): Age + Gender
+                    Row(
+                      children: [
+                        const Text(
+                          'Age:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        flex: 2,
-                        child: Wrap(
-                          spacing: 12,
-                          runSpacing: 6,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: Radio<String>(
-                                    value: 'Male',
-                                    groupValue: _selectedGender,
-                                    onChanged: (v) {
-                                      setState(() {
-                                        _selectedGender = v;
-                                        _genderController.text = v ?? '';
-                                        _markUnsaved();
-                                      });
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const Text('M'),
-                              ],
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 70,
+                          child: TextField(
+                            controller: _ageController,
+                            decoration: const InputDecoration(
+                              hintText: 'Age',
+                              border: UnderlineInputBorder(),
+                              contentPadding: EdgeInsets.only(bottom: 4),
+                              isDense: true,
                             ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: Radio<String>(
-                                    value: 'Female',
-                                    groupValue: _selectedGender,
-                                    onChanged: (v) {
-                                      setState(() {
-                                        _selectedGender = v;
-                                        _genderController.text = v ?? '';
-                                        _markUnsaved();
-                                      });
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const Text('F'),
-                              ],
-                            ),
-                          ],
+                            style: const TextStyle(fontSize: 14),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 14),
+                        const Text(
+                          'Gender:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Wrap(
+                            spacing: 12,
+                            runSpacing: 6,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: Radio<String>(
+                                      value: 'Male',
+                                      groupValue: _selectedGender,
+                                      onChanged: (v) {
+                                        setState(() {
+                                          _selectedGender = v;
+                                          _genderController.text = v ?? '';
+                                          _markUnsaved();
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Text('M'),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: Radio<String>(
+                                      value: 'Female',
+                                      groupValue: _selectedGender,
+                                      onChanged: (v) {
+                                        setState(() {
+                                          _selectedGender = v;
+                                          _genderController.text = v ?? '';
+                                          _markUnsaved();
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Text('F'),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    // 🔹 Row 2 (Web/desktop): Number + Age + Gender
+                    Row(
+                      children: [
+                        const Text(
+                          'Number:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          flex: 3,
+                          child: TextField(
+                            controller: _rollController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(11),
+                            ],
+                            decoration: InputDecoration(
+                              prefixText: "+88 ",
+                              prefixStyle: const TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              suffixIcon: _autoFillLoading
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(10),
+                                      child: SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    )
+                                  : IconButton(
+                                      tooltip: 'Auto-fill from account',
+                                      icon: const Icon(Icons.search),
+                                      onPressed: _autoFillPatientByPhone,
+                                    ),
+                              border: const UnderlineInputBorder(),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.only(bottom: 4),
+                            ),
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Age:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          flex: 1,
+                          child: TextField(
+                            controller: _ageController,
+                            decoration: const InputDecoration(
+                              hintText: 'Age',
+                              border: UnderlineInputBorder(),
+                              contentPadding: EdgeInsets.only(bottom: 4),
+                              isDense: true,
+                            ),
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Gender:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          flex: 2,
+                          child: Wrap(
+                            spacing: 12,
+                            runSpacing: 6,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: Radio<String>(
+                                      value: 'Male',
+                                      groupValue: _selectedGender,
+                                      onChanged: (v) {
+                                        setState(() {
+                                          _selectedGender = v;
+                                          _genderController.text = v ?? '';
+                                          _markUnsaved();
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Text('M'),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: Radio<String>(
+                                      value: 'Female',
+                                      groupValue: _selectedGender,
+                                      onChanged: (v) {
+                                        setState(() {
+                                          _selectedGender = v;
+                                          _genderController.text = v ?? '';
+                                          _markUnsaved();
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Text('F'),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   // Show patient validation errors (if any)
                   if (_nameError != null ||
                       _numberError != null ||
@@ -1566,7 +1835,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(
-                          width: 160,
+                          width: 100,
                           child: TextField(
                             controller: _nextVisitController,
                             keyboardType: TextInputType.number,
@@ -1581,7 +1850,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                             ),
                           ),
                         ),
-                        Container(width: 160, height: 1, color: Colors.black),
+                        Container(width: 100, height: 1, color: Colors.black),
                       ],
                     ),
                   ],
@@ -1593,7 +1862,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     SizedBox(
-                      width: 160,
+                      width: 150,
                       height: 60,
                       child: _loadingDoctorInfo
                           ? const Center(

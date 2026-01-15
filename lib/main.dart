@@ -40,7 +40,7 @@ import 'src/forget_password.dart';
 // Import from your existing backend_client package
 import 'package:backend_client/backend_client.dart';
 
-void main(){
+void main() {
   // Initialize Serverpod client before running app
   WidgetsFlutterBinding.ensureInitialized();
   initServerpodClient();
@@ -67,7 +67,8 @@ class MyApp extends StatelessWidget {
 
         // Admin routes (grouped under /admin)
         '/admin': (context) => const AdminDashboard(),
-        '/admin-dashboard': (context) => const AdminDashboard(), // alias used in navigation
+        '/admin-dashboard': (context) =>
+            const AdminDashboard(), // alias used in navigation
         '/admin/profile': (context) => const AdminProfile(),
         '/admin/users': (context) => const UserManagement(),
         '/admin/inventory': (context) => const InventoryManagement(),
@@ -84,16 +85,17 @@ class MyApp extends StatelessWidget {
 
         // Dispenser routes (grouped under /dispenser)
         '/dispenser': (context) => const DispenserDashboard(),
-        '/dispenser-dashboard': (context) => const DispenserDashboard(), // alias
+        '/dispenser-dashboard': (context) =>
+            const DispenserDashboard(), // alias
         '/dispenser/profile': (context) => const DispenserProfile(),
 
         // Lab tester routes (grouped under /lab)
         '/lab': (context) => const LabTesterHome(),
         '/lab-dashboard': (context) => const LabTesterHome(), // alias
-
         // Patient routes (grouped under /patient)
         '/patient': (context) => const PatientDashboard(name: '', email: ''),
-        '/patient-dashboard': (context) => const PatientDashboard(name: '', email: ''), // alias
+        '/patient-dashboard': (context) =>
+            const PatientDashboard(name: '', email: ''), // alias
         '/patient/profile': (context) => const PatientProfilePage(),
         '/patient/prescriptions': (context) => const PatientPrescriptions(),
         '/patient/reports': (context) => const PatientReports(),
@@ -103,14 +105,13 @@ class MyApp extends StatelessWidget {
 
         // Signup ,forgot password and change password
         '/signup': (context) => const PatientSignupPage(),
-        '/patient-signup': (context) => const PatientSignupPage(), // alias for links coming from login
+        '/patient-signup': (context) =>
+            const PatientSignupPage(), // alias for links coming from login
         '/forgotpassword': (context) => const ForgetPassword(),
         '/change-password': (context) => const ChangePasswordPage(),
 
         //notifications
         '/notifications': (context) => const Notifications(),
-
-
       },
       onUnknownRoute: (settings) => MaterialPageRoute(
         builder: (context) => Scaffold(

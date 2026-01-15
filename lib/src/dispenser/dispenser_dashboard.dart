@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dispenser_medicine_item.dart';
 import 'dispenser_profile.dart';
-import 'dispenser_history.dart';
 import 'dispenser_inventory.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
 
 // Use Map-based structures for prescriptions and logs to avoid custom classes
@@ -25,13 +23,45 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
   String _searchQuery = '';
   final List<int> _navigationHistory = [0]; // Track tab navigation
 
+  static const _brandTeal = Color(0xFF1F9E98);
+
+  DispenserProfileR? _profile;
+  bool _homeLoading = false;
+  List<InventoryAuditLog> _homeLogs = [];
+
   final List<PrescriptionMap> _allPrescriptions = [];
 
   int _toInt(dynamic v) {
     if (v == null) return 0;
     if (v is int) return v;
     if (v is num) return v.toInt();
-    return int.tryParse(v.toString()) ?? 0;
+
+    final s = v.toString().trim();
+    if (s.isEmpty) return 0;
+
+    // New DB format: 1+0+1 => sum = 2
+    if (s.contains('+')) {
+      final parts = s.split('+').map((p) => p.trim()).toList();
+      if (parts.isNotEmpty && parts.every((p) => p == '0' || p == '1')) {
+        return parts.fold<int>(0, (sum, p) => sum + (p == '1' ? 1 : 0));
+      }
+    }
+
+    // Legacy/text format: count occurrences
+    final lower = s.toLowerCase();
+    var count = 0;
+    if (lower.contains('সকাল') || lower.contains('morning')) count++;
+    if (lower.contains('দুপুর') || lower.contains('noon')) count++;
+    if (lower.contains('রাত') || lower.contains('night')) count++;
+    if (count > 0) return count;
+
+    // Fallback: first integer in string
+    final m = RegExp(r'\d+').firstMatch(s);
+    if (m != null) {
+      return int.tryParse(m.group(0)!) ?? 0;
+    }
+
+    return 0;
   }
 
   @override
@@ -40,6 +70,7 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _verifyDispenser();
       _loadPendingPrescriptions();
+      _loadHome();
     });
   }
 
@@ -48,20 +79,6 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
       // ignore: deprecated_member_use
       final authKey = await client.authenticationKeyManager?.get();
       if (authKey == null || authKey.isEmpty) {
-        if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/');
-        return;
-      }
-
-      final prefs = await SharedPreferences.getInstance();
-      final storedUserId = prefs.getString('user_id');
-      if (storedUserId == null || storedUserId.isEmpty) {
-        if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/');
-        return;
-      }
-      final int? numericId = int.tryParse(storedUserId);
-      if (numericId == null) {
         if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/');
         return;
@@ -87,10 +104,30 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     }
   }
 
-  Future<int?> _getUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    final storedUserId = prefs.getString('user_id');
-    return storedUserId != null ? int.tryParse(storedUserId) : null;
+  Future<void> _loadHome() async {
+    if (!mounted) return;
+    setState(() => _homeLoading = true);
+
+    try {
+      final results = await Future.wait([
+        client.dispenser.getDispenserProfile(),
+        client.dispenser.getDispenserHistory(),
+      ]);
+
+      final profile = results[0] as DispenserProfileR?;
+      final logs = results[1] as List<InventoryAuditLog>;
+
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _homeLogs = logs;
+        _homeLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Failed to load home data: $e');
+      if (!mounted) return;
+      setState(() => _homeLoading = false);
+    }
   }
 
   // Fetch pending prescriptions from backend
@@ -188,7 +225,6 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
 
   Future<void> _dispensePrescription() async {
     final meds = _currentPrescription!['medicines'] as List<Medicine>;
-    final dispenserId = await _getUserId();
 
     final List<DispenseItemRequest> items = [];
 
@@ -231,7 +267,8 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     try {
       final success = await client.dispenser.dispensePrescription(
         prescriptionId: int.parse(_currentPrescription!['id']),
-        dispenserId: dispenserId!,
+        // Backend uses authenticated session userId; do not send device/userId.
+        dispenserId: 0,
         items: items,
       );
 
@@ -257,7 +294,292 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
   }
 
   Future<void> _refresh() async {
-    await _loadPendingPrescriptions();
+    await Future.wait([_loadPendingPrescriptions(), _loadHome()]);
+  }
+
+  int _countDispensedToday() {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+    return _homeLogs
+        .where((l) => l.action == 'DISPENSE')
+        .where((l) => l.timestamp.isAfter(start) && l.timestamp.isBefore(end))
+        .length;
+  }
+
+  List<InventoryAuditLog> _last7DaysLogs() {
+    final since = DateTime.now().subtract(const Duration(days: 7));
+    return _homeLogs.where((l) => l.timestamp.isAfter(since)).toList();
+  }
+
+  Widget _statCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color background,
+    required Color iconBg,
+    required Color iconColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.black.withOpacity(0.06)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.grey.shade800,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.w800,
+                    height: 1.0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: iconColor, size: 28),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHome() {
+    final profile = _profile;
+    final pending = _allPrescriptions.length;
+    final dispensedToday = _countDispensedToday();
+    final recent = _last7DaysLogs();
+
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1F9E98), Color(0xFF38B8B2)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundImage:
+                        (profile?.profilePictureUrl != null &&
+                            (profile!.profilePictureUrl!.isNotEmpty))
+                        ? NetworkImage(profile.profilePictureUrl!)
+                        : null,
+                    child:
+                        (profile?.profilePictureUrl == null ||
+                            profile!.profilePictureUrl!.isEmpty)
+                        ? const Icon(Icons.person, color: Colors.white)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          (profile?.name ?? 'Dispenser'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          (profile?.email ?? ''),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            if (_homeLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 18),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final stack = constraints.maxWidth < 720;
+                if (stack) {
+                  return Column(
+                    children: [
+                      _statCard(
+                        title: 'Pending Prescriptions',
+                        value: '$pending',
+                        icon: Icons.access_time,
+                        background: const Color(0xFFF7F1E6),
+                        iconBg: const Color(0xFFF3DDB1),
+                        iconColor: const Color(0xFFF59E0B),
+                      ),
+                      const SizedBox(height: 12),
+                      _statCard(
+                        title: 'Dispensed Today',
+                        value: '$dispensedToday',
+                        icon: Icons.check_circle,
+                        background: const Color(0xFFEAF7EF),
+                        iconBg: const Color(0xFFBFE8CC),
+                        iconColor: const Color(0xFF16A34A),
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _statCard(
+                        title: 'Pending Prescriptions',
+                        value: '$pending',
+                        icon: Icons.access_time,
+                        background: const Color(0xFFF7F1E6),
+                        iconBg: const Color(0xFFF3DDB1),
+                        iconColor: const Color(0xFFF59E0B),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _statCard(
+                        title: 'Dispensed Today',
+                        value: '$dispensedToday',
+                        icon: Icons.check_circle,
+                        background: const Color(0xFFEAF7EF),
+                        iconBg: const Color(0xFFBFE8CC),
+                        iconColor: const Color(0xFF16A34A),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+
+            const SizedBox(height: 18),
+            Text(
+              'Recent History (Last 7 Days)',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade900,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            if (recent.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Text(
+                  'No activity in last 7 days',
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
+              )
+            else
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: recent.length > 8 ? 8 : recent.length,
+                  separatorBuilder: (_, __) =>
+                      Divider(height: 1, color: Colors.grey.shade200),
+                  itemBuilder: (context, index) {
+                    final log = recent[index];
+                    final isDispensed = log.action == 'DISPENSE';
+                    final color = isDispensed
+                        ? Colors.orange
+                        : (log.action == 'ADD_STOCK'
+                              ? Colors.green
+                              : Colors.blue);
+                    final icon = isDispensed
+                        ? Icons.outbox
+                        : (log.action == 'ADD_STOCK'
+                              ? Icons.add_business
+                              : Icons.history);
+
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: color.withOpacity(0.12),
+                        child: Icon(icon, color: color),
+                      ),
+                      title: Text(
+                        (log.userName ?? 'Unknown Item'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        '${log.action} • Stock: ${log.oldQuantity} → ${log.newQuantity}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Text(
+                        '${log.timestamp.day}/${log.timestamp.month}',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<bool> _onWillPop() async {
@@ -292,36 +614,417 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
   }
 
   Widget _buildSearchSection() {
-    return Card(
-      elevation: 4,
-      margin: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final contentWidth = maxWidth > 920 ? 920.0 : maxWidth;
+
+        return Align(
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: contentWidth,
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.black.withOpacity(0.06)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: _searchController,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'Search by patient name or mobile',
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  suffixIcon: _searchController.text.trim().isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _searchQuery = '';
+                              _searchController.clear();
+                            });
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: (v) {
+                  final q = v.trim();
+                  if (q == _searchQuery) return;
+                  setState(() => _searchQuery = q);
+                },
+                onSubmitted: (_) => _searchPrescription(),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _pill({
+    required IconData icon,
+    required String label,
+    required Color bg,
+    required Color fg,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: fg.withOpacity(0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: fg,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDispenseControls() {
+    final q = _searchQuery.trim();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final contentWidth = maxWidth > 920 ? 920.0 : maxWidth;
+
+        return Align(
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: contentWidth,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (q.isNotEmpty)
+                    ActionChip(
+                      label: const Text('Clear Search'),
+                      avatar: const Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        setState(() {
+                          _searchQuery = '';
+                          _searchController.clear();
+                        });
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPageHeader({
+    required String title,
+    String? subtitle,
+    List<Widget> actions = const [],
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final contentWidth = maxWidth > 920 ? 920.0 : maxWidth;
+
+        return Align(
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: contentWidth,
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [_brandTeal, Color(0xFF38B8B2)],
+                ),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                          ),
+                        ),
+                        if (subtitle != null && subtitle.trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  ...actions,
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDispenseTab() {
+    final pending = _allPrescriptions.length;
+    final subtitle = pending == 0
+        ? 'No pending prescriptions'
+        : '$pending pending prescriptions';
+
+    return SafeArea(
+      child: Container(
+        color: Colors.grey.shade50,
         child: Column(
           children: [
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: 'Prescription Number or name',
-                prefixIcon: const Icon(Icons.search),
-                border: const OutlineInputBorder(),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          setState(() {
-                            _searchQuery = '';
-                            _searchController.clear();
-                          });
-                        },
+            _buildPageHeader(
+              title: 'Dispense',
+              subtitle: subtitle,
+              actions: [
+                IconButton(
+                  tooltip: 'Refresh',
+                  onPressed: _refresh,
+                  icon: const Icon(Icons.refresh, color: Colors.white),
+                ),
+              ],
+            ),
+            _buildSearchSection(),
+            _buildDispenseControls(),
+            const SizedBox(height: 10),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: _currentPrescription != null
+                    ? KeyedSubtree(
+                        key: const ValueKey('details'),
+                        child: _buildPrescriptionView(),
                       )
-                    : null,
+                    : KeyedSubtree(
+                        key: const ValueKey('list'),
+                        child: _buildAllPrescriptionsList(),
+                      ),
               ),
-              onSubmitted: (_) => _searchPrescription(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  DateTime? _tryParseDate(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v;
+    return DateTime.tryParse(v.toString());
+  }
+
+  Widget _prescriptionCard(PrescriptionMap prescription) {
+    final id = prescription['id'];
+    final patient = (prescription['name'] ?? '').toString();
+    final doctor = (prescription['doctorName'] ?? '').toString();
+    final mobile = (prescription['mobileNumber'] ?? '').toString();
+    final date = _tryParseDate(prescription['prescriptionDate']);
+
+    final dateText = date == null
+        ? ''
+        : '${date.day}/${date.month}/${date.year}';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => _selectPrescription(prescription),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            color: Colors.white,
+            border: Border.all(color: Colors.black.withOpacity(0.06)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.receipt_long, color: Colors.white),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Prescription #$id',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                          _pill(
+                            icon: Icons.schedule,
+                            label: 'Pending',
+                            bg: const Color(0xFFFFF7ED),
+                            fg: const Color(0xFFEA580C),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Patient: $patient',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.grey.shade800),
+                      ),
+                      Text(
+                        'Doctor: $doctor',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.grey.shade700),
+                      ),
+                      if (mobile.isNotEmpty)
+                        Text(
+                          'Mobile: $mobile',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      if (dateText.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.event,
+                                size: 14,
+                                color: Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                dateText,
+                                style: TextStyle(color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Icon(Icons.chevron_right, color: Colors.grey.shade400),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _navIconWithBadge(IconData icon, int badgeCount) {
+    if (badgeCount <= 0) return Icon(icon);
+
+    final text = badgeCount > 99 ? '99+' : badgeCount.toString();
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon),
+        Positioned(
+          right: -10,
+          top: -6,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                height: 1.0,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -330,7 +1033,7 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     if (searchTerm.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter Prescription ID, Patient ID or Name'),
+          content: Text('Search by prescription ID, patient name, or mobile'),
         ),
       );
       return;
@@ -501,18 +1204,29 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
   }
 
   Widget _buildAllPrescriptionsList() {
-    final prescriptions = _searchQuery.isEmpty
-        ? _allPrescriptions
-        : _allPrescriptions.where((prescription) {
-            final id = (prescription['id'] ?? '').toString().toLowerCase();
-            final name = (prescription['name'] ?? '').toString().toLowerCase();
-            final doctor = (prescription['doctorName'] ?? '')
-                .toString()
-                .toLowerCase();
-            return id.contains(_searchQuery.toLowerCase()) ||
-                name.contains(_searchQuery.toLowerCase()) ||
-                doctor.contains(_searchQuery.toLowerCase());
-          }).toList();
+    final q = _searchQuery.trim().toLowerCase();
+    final prescriptions =
+        (q.isEmpty
+                ? _allPrescriptions
+                : _allPrescriptions.where((prescription) {
+                    final id = (prescription['id'] ?? '')
+                        .toString()
+                        .toLowerCase();
+                    final name = (prescription['name'] ?? '')
+                        .toString()
+                        .toLowerCase();
+                    final doctor = (prescription['doctorName'] ?? '')
+                        .toString()
+                        .toLowerCase();
+                    final mobile = (prescription['mobileNumber'] ?? '')
+                        .toString()
+                        .toLowerCase();
+                    return id.contains(q) ||
+                        name.contains(q) ||
+                        doctor.contains(q) ||
+                        mobile.contains(q);
+                  }))
+            .toList();
 
     if (prescriptions.isEmpty) {
       return Center(
@@ -537,75 +1251,16 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
 
     return RefreshIndicator(
       onRefresh: _refresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         itemCount: prescriptions.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final prescription = prescriptions[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: const Icon(Icons.medical_services, color: Colors.blue),
-              title: Text('Prescription #${prescription['id']}'),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Patient: ${prescription['name']}'),
-                  Text('Doctor: ${prescription['doctorName']}'),
-                  Text('Mobile: ${prescription['mobileNumber']}'),
-                  if (prescription['prescriptionDate'] != null)
-                    Text(
-                      'Date: ${prescription['prescriptionDate'].toString().split(' ')[0]}',
-                    ),
-                ],
-              ),
-              onTap: () => _selectPrescription(prescription),
-            ),
-          );
+          return _prescriptionCard(prescription);
         },
       ),
     );
-  }
-
-  void _confirmLogout() async {
-    final shouldLogout = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Logout', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (shouldLogout == true) {
-      // Clear stored session if needed, then navigate to root
-      try {
-        try {
-          await client.auth.logout();
-        } catch (_) {}
-        // ignore: deprecated_member_use
-        await client.authenticationKeyManager?.remove();
-      } catch (_) {}
-
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('user_id');
-        await prefs.remove('user_role');
-        await prefs.remove('user_email');
-      } catch (_) {}
-
-      if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-    }
   }
 
   @override
@@ -614,61 +1269,17 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            _selectedIndex == 0
-                ? 'Dispenser Dashboard'
-                : _selectedIndex == 1
-                ? 'Inventory Management'
-                : _selectedIndex == 2
-                ? 'Dispense History'
-                : 'Profile',
-            style: const TextStyle(color: Colors.blueAccent),
-          ),
-          centerTitle: true,
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.blueAccent,
-          elevation: 0,
-          actions: [
-            if (_selectedIndex == 0) ...[
-              IconButton(
-                icon: const Icon(Icons.refresh, color: Colors.blueAccent),
-                tooltip: 'Refresh',
-                onPressed: _refresh,
-              ),
-              IconButton(
-                icon: const Icon(Icons.notifications),
-                onPressed: () async {
-                  await Navigator.pushNamed(context, '/notifications');
-                },
-              ),
-            ],
-            // Show logout button at AppBar when in Profile tab
-            if (_selectedIndex == 3) ...[
-              IconButton(
-                icon: const Icon(Icons.logout, color: Colors.blueAccent),
-                tooltip: 'Logout',
-                onPressed: _confirmLogout,
-              ),
-            ],
+        backgroundColor: Colors.grey.shade50,
+
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: [
+            SafeArea(child: _buildHome()),
+            _buildDispenseTab(),
+            const InventoryManagement(),
+            const DispenserProfile(),
           ],
         ),
-
-        body: _selectedIndex == 0
-            ? Column(
-                children: [
-                  _buildSearchSection(),
-                  if (_currentPrescription != null)
-                    Expanded(child: _buildPrescriptionView())
-                  else
-                    Expanded(child: _buildAllPrescriptionsList()),
-                ],
-              )
-            : _selectedIndex == 1
-            ? const InventoryManagement()
-            : _selectedIndex == 2
-            ? DispenseLogsScreen()
-            : const DispenserProfile(),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: (index) {
@@ -679,20 +1290,30 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
             setState(() => _selectedIndex = index);
           },
           type: BottomNavigationBarType.fixed,
-          items: const [
+          backgroundColor: Colors.white,
+          selectedItemColor: _brandTeal,
+          unselectedItemColor: Colors.grey.shade600,
+          showUnselectedLabels: true,
+          items: [
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.home),
+              label: 'Home',
+            ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.medical_services),
+              icon: _navIconWithBadge(
+                Icons.medical_services,
+                _allPrescriptions.length,
+              ),
               label: 'Dispense',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.inventory),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.inventory_2_outlined),
               label: 'Inventory',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history),
-              label: 'History',
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              label: 'Profile',
             ),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
           ],
         ),
       ),

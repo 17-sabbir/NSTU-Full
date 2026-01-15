@@ -31,6 +31,8 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
 
   DateTime? _dateOfBirth;
 
+  String? _gender;
+
   String _patientType = 'STUDENT';
 
   @override
@@ -134,6 +136,12 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
   ];
   String? _validateBloodGroup(String? value) {
     if (value == null || value.isEmpty) return 'Please select your blood group';
+    return null;
+  }
+
+
+  String? _validateGender(String? value) {
+    if (value == null || value.isEmpty) return 'Please select gender';
     return null;
   }
 
@@ -255,6 +263,7 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
         final role = _patientType;
         final bloodGroup = _bloodGroupController!.text.trim();
         final dob = _dateOfBirth;
+        final gender = _gender;
 
         final res = await client.auth.completeSignupWithPhoneOtp(
           email,
@@ -266,6 +275,7 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
           role,
           bloodGroup.isEmpty ? null : bloodGroup,
           dob,
+          gender,
         );
 
         if (res.success != true) {
@@ -445,27 +455,71 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
                     ),
                     const SizedBox(height: 15),
 
-                    // Patient Type dropdown
-                    DropdownButtonFormField<String>(
+                    // User Role (radio)
+                    FormField<String>(
                       initialValue: _patientType,
-                      decoration: _inputDecoration(
-                        'User Role',
-                        Icons.person_search,
-                      ),
-                      items: ['STUDENT', 'TEACHER', 'STAFF']
-                          .map(
-                            (type) => DropdownMenuItem(
-                              value: type,
-                              child: Text(
-                                type[0] + type.substring(1).toLowerCase(),
+                      builder: (field) {
+                        return InputDecorator(
+                          decoration: _inputDecoration(
+                            'User Role',
+                            Icons.person_search,
+                          ),
+                          child: Wrap(
+                            spacing: 5,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Radio<String>(
+                                    value: 'STUDENT',
+                                    groupValue: field.value,
+                                    onChanged: (v) {
+                                      setState(() {
+                                        _patientType = v ?? 'STUDENT';
+                                      });
+                                      field.didChange(v);
+                                    },
+                                  ),
+                                  const Text('Student'),
+                                ],
                               ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          _patientType = val ?? 'STUDENT';
-                        });
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Radio<String>(
+                                    value: 'TEACHER',
+                                    groupValue: field.value,
+                                    onChanged: (v) {
+                                      setState(() {
+                                        _patientType = v ?? 'STUDENT';
+                                      });
+                                      field.didChange(v);
+                                    },
+                                  ),
+                                  const Text('Teacher'),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Radio<String>(
+                                    value: 'STAFF',
+                                    groupValue: field.value,
+                                    onChanged: (v) {
+                                      setState(() {
+                                        _patientType = v ?? 'STUDENT';
+                                      });
+                                      field.didChange(v);
+                                    },
+                                  ),
+                                  const Text('Staff'),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
                       },
                     ),
 
@@ -492,6 +546,60 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
                         });
                       },
                       validator: _validateBloodGroup,
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Gender
+                    FormField<String>(
+                      initialValue: _gender,
+                      validator: _validateGender,
+                      builder: (field) {
+                        return InputDecorator(
+                          decoration: _inputDecoration(
+                            'Gender',
+                            Icons.wc,
+                          ).copyWith(errorText: field.errorText),
+                          child: Wrap(
+                            spacing: 18,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Radio<String>(
+                                    value: 'male',
+                                    groupValue: field.value,
+                                    onChanged: (v) {
+                                      setState(() {
+                                        _gender = v;
+                                      });
+                                      field.didChange(v);
+                                    },
+                                  ),
+                                  const Text('Male'),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Radio<String>(
+                                    value: 'female',
+                                    groupValue: field.value,
+                                    onChanged: (v) {
+                                      setState(() {
+                                        _gender = v;
+                                      });
+                                      field.didChange(v);
+                                    },
+                                  ),
+                                  const Text('Female'),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 15),
 

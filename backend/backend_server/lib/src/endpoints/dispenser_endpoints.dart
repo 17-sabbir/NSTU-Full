@@ -9,7 +9,6 @@ class DispenserEndpoint extends Endpoint {
 
   Future<DispenserProfileR?> getDispenserProfile(
     Session session,
-    int userId,
   ) async {
     try {
       final resolvedUserId = requireAuthenticatedUserId(session);
@@ -56,7 +55,6 @@ class DispenserEndpoint extends Endpoint {
   /// 2️⃣ Update dispenser profile
   Future<String> updateDispenserProfile(
     Session session, {
-    required int userId,
     required String name,
     required String phone,
     required String qualification,
@@ -160,7 +158,6 @@ class DispenserEndpoint extends Endpoint {
 
   Future<bool> restockItem(
     Session session, {
-    required int userId,
     required int itemId,
     required int quantity,
   }) async {
@@ -248,7 +245,6 @@ class DispenserEndpoint extends Endpoint {
 
   Future<List<InventoryAuditLog>> getDispenserHistory(
     Session session,
-    int userId,
   ) async {
     try {
       final resolvedUserId = requireAuthenticatedUserId(session);
@@ -457,6 +453,14 @@ class DispenserEndpoint extends Endpoint {
     required int dispenserId,
     required List<DispenseItemRequest> items,
   }) async {
+    final resolvedUserId = requireAuthenticatedUserId(session);
+    if (dispenserId != resolvedUserId) {
+      session.log(
+        'dispensePrescription: ignoring client dispenserId=$dispenserId; using session userId=$resolvedUserId',
+        level: LogLevel.warning,
+      );
+    }
+
     return await session.db.transaction((transaction) async {
       try {
         // ১. মেইন ডিসপেন্স রেকর্ড তৈরি
@@ -467,7 +471,7 @@ class DispenserEndpoint extends Endpoint {
         ''',
             parameters: QueryParameters.named({
               'pid': prescriptionId,
-              'did': dispenserId,
+              'did': resolvedUserId,
             }));
 
         final int dispenseId = dispenseResult.first.first as int;
@@ -522,7 +526,7 @@ class DispenserEndpoint extends Endpoint {
                 'id': item.itemId,
                 'old': currentStock,
                 'new': newStock,
-                'uid': dispenserId,
+                'uid': resolvedUserId,
               }));
         }
 

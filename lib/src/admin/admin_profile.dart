@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:flutter/services.dart';
-
 import '../cloudinary_upload.dart';
 
 class AdminProfile extends StatefulWidget {
@@ -314,21 +312,17 @@ class _AdminProfileState extends State<AdminProfile> {
     double responsiveWidth(double w) => size.width * w / 375;
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text("My Profile"),
-        foregroundColor: Colors.blue,
-        backgroundColor: Colors.white,
+        title: const Text(
+          "My Profile",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        foregroundColor: Colors.white,
+        backgroundColor: const Color(0xFF00695C),
         centerTitle: true,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () async {
-              await Navigator.pushNamed(context, '/notifications');
-            },
-          ),
-        ],
+      
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -356,43 +350,56 @@ class _AdminProfileState extends State<AdminProfile> {
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF2E7DFF), Color(0xFF6A9CFF)],
+          colors: [Color(0xFF00695C), Color(0xFF4DB6AC)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color.fromRGBO(0, 0, 0, 0.06),
+            color: const Color(0xFF00695C).withOpacity(0.3),
             blurRadius: 10,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Column(
         children: [
           Stack(
             children: [
-              CircleAvatar(
-                radius: 40,
-                backgroundColor: Colors.white.withAlpha(30),
-                backgroundImage: _imageBytes != null
-                    ? MemoryImage(_imageBytes!) as ImageProvider
-                    : (_profilePictureUrl != null &&
-                          _profilePictureUrl!.isNotEmpty)
-                    ? NetworkImage(_profilePictureUrl!) as ImageProvider
-                    : null,
-                child:
-                    (_imageBytes == null &&
-                        (_profilePictureUrl == null ||
-                            _profilePictureUrl!.isEmpty))
-                    ? const Icon(Icons.person, size: 40, color: Colors.white)
-                    : null,
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: CircleAvatar(
+                  radius: 50,
+                  backgroundColor: Colors.white.withAlpha(30),
+                  backgroundImage: _imageBytes != null
+                      ? MemoryImage(_imageBytes!) as ImageProvider
+                      : (_profilePictureUrl != null &&
+                            _profilePictureUrl!.isNotEmpty)
+                      ? NetworkImage(_profilePictureUrl!) as ImageProvider
+                      : null,
+                  child:
+                      (_imageBytes == null &&
+                          (_profilePictureUrl == null ||
+                              _profilePictureUrl!.isEmpty))
+                      ? const Icon(Icons.person, size: 50, color: Colors.white)
+                      : null,
+                ),
               ),
               Positioned(
-                bottom: -2,
-                right: -2,
+                bottom: 0,
+                right: 0,
                 child: Tooltip(
                   message: 'Edit photo',
                   child: InkWell(
@@ -404,16 +411,16 @@ class _AdminProfileState extends State<AdminProfile> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withAlpha(30),
+                            color: Colors.black.withOpacity(0.2),
                             blurRadius: 4,
                           ),
                         ],
                       ),
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(8),
                       child: const Icon(
-                        Icons.edit,
-                        size: 18,
-                        color: Colors.blueAccent,
+                        Icons.camera_alt,
+                        size: 20,
+                        color: Color(0xFF00695C),
                       ),
                     ),
                   ),
@@ -421,28 +428,21 @@ class _AdminProfileState extends State<AdminProfile> {
               ),
             ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _nameCtrl.text.isNotEmpty
-                      ? _nameCtrl.text
-                      : (name.isNotEmpty ? name : 'Unnamed'),
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  email.isNotEmpty ? email : '',
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
-                ),
-              ],
+          const SizedBox(height: 16),
+          Text(
+            _nameCtrl.text.isNotEmpty
+                ? _nameCtrl.text
+                : (name.isNotEmpty ? name : 'Unnamed'),
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            email.isNotEmpty ? email : '',
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
           ),
         ],
       ),
@@ -482,78 +482,78 @@ class _AdminProfileState extends State<AdminProfile> {
   }
 
   Widget _buildActionButtons() {
-    return Center(
-      child: Column(
-        children: [
-          SizedBox(
-            height: 44,
-            width: 220,
-            child: _isSaving
-                ? const Center(child: CircularProgressIndicator())
-                : ElevatedButton(
-                    onPressed: _isChanged ? _saveProfile : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isChanged
-                          ? Colors.green.shade600
-                          : Colors.grey.shade300,
-                      foregroundColor: _isChanged
-                          ? Colors.white
-                          : Colors.grey.shade600,
-                      elevation: _isChanged ? 6 : 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 12,
-                      ),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton.icon(
+            onPressed: _isChanged ? (_isSaving ? null : _saveProfile) : null,
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
                     ),
-                    child: Text(
-                      'Save Changes',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _isChanged ? Colors.white : Colors.grey.shade600,
-                      ),
-                    ),
-                  ),
+                  )
+                : const Icon(Icons.check_circle, size: 22),
+            label: Text(
+              _isSaving ? 'Saving...' : 'Save Changes',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00695C),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey.shade300,
+              disabledForegroundColor: Colors.grey.shade600,
+              elevation: 6,
+              shadowColor: const Color(0xFF00695C).withOpacity(0.4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton.icon(
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
                 onPressed: () =>
                     Navigator.pushNamed(context, '/change-password'),
-                icon: const Icon(Icons.lock_reset, size: 18),
+                icon: const Icon(Icons.lock_reset_rounded, size: 20),
                 label: const Text('Change Password'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepOrange,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-
-              const SizedBox(width: 16),
-              ElevatedButton.icon(
-                onPressed: _logout,
-                icon: const Icon(Icons.logout, size: 18),
-                label: const Text('Logout'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent.shade700,
-                  foregroundColor: Colors.white,
-                  elevation: 2,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange.shade800,
+                  side: BorderSide(color: Colors.orange.shade800, width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _logout,
+                icon: const Icon(Icons.logout_rounded, size: 20),
+                label: const Text('Logout'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red.shade700,
+                  side: BorderSide(color: Colors.red.shade700, width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
-            ],
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -566,26 +566,24 @@ class _AdminProfileState extends State<AdminProfile> {
       controller: ctrl,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: Colors.blueAccent),
+        prefixIcon: Icon(icon, color: const Color(0xFF00695C)),
         filled: true,
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(
-          vertical: 14,
-          horizontal: 12,
+          vertical: 16,
+          horizontal: 16,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.blue.shade300, width: 2),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF00695C), width: 2),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
+      style: const TextStyle(fontWeight: FontWeight.w500),
       inputFormatters: label.toLowerCase().contains('phone')
           ? [FilteringTextInputFormatter.digitsOnly]
           : null,

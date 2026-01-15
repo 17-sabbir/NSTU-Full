@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart';
-
+import 'dosage_times.dart';
 import 'test_reports_view.dart';
 
 class DoctorHomePage extends StatefulWidget {
@@ -738,9 +738,10 @@ class PrescriptionDetailsDialog extends StatelessWidget {
                 for (final it in details.items)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(
-                      '- ${it.medicineName} | ${it.dosageTimes ?? ''} | ${it.mealTiming ?? ''} | ${it.duration ?? ''}',
-                    ),
+                    child: Text(() {
+                      final dt = dosageTimesDisplayBangla(it.dosageTimes ?? '');
+                      return '- ${it.medicineName} | ${dt.isEmpty ? '-' : dt} | ${it.mealTiming ?? ''} | ${it.duration ?? ''}';
+                    }()),
                   ),
             ],
           ),

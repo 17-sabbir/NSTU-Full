@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:backend_client/backend_client.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -87,11 +88,7 @@ class _DispenserProfileState extends State<DispenserProfile> {
 
   Future<void> _loadProfile() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final userId = int.tryParse(prefs.getString('user_id') ?? '');
-      if (userId == null) return;
-
-      final profile = await client.dispenser.getDispenserProfile(0);
+      final profile = await client.dispenser.getDispenserProfile();
       if (profile == null) return;
 
       if (!mounted) return;
@@ -106,7 +103,7 @@ class _DispenserProfileState extends State<DispenserProfile> {
 
         _nameCtrl.text = name;
         _emailCtrl.text = email;
-        _phoneCtrl.text = phone;
+        _phoneCtrl.text = _normalizeBdPhoneForEdit(phone);
         _qualificationCtrl.text = qualification;
         _designationCtrl.text = designation;
 
@@ -115,6 +112,68 @@ class _DispenserProfileState extends State<DispenserProfile> {
     } catch (e) {
       debugPrint('Failed to load dispenser profile: $e');
     }
+  }
+
+  String _normalizeBdPhoneForEdit(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return '';
+
+    // Convert stored forms like +8801XXXXXXXXX / 8801XXXXXXXXX -> 01XXXXXXXXX
+    final digitsOnly = trimmed.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (digitsOnly.startsWith('+88')) {
+      final rest = digitsOnly.substring(3);
+      return rest.startsWith('01') ? rest : rest;
+    }
+    if (digitsOnly.startsWith('88') && digitsOnly.length >= 13) {
+      final rest = digitsOnly.substring(2);
+      return rest.startsWith('01') ? rest : rest;
+    }
+    return digitsOnly.startsWith('01') ? digitsOnly : digitsOnly;
+  }
+
+  bool _isValidBdLocalPhone(String local) {
+    // Expect local part without country code: 01 + 9 digits (11 digits total)
+    return RegExp(r'^01\d{9}$').hasMatch(local);
+  }
+
+  Future<void> _confirmLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Logout', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout != true) return;
+
+    try {
+      try {
+        await client.auth.logout();
+      } catch (_) {}
+      // ignore: deprecated_member_use
+      await client.authenticationKeyManager?.remove();
+    } catch (_) {}
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user_id');
+      await prefs.remove('user_role');
+      await prefs.remove('user_email');
+    } catch (_) {}
+
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
   }
 
   Future<void> _pickImage() async {
@@ -144,6 +203,19 @@ class _DispenserProfileState extends State<DispenserProfile> {
     if (!_isChanged) return;
     setState(() => _isSaving = true);
 
+    final localPhone = _phoneCtrl.text.trim();
+    if (localPhone.isNotEmpty && !_isValidBdLocalPhone(localPhone)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Phone must be like +8801XXXXXXXXX (total 14 chars)'),
+          ),
+        );
+        setState(() => _isSaving = false);
+      }
+      return;
+    }
+
     String? profileUrl = profileImageUrl.isEmpty ? null : profileImageUrl;
     if (_imageBytes != null) {
       final uploadedUrl = await CloudinaryUpload.uploadBytes(
@@ -165,14 +237,9 @@ class _DispenserProfileState extends State<DispenserProfile> {
     }
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final userId = int.tryParse(prefs.getString('user_id') ?? '');
-      if (userId == null) return;
-
       await client.dispenser.updateDispenserProfile(
-        userId: 0,
         name: _nameCtrl.text.trim(),
-        phone: _phoneCtrl.text.trim(),
+        phone: localPhone.isEmpty ? '' : '+88$localPhone',
         qualification: _qualificationCtrl.text.trim(),
         designation: _designationCtrl.text.trim(), // ✅ Pass designation
         profilePictureUrl: profileUrl,
@@ -204,6 +271,7 @@ class _DispenserProfileState extends State<DispenserProfile> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
+
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -216,6 +284,13 @@ class _DispenserProfileState extends State<DispenserProfile> {
                     colors: [Colors.blue, Colors.blueAccent],
                   ),
                   borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -255,7 +330,9 @@ class _DispenserProfileState extends State<DispenserProfile> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _nameCtrl.text,
+                            _nameCtrl.text.isEmpty
+                                ? 'Dispenser'
+                                : _nameCtrl.text,
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -263,10 +340,23 @@ class _DispenserProfileState extends State<DispenserProfile> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            'Dispenser',
-                            style: TextStyle(color: Colors.white70),
+                          Text(
+                            _emailCtrl.text.isEmpty
+                                ? 'Dispenser'
+                                : _emailCtrl.text,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white70),
                           ),
+                          const SizedBox(height: 4),
+                         if (designation.isNotEmpty)
+                            Text(
+                              designation,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+
                         ],
                       ),
                     ),
@@ -275,8 +365,11 @@ class _DispenserProfileState extends State<DispenserProfile> {
               ),
               const SizedBox(height: 20),
               Card(
+                elevation: 0,
+                color: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: Colors.grey.shade200),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -284,11 +377,22 @@ class _DispenserProfileState extends State<DispenserProfile> {
                     children: [
                       _field(_nameCtrl, Icons.person, 'Name'),
                       const SizedBox(height: 12),
-                      _field(_emailCtrl, Icons.email, 'Email'),
+                      _field(_emailCtrl, Icons.email, 'Email', readOnly: true),
                       const SizedBox(height: 12),
                       _field(_designationCtrl, Icons.work, 'Designation'),
                       const SizedBox(height: 12),
-                      _field(_phoneCtrl, Icons.phone, 'Phone'),
+                      _field(
+                        _phoneCtrl,
+                        Icons.phone,
+                        'Phone',
+                        prefixText: '+88 ',
+                        hintText: '01XXXXXXXXX',
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(11),
+                        ],
+                      ),
                       const SizedBox(height: 12),
                       _field(_qualificationCtrl, Icons.school, 'Qualification'),
                     ],
@@ -296,34 +400,88 @@ class _DispenserProfileState extends State<DispenserProfile> {
                 ),
               ),
               const SizedBox(height: 20),
-              Center(
-                child: SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.5,
-                  height: 44,
-                  child: _isSaving
-                      ? const Center(child: CircularProgressIndicator())
-                      : ElevatedButton(
-                          onPressed: _isChanged ? _saveProfile : null,
-                          child: const Text('Save Changes'),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final maxWidth = constraints.maxWidth;
+                  final contentWidth = maxWidth > 520 ? 520.0 : maxWidth;
+                  return SizedBox(
+                    width: contentWidth,
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height: 46,
+                          width: double.infinity,
+                          child: _isSaving
+                              ? const Center(
+                                  child: SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                )
+                              : ElevatedButton(
+                                  onPressed: _isChanged ? _saveProfile : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blueAccent,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text('Save Changes'),
+                                ),
                         ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.5,
-                  height: 44,
-                  child: ElevatedButton.icon(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, '/change-password'),
-                    icon: const Icon(Icons.lock_reset, size: 18),
-                    label: const Text('Change Password'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepOrange,
-                      foregroundColor: Colors.white,
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 46,
+                                child: OutlinedButton.icon(
+                                  onPressed: () => Navigator.pushNamed(
+                                    context,
+                                    '/change-password',
+                                  ),
+                                  icon: const Icon(Icons.lock_reset, size: 18),
+                                  label: const Text('Change Password'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.deepOrange,
+                                    side: const BorderSide(
+                                      color: Colors.deepOrange,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: SizedBox(
+                                height: 46,
+                                child: OutlinedButton.icon(
+                                  onPressed: _confirmLogout,
+                                  icon: const Icon(Icons.logout, size: 18),
+                                  label: const Text('Logout'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.red,
+                                    side: const BorderSide(color: Colors.red),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ],
           ),
@@ -332,12 +490,26 @@ class _DispenserProfileState extends State<DispenserProfile> {
     );
   }
 
-  Widget _field(TextEditingController c, IconData i, String l) {
+  Widget _field(
+    TextEditingController c,
+    IconData i,
+    String l, {
+    bool readOnly = false,
+    String? prefixText,
+    String? hintText,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
     return TextField(
       controller: c,
+      readOnly: readOnly,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: l,
         prefixIcon: Icon(i),
+        prefixText: prefixText,
+        hintText: hintText,
         filled: true,
         fillColor: Colors.grey[50],
         border: OutlineInputBorder(

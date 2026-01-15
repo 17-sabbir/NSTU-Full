@@ -21,37 +21,39 @@ import 'package:backend_client/src/protocol/InventoryCategory.dart' as _i8;
 import 'package:backend_client/src/protocol/InventoryItemInfo.dart' as _i9;
 import 'package:backend_client/src/protocol/inventory_transaction.dart' as _i10;
 import 'package:backend_client/src/protocol/inventory_audit_log.dart' as _i11;
-import 'package:backend_client/src/protocol/dashboard_analytics.dart' as _i12;
-import 'package:backend_client/src/protocol/login_response.dart' as _i13;
+import 'package:backend_client/src/protocol/admin_dashboard_overview.dart'
+    as _i12;
+import 'package:backend_client/src/protocol/dashboard_analytics.dart' as _i13;
+import 'package:backend_client/src/protocol/login_response.dart' as _i14;
 import 'package:backend_client/src/protocol/otp_challenge_response.dart'
-    as _i14;
-import 'package:backend_client/src/protocol/dispenser_profile_r.dart' as _i15;
-import 'package:backend_client/src/protocol/prescription.dart' as _i16;
-import 'package:backend_client/src/protocol/prescription_detail.dart' as _i17;
-import 'package:backend_client/src/protocol/dispense_request.dart' as _i18;
-import 'package:backend_client/src/protocol/doctor_home_data.dart' as _i19;
-import 'package:backend_client/src/protocol/doctor_profile.dart' as _i20;
-import 'package:backend_client/src/protocol/PrescribedItem.dart' as _i21;
+    as _i15;
+import 'package:backend_client/src/protocol/dispenser_profile_r.dart' as _i16;
+import 'package:backend_client/src/protocol/prescription.dart' as _i17;
+import 'package:backend_client/src/protocol/prescription_detail.dart' as _i18;
+import 'package:backend_client/src/protocol/dispense_request.dart' as _i19;
+import 'package:backend_client/src/protocol/doctor_home_data.dart' as _i20;
+import 'package:backend_client/src/protocol/doctor_profile.dart' as _i21;
+import 'package:backend_client/src/protocol/PrescribedItem.dart' as _i22;
 import 'package:backend_client/src/protocol/patient_external_report.dart'
-    as _i22;
-import 'package:backend_client/src/protocol/patient_record_list.dart' as _i23;
+    as _i23;
+import 'package:backend_client/src/protocol/patient_record_list.dart' as _i24;
 import 'package:backend_client/src/protocol/patient_record_prescription_details.dart'
-    as _i24;
-import 'package:backend_client/src/protocol/patient_return_tests.dart' as _i25;
+    as _i25;
+import 'package:backend_client/src/protocol/patient_return_tests.dart' as _i26;
 import 'package:backend_client/src/protocol/test_result_create_upload.dart'
-    as _i26;
-import 'package:backend_client/src/protocol/staff_profile.dart' as _i27;
-import 'package:backend_client/src/protocol/lab_today.dart' as _i28;
-import 'package:backend_client/src/protocol/lab_ten_history.dart' as _i29;
-import 'package:backend_client/src/protocol/notification.dart' as _i30;
-import 'package:backend_client/src/protocol/patient_reponse.dart' as _i31;
-import 'package:backend_client/src/protocol/patient_report.dart' as _i32;
-import 'package:backend_client/src/protocol/prescription_list.dart' as _i33;
-import 'package:backend_client/src/protocol/StaffInfo.dart' as _i34;
-import 'package:backend_client/src/protocol/ambulance_contact.dart' as _i35;
-import 'package:backend_client/src/protocol/onduty_staff.dart' as _i36;
-import 'package:backend_client/src/protocol/greeting.dart' as _i37;
-import 'protocol.dart' as _i38;
+    as _i27;
+import 'package:backend_client/src/protocol/staff_profile.dart' as _i28;
+import 'package:backend_client/src/protocol/lab_today.dart' as _i29;
+import 'package:backend_client/src/protocol/lab_ten_history.dart' as _i30;
+import 'package:backend_client/src/protocol/notification.dart' as _i31;
+import 'package:backend_client/src/protocol/patient_reponse.dart' as _i32;
+import 'package:backend_client/src/protocol/patient_report.dart' as _i33;
+import 'package:backend_client/src/protocol/prescription_list.dart' as _i34;
+import 'package:backend_client/src/protocol/StaffInfo.dart' as _i35;
+import 'package:backend_client/src/protocol/ambulance_contact.dart' as _i36;
+import 'package:backend_client/src/protocol/onduty_staff.dart' as _i37;
+import 'package:backend_client/src/protocol/greeting.dart' as _i38;
+import 'protocol.dart' as _i39;
 
 /// AdminEndpoints: server-side methods used by the admin UI to manage users,
 /// inventory, rosters, audit logs and notifications.
@@ -244,6 +246,20 @@ class EndpointAdminEndpoints extends _i1.EndpointRef {
         {},
       );
 
+  /// Fetch recent audit logs within the last [hours] hours.
+  /// Used by Admin Dashboard Recent Activity (last 24h).
+  _i2.Future<List<_i7.AuditEntry>> getRecentAuditLogs(
+    int hours,
+    int limit,
+  ) => caller.callServerEndpoint<List<_i7.AuditEntry>>(
+    'adminEndpoints',
+    'getRecentAuditLogs',
+    {
+      'hours': hours,
+      'limit': limit,
+    },
+  );
+
   _i2.Future<bool> addAmbulanceContact(
     String title,
     String phoneBn,
@@ -406,8 +422,15 @@ class EndpointAdminReportEndpoints extends _i1.EndpointRef {
   @override
   String get name => 'adminReportEndpoints';
 
-  _i2.Future<_i12.DashboardAnalytics> getDashboardAnalytics() =>
-      caller.callServerEndpoint<_i12.DashboardAnalytics>(
+  _i2.Future<_i12.AdminDashboardOverview> getAdminDashboardOverview() =>
+      caller.callServerEndpoint<_i12.AdminDashboardOverview>(
+        'adminReportEndpoints',
+        'getAdminDashboardOverview',
+        {},
+      );
+
+  _i2.Future<_i13.DashboardAnalytics> getDashboardAnalytics() =>
+      caller.callServerEndpoint<_i13.DashboardAnalytics>(
         'adminReportEndpoints',
         'getDashboardAnalytics',
         {},
@@ -421,11 +444,11 @@ class EndpointAuth extends _i1.EndpointRef {
   @override
   String get name => 'auth';
 
-  _i2.Future<_i13.LoginResponse> login(
+  _i2.Future<_i14.LoginResponse> login(
     String email,
     String password, {
     String? deviceId,
-  }) => caller.callServerEndpoint<_i13.LoginResponse>(
+  }) => caller.callServerEndpoint<_i14.LoginResponse>(
     'auth',
     'login',
     {
@@ -438,10 +461,10 @@ class EndpointAuth extends _i1.EndpointRef {
   /// Signup requirement redesign: only phone verification (OTP) during signup.
   /// No email OTP is required here.
   /// Since no SMS API, OTP is returned as debugOtp for UI popup.
-  _i2.Future<_i14.OtpChallengeResponse> startSignupPhoneOtp(
+  _i2.Future<_i15.OtpChallengeResponse> startSignupPhoneOtp(
     String email,
     String phone,
-  ) => caller.callServerEndpoint<_i14.OtpChallengeResponse>(
+  ) => caller.callServerEndpoint<_i15.OtpChallengeResponse>(
     'auth',
     'startSignupPhoneOtp',
     {
@@ -452,12 +475,12 @@ class EndpointAuth extends _i1.EndpointRef {
 
   /// Verify login OTP after password was correct but user required OTP.
   /// Returns a normal LoginResponse containing the session token.
-  _i2.Future<_i13.LoginResponse> verifyLoginOtp(
+  _i2.Future<_i14.LoginResponse> verifyLoginOtp(
     String email,
     String otp,
     String otpToken, {
     String? deviceId,
-  }) => caller.callServerEndpoint<_i13.LoginResponse>(
+  }) => caller.callServerEndpoint<_i14.LoginResponse>(
     'auth',
     'verifyLoginOtp',
     {
@@ -509,12 +532,12 @@ class EndpointAuth extends _i1.EndpointRef {
 
   /// After signup email OTP verified, start phone verification.
   /// Since no SMS API, OTP is returned as debugOtp for UI popup.
-  _i2.Future<_i14.OtpChallengeResponse> verifySignupEmailAndStartPhoneOtp(
+  _i2.Future<_i15.OtpChallengeResponse> verifySignupEmailAndStartPhoneOtp(
     String email,
     String emailOtp,
     String emailOtpToken,
     String phone,
-  ) => caller.callServerEndpoint<_i14.OtpChallengeResponse>(
+  ) => caller.callServerEndpoint<_i15.OtpChallengeResponse>(
     'auth',
     'verifySignupEmailAndStartPhoneOtp',
     {
@@ -527,7 +550,7 @@ class EndpointAuth extends _i1.EndpointRef {
 
   /// Finalize signup by verifying phone OTP, then creating the user.
   /// Returns LoginResponse with session token (auto-login after signup).
-  _i2.Future<_i13.LoginResponse> completeSignupWithPhoneOtp(
+  _i2.Future<_i14.LoginResponse> completeSignupWithPhoneOtp(
     String email,
     String phone,
     String phoneOtp,
@@ -537,7 +560,8 @@ class EndpointAuth extends _i1.EndpointRef {
     String role,
     String? bloodGroup,
     DateTime? dateOfBirth,
-  ) => caller.callServerEndpoint<_i13.LoginResponse>(
+    String? gender,
+  ) => caller.callServerEndpoint<_i14.LoginResponse>(
     'auth',
     'completeSignupWithPhoneOtp',
     {
@@ -550,6 +574,7 @@ class EndpointAuth extends _i1.EndpointRef {
       'role': role,
       'bloodGroup': bloodGroup,
       'dateOfBirth': dateOfBirth,
+      'gender': gender,
     },
   );
 
@@ -656,16 +681,15 @@ class EndpointDispenser extends _i1.EndpointRef {
   @override
   String get name => 'dispenser';
 
-  _i2.Future<_i15.DispenserProfileR?> getDispenserProfile(int userId) =>
-      caller.callServerEndpoint<_i15.DispenserProfileR?>(
+  _i2.Future<_i16.DispenserProfileR?> getDispenserProfile() =>
+      caller.callServerEndpoint<_i16.DispenserProfileR?>(
         'dispenser',
         'getDispenserProfile',
-        {'userId': userId},
+        {},
       );
 
   /// 2️⃣ Update dispenser profile
   _i2.Future<String> updateDispenserProfile({
-    required int userId,
     required String name,
     required String phone,
     required String qualification,
@@ -675,7 +699,6 @@ class EndpointDispenser extends _i1.EndpointRef {
     'dispenser',
     'updateDispenserProfile',
     {
-      'userId': userId,
       'name': name,
       'phone': phone,
       'qualification': qualification,
@@ -693,38 +716,36 @@ class EndpointDispenser extends _i1.EndpointRef {
       );
 
   _i2.Future<bool> restockItem({
-    required int userId,
     required int itemId,
     required int quantity,
   }) => caller.callServerEndpoint<bool>(
     'dispenser',
     'restockItem',
     {
-      'userId': userId,
       'itemId': itemId,
       'quantity': quantity,
     },
   );
 
-  _i2.Future<List<_i11.InventoryAuditLog>> getDispenserHistory(int userId) =>
+  _i2.Future<List<_i11.InventoryAuditLog>> getDispenserHistory() =>
       caller.callServerEndpoint<List<_i11.InventoryAuditLog>>(
         'dispenser',
         'getDispenserHistory',
-        {'userId': userId},
+        {},
       );
 
   /// Fetch all prescriptions that have not yet been dispensed
   /// Fetch pending prescriptions (not dispensed, not outside)
-  _i2.Future<List<_i16.Prescription>> getPendingPrescriptions() =>
-      caller.callServerEndpoint<List<_i16.Prescription>>(
+  _i2.Future<List<_i17.Prescription>> getPendingPrescriptions() =>
+      caller.callServerEndpoint<List<_i17.Prescription>>(
         'dispenser',
         'getPendingPrescriptions',
         {},
       );
 
-  _i2.Future<_i17.PrescriptionDetail?> getPrescriptionDetail(
+  _i2.Future<_i18.PrescriptionDetail?> getPrescriptionDetail(
     int prescriptionId,
-  ) => caller.callServerEndpoint<_i17.PrescriptionDetail?>(
+  ) => caller.callServerEndpoint<_i18.PrescriptionDetail?>(
     'dispenser',
     'getPrescriptionDetail',
     {'prescriptionId': prescriptionId},
@@ -748,7 +769,7 @@ class EndpointDispenser extends _i1.EndpointRef {
   _i2.Future<bool> dispensePrescription({
     required int prescriptionId,
     required int dispenserId,
-    required List<_i18.DispenseItemRequest> items,
+    required List<_i19.DispenseItemRequest> items,
   }) => caller.callServerEndpoint<bool>(
     'dispenser',
     'dispensePrescription',
@@ -768,8 +789,8 @@ class EndpointDoctor extends _i1.EndpointRef {
   String get name => 'doctor';
 
   /// Doctor home dashboard data
-  _i2.Future<_i19.DoctorHomeData> getDoctorHomeData() =>
-      caller.callServerEndpoint<_i19.DoctorHomeData>(
+  _i2.Future<_i20.DoctorHomeData> getDoctorHomeData() =>
+      caller.callServerEndpoint<_i20.DoctorHomeData>(
         'doctor',
         'getDoctorHomeData',
         {},
@@ -783,8 +804,8 @@ class EndpointDoctor extends _i1.EndpointRef {
       );
 
   /// ডাক্তারের আইডি দিয়ে তার সই এবং নাম খুঁজে বের করা
-  _i2.Future<_i20.DoctorProfile?> getDoctorProfile(int doctorId) =>
-      caller.callServerEndpoint<_i20.DoctorProfile?>(
+  _i2.Future<_i21.DoctorProfile?> getDoctorProfile(int doctorId) =>
+      caller.callServerEndpoint<_i21.DoctorProfile?>(
         'doctor',
         'getDoctorProfile',
         {'doctorId': doctorId},
@@ -825,8 +846,8 @@ class EndpointDoctor extends _i1.EndpointRef {
 
   /// নতুন প্রেসক্রিপশন সেভ করা
   _i2.Future<int> createPrescription(
-    _i16.Prescription prescription,
-    List<_i21.PrescribedItem> items,
+    _i17.Prescription prescription,
+    List<_i22.PrescribedItem> items,
     String patientPhone,
   ) => caller.callServerEndpoint<int>(
     'doctor',
@@ -838,9 +859,9 @@ class EndpointDoctor extends _i1.EndpointRef {
     },
   );
 
-  _i2.Future<List<_i22.PatientExternalReport>> getReportsForDoctor(
+  _i2.Future<List<_i23.PatientExternalReport>> getReportsForDoctor(
     int doctorId,
-  ) => caller.callServerEndpoint<List<_i22.PatientExternalReport>>(
+  ) => caller.callServerEndpoint<List<_i23.PatientExternalReport>>(
     'doctor',
     'getReportsForDoctor',
     {'doctorId': doctorId},
@@ -849,7 +870,7 @@ class EndpointDoctor extends _i1.EndpointRef {
   _i2.Future<int> revisePrescription({
     required int originalPrescriptionId,
     required String newAdvice,
-    required List<_i21.PrescribedItem> newItems,
+    required List<_i22.PrescribedItem> newItems,
   }) => caller.callServerEndpoint<int>(
     'doctor',
     'revisePrescription',
@@ -861,12 +882,12 @@ class EndpointDoctor extends _i1.EndpointRef {
   );
 
   /// List page: all prescriptions (latest first) + optional search by name/phone
-  _i2.Future<List<_i23.PatientPrescriptionListItem>>
+  _i2.Future<List<_i24.PatientPrescriptionListItem>>
   getPatientPrescriptionList({
     String? query,
     required int limit,
     required int offset,
-  }) => caller.callServerEndpoint<List<_i23.PatientPrescriptionListItem>>(
+  }) => caller.callServerEndpoint<List<_i24.PatientPrescriptionListItem>>(
     'doctor',
     'getPatientPrescriptionList',
     {
@@ -877,9 +898,9 @@ class EndpointDoctor extends _i1.EndpointRef {
   );
 
   /// Bottom sheet: single prescription full details + medicines
-  _i2.Future<_i24.PatientPrescriptionDetails?> getPrescriptionDetails({
+  _i2.Future<_i25.PatientPrescriptionDetails?> getPrescriptionDetails({
     required int prescriptionId,
-  }) => caller.callServerEndpoint<_i24.PatientPrescriptionDetails?>(
+  }) => caller.callServerEndpoint<_i25.PatientPrescriptionDetails?>(
     'doctor',
     'getPrescriptionDetails',
     {'prescriptionId': prescriptionId},
@@ -894,8 +915,8 @@ class EndpointLab extends _i1.EndpointRef {
   String get name => 'lab';
 
   /// Fetch all lab tests using your raw SQL schema
-  _i2.Future<List<_i25.LabTests>> getAllLabTests() =>
-      caller.callServerEndpoint<List<_i25.LabTests>>(
+  _i2.Future<List<_i26.LabTests>> getAllLabTests() =>
+      caller.callServerEndpoint<List<_i26.LabTests>>(
         'lab',
         'getAllLabTests',
         {},
@@ -918,7 +939,7 @@ class EndpointLab extends _i1.EndpointRef {
   );
 
   /// Create a new lab test record
-  _i2.Future<bool> createLabTest(_i25.LabTests test) =>
+  _i2.Future<bool> createLabTest(_i26.LabTests test) =>
       caller.callServerEndpoint<bool>(
         'lab',
         'createLabTest',
@@ -926,7 +947,7 @@ class EndpointLab extends _i1.EndpointRef {
       );
 
   /// Update an existing lab test (Admin style using QueryParameters)
-  _i2.Future<bool> updateLabTest(_i25.LabTests test) =>
+  _i2.Future<bool> updateLabTest(_i26.LabTests test) =>
       caller.callServerEndpoint<bool>(
         'lab',
         'updateLabTest',
@@ -967,16 +988,16 @@ class EndpointLab extends _i1.EndpointRef {
     },
   );
 
-  _i2.Future<List<_i26.TestResult>> getAllTestResults() =>
-      caller.callServerEndpoint<List<_i26.TestResult>>(
+  _i2.Future<List<_i27.TestResult>> getAllTestResults() =>
+      caller.callServerEndpoint<List<_i27.TestResult>>(
         'lab',
         'getAllTestResults',
         {},
       );
 
   /// Fetch Lab Staff profile by userId
-  _i2.Future<_i27.StaffProfileDto?> getStaffProfile(int userId) =>
-      caller.callServerEndpoint<_i27.StaffProfileDto?>(
+  _i2.Future<_i28.StaffProfileDto?> getStaffProfile(int userId) =>
+      caller.callServerEndpoint<_i28.StaffProfileDto?>(
         'lab',
         'getStaffProfile',
         {'userId': userId},
@@ -1005,15 +1026,15 @@ class EndpointLab extends _i1.EndpointRef {
     },
   );
 
-  _i2.Future<_i28.LabToday> getLabHomeTwoDaySummary() =>
-      caller.callServerEndpoint<_i28.LabToday>(
+  _i2.Future<_i29.LabToday> getLabHomeTwoDaySummary() =>
+      caller.callServerEndpoint<_i29.LabToday>(
         'lab',
         'getLabHomeTwoDaySummary',
         {},
       );
 
-  _i2.Future<List<_i29.LabTenHistory>> getLast10TestHistory() =>
-      caller.callServerEndpoint<List<_i29.LabTenHistory>>(
+  _i2.Future<List<_i30.LabTenHistory>> getLast10TestHistory() =>
+      caller.callServerEndpoint<List<_i30.LabTenHistory>>(
         'lab',
         'getLast10TestHistory',
         {},
@@ -1041,10 +1062,10 @@ class EndpointNotification extends _i1.EndpointRef {
     },
   );
 
-  _i2.Future<List<_i30.NotificationInfo>> getMyNotifications({
+  _i2.Future<List<_i31.NotificationInfo>> getMyNotifications({
     required int limit,
     required int userId,
-  }) => caller.callServerEndpoint<List<_i30.NotificationInfo>>(
+  }) => caller.callServerEndpoint<List<_i31.NotificationInfo>>(
     'notification',
     'getMyNotifications',
     {
@@ -1060,10 +1081,10 @@ class EndpointNotification extends _i1.EndpointRef {
         {'userId': userId},
       );
 
-  _i2.Future<_i30.NotificationInfo?> getNotificationById({
+  _i2.Future<_i31.NotificationInfo?> getNotificationById({
     required int notificationId,
     required int userId,
-  }) => caller.callServerEndpoint<_i30.NotificationInfo?>(
+  }) => caller.callServerEndpoint<_i31.NotificationInfo?>(
     'notification',
     'getNotificationById',
     {
@@ -1119,8 +1140,8 @@ class EndpointPatient extends _i1.EndpointRef {
   @override
   String get name => 'patient';
 
-  _i2.Future<_i31.PatientProfile?> getPatientProfile() =>
-      caller.callServerEndpoint<_i31.PatientProfile?>(
+  _i2.Future<_i32.PatientProfile?> getPatientProfile() =>
+      caller.callServerEndpoint<_i32.PatientProfile?>(
         'patient',
         'getPatientProfile',
         {},
@@ -1128,8 +1149,8 @@ class EndpointPatient extends _i1.EndpointRef {
 
   /// List lab tests from the `tests` table. Returns a list of maps with keys:
   /// test_name, description, student_fee, teacher_fee, outside_fee, available
-  _i2.Future<List<_i25.LabTests>> listTests() =>
-      caller.callServerEndpoint<List<_i25.LabTests>>(
+  _i2.Future<List<_i26.LabTests>> listTests() =>
+      caller.callServerEndpoint<List<_i26.LabTests>>(
         'patient',
         'listTests',
         {},
@@ -1150,6 +1171,7 @@ class EndpointPatient extends _i1.EndpointRef {
     String phone,
     String? bloodGroup,
     DateTime? dateOfBirth,
+    String? gender,
     String? profileImageUrl,
   ) => caller.callServerEndpoint<String>(
     'patient',
@@ -1160,20 +1182,21 @@ class EndpointPatient extends _i1.EndpointRef {
       'phone': phone,
       'bloodGroup': bloodGroup,
       'dateOfBirth': dateOfBirth,
+      'gender': gender,
       'profileImageUrl': profileImageUrl,
     },
   );
 
   /// Fetch logged-in patient's lab reports using phone number
-  _i2.Future<List<_i32.PatientReportDto>> getMyLabReports(int userId) =>
-      caller.callServerEndpoint<List<_i32.PatientReportDto>>(
+  _i2.Future<List<_i33.PatientReportDto>> getMyLabReports(int userId) =>
+      caller.callServerEndpoint<List<_i33.PatientReportDto>>(
         'patient',
         'getMyLabReports',
         {'userId': userId},
       );
 
-  _i2.Future<List<_i33.PrescriptionList>> getMyPrescriptionList(int userId) =>
-      caller.callServerEndpoint<List<_i33.PrescriptionList>>(
+  _i2.Future<List<_i34.PrescriptionList>> getMyPrescriptionList(int userId) =>
+      caller.callServerEndpoint<List<_i34.PrescriptionList>>(
         'patient',
         'getMyPrescriptionList',
         {'userId': userId},
@@ -1195,35 +1218,35 @@ class EndpointPatient extends _i1.EndpointRef {
     },
   );
 
-  _i2.Future<List<_i22.PatientExternalReport>> getMyExternalReports(
+  _i2.Future<List<_i23.PatientExternalReport>> getMyExternalReports(
     int userId,
-  ) => caller.callServerEndpoint<List<_i22.PatientExternalReport>>(
+  ) => caller.callServerEndpoint<List<_i23.PatientExternalReport>>(
     'patient',
     'getMyExternalReports',
     {'userId': userId},
   );
 
   /// ১. রোগীর সব প্রেসক্রিপশনের লিস্ট আনা
-  _i2.Future<List<_i33.PrescriptionList>> getPrescriptionList(int patientId) =>
-      caller.callServerEndpoint<List<_i33.PrescriptionList>>(
+  _i2.Future<List<_i34.PrescriptionList>> getPrescriptionList(int patientId) =>
+      caller.callServerEndpoint<List<_i34.PrescriptionList>>(
         'patient',
         'getPrescriptionList',
         {'patientId': patientId},
       );
 
   /// সরাসরি Patient ID (User ID) দিয়ে প্রেসক্রিপশন লিস্ট আনা
-  _i2.Future<List<_i33.PrescriptionList>> getPrescriptionsByPatientId(
+  _i2.Future<List<_i34.PrescriptionList>> getPrescriptionsByPatientId(
     int patientId,
-  ) => caller.callServerEndpoint<List<_i33.PrescriptionList>>(
+  ) => caller.callServerEndpoint<List<_i34.PrescriptionList>>(
     'patient',
     'getPrescriptionsByPatientId',
     {'patientId': patientId},
   );
 
   /// ২. একটি নির্দিষ্ট প্রেসক্রিপশনের বিস্তারিত তথ্য (PDF এর জন্য)
-  _i2.Future<_i17.PrescriptionDetail?> getPrescriptionDetail(
+  _i2.Future<_i18.PrescriptionDetail?> getPrescriptionDetail(
     int prescriptionId,
-  ) => caller.callServerEndpoint<_i17.PrescriptionDetail?>(
+  ) => caller.callServerEndpoint<_i18.PrescriptionDetail?>(
     'patient',
     'getPrescriptionDetail',
     {'prescriptionId': prescriptionId},
@@ -1231,22 +1254,22 @@ class EndpointPatient extends _i1.EndpointRef {
 
   /// Fetch all active medical staff (Admin, Doctor, Dispenser, Labstaff)
   /// Fetch all active medical staff (Admin, Doctor, Dispenser, Labstaff)
-  _i2.Future<List<_i34.StaffInfo>> getMedicalStaff() =>
-      caller.callServerEndpoint<List<_i34.StaffInfo>>(
+  _i2.Future<List<_i35.StaffInfo>> getMedicalStaff() =>
+      caller.callServerEndpoint<List<_i35.StaffInfo>>(
         'patient',
         'getMedicalStaff',
         {},
       );
 
-  _i2.Future<List<_i35.AmbulanceContact>> getAmbulanceContacts() =>
-      caller.callServerEndpoint<List<_i35.AmbulanceContact>>(
+  _i2.Future<List<_i36.AmbulanceContact>> getAmbulanceContacts() =>
+      caller.callServerEndpoint<List<_i36.AmbulanceContact>>(
         'patient',
         'getAmbulanceContacts',
         {},
       );
 
-  _i2.Future<List<_i36.OndutyStaff>> getOndutyStaff() =>
-      caller.callServerEndpoint<List<_i36.OndutyStaff>>(
+  _i2.Future<List<_i37.OndutyStaff>> getOndutyStaff() =>
+      caller.callServerEndpoint<List<_i37.OndutyStaff>>(
         'patient',
         'getOndutyStaff',
         {},
@@ -1263,8 +1286,8 @@ class EndpointGreeting extends _i1.EndpointRef {
   String get name => 'greeting';
 
   /// Returns a personalized greeting message: "Hello {name}".
-  _i2.Future<_i37.Greeting> hello(String name) =>
-      caller.callServerEndpoint<_i37.Greeting>(
+  _i2.Future<_i38.Greeting> hello(String name) =>
+      caller.callServerEndpoint<_i38.Greeting>(
         'greeting',
         'hello',
         {'name': name},
@@ -1291,7 +1314,7 @@ class Client extends _i1.ServerpodClientShared {
     bool? disconnectStreamsOnLostInternetConnection,
   }) : super(
          host,
-         _i38.Protocol(),
+         _i39.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,

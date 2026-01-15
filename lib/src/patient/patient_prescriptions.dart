@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:bangla_pdf_fixer/bangla_pdf_fixer.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:dishari/src/doctor/dosage_times.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_html/html.dart' as html;
 import 'dart:io' show File;
@@ -305,7 +306,8 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptions> {
                     // Dosage Times: Bangla check
                     pw.Expanded(
                       child: () {
-                        final dosage = item.dosageTimes ?? '';
+                        final raw = item.dosageTimes ?? '';
+                        final dosage = dosageTimesDisplayBangla(raw);
                         if (_hasBangla(dosage)) {
                           return BanglaText(dosage, fontSize: 11);
                         }

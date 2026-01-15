@@ -2,8 +2,28 @@ import 'package:serverpod/serverpod.dart';
 import 'package:backend_server/src/generated/protocol.dart';
 
 class AdminReportEndpoints extends Endpoint {
+  Future<AdminDashboardOverview> getAdminDashboardOverview(
+    Session session,
+  ) async {
+    try {
+      final totalUsers =
+          await _getSingleInt(session, 'SELECT COUNT(*) FROM users');
+      final totalStockItems =
+          await _getSingleInt(session, 'SELECT COUNT(*) FROM inventory_item');
 
-
+      return AdminDashboardOverview(
+        totalUsers: totalUsers,
+        totalStockItems: totalStockItems,
+      );
+    } catch (e, st) {
+      session.log(
+        'Admin dashboard overview error: $e',
+        level: LogLevel.error,
+        stackTrace: st,
+      );
+      rethrow;
+    }
+  }
 
   Future<DashboardAnalytics> getDashboardAnalytics(Session session) async {
     try {
@@ -82,13 +102,11 @@ class AdminReportEndpoints extends Endpoint {
           student: _toInt(m['student']),
           teacher: _toInt(m['teacher']),
           outside: _toInt(m['outside']),
-          revenue: m['revenue'] != null ? double.parse(m['revenue'].toString()) : 0.0,
+          revenue: m['revenue'] != null
+              ? double.parse(m['revenue'].toString())
+              : 0.0,
         );
       }).toList();
-
-
-
-
 
       // ---------- TOP MEDICINES ----------
       final topMedRows = await session.db.unsafeQuery('''
