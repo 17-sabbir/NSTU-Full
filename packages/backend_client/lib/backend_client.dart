@@ -44,8 +44,8 @@ late Client client;
 late PrefsAuthenticationKeyManager authKeyManager;
 
 void initServerpodClient() {
-  // late String serverUrl = 'https://nstu-backend-production.up.railway.app/';
-  late String serverUrl = 'http://localhost:8080';
+  late String serverUrl = 'https://nstu-backend-production.up.railway.app/';
+  // late String serverUrl = 'http://localhost:8080';
 
   authKeyManager = PrefsAuthenticationKeyManager();
   client = Client(
