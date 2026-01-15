@@ -29,6 +29,9 @@ adminReportEndpoints:
   - getAdminDashboardOverview:
   - getDashboardAnalytics:
 auth:
+  - requestProfileEmailChangeOtp:
+  - verifyProfileEmailChangeOtp:
+  - updateMyEmailWithOtp:
   - login:
   - startSignupPhoneOtp:
   - verifyLoginOtp:
@@ -62,6 +65,7 @@ doctor:
   - getPatientByPhone:
   - createPrescription:
   - getReportsForDoctor:
+  - markReportReviewed:
   - revisePrescription:
   - getPatientPrescriptionList:
   - getPrescriptionDetails:

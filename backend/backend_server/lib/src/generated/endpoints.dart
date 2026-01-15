@@ -910,6 +910,87 @@ class Endpoints extends _i1.EndpointDispatch {
       name: 'auth',
       endpoint: endpoints['auth']!,
       methodConnectors: {
+        'requestProfileEmailChangeOtp': _i1.MethodConnector(
+          name: 'requestProfileEmailChangeOtp',
+          params: {
+            'newEmail': _i1.ParameterDescription(
+              name: 'newEmail',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint)
+                  .requestProfileEmailChangeOtp(
+                    session,
+                    params['newEmail'],
+                  ),
+        ),
+        'verifyProfileEmailChangeOtp': _i1.MethodConnector(
+          name: 'verifyProfileEmailChangeOtp',
+          params: {
+            'newEmail': _i1.ParameterDescription(
+              name: 'newEmail',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'otp': _i1.ParameterDescription(
+              name: 'otp',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'otpToken': _i1.ParameterDescription(
+              name: 'otpToken',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint)
+                  .verifyProfileEmailChangeOtp(
+                    session,
+                    params['newEmail'],
+                    params['otp'],
+                    params['otpToken'],
+                  ),
+        ),
+        'updateMyEmailWithOtp': _i1.MethodConnector(
+          name: 'updateMyEmailWithOtp',
+          params: {
+            'newEmail': _i1.ParameterDescription(
+              name: 'newEmail',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'otp': _i1.ParameterDescription(
+              name: 'otp',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'otpToken': _i1.ParameterDescription(
+              name: 'otpToken',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['auth'] as _i5.AuthEndpoint).updateMyEmailWithOtp(
+                    session,
+                    params['newEmail'],
+                    params['otp'],
+                    params['otpToken'],
+                  ),
+        ),
         'login': _i1.MethodConnector(
           name: 'login',
           params: {
@@ -1770,6 +1851,25 @@ class Endpoints extends _i1.EndpointDispatch {
                   .getReportsForDoctor(
                     session,
                     params['doctorId'],
+                  ),
+        ),
+        'markReportReviewed': _i1.MethodConnector(
+          name: 'markReportReviewed',
+          params: {
+            'reportId': _i1.ParameterDescription(
+              name: 'reportId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
+                  .markReportReviewed(
+                    session,
+                    params['reportId'],
                   ),
         ),
         'revisePrescription': _i1.MethodConnector(

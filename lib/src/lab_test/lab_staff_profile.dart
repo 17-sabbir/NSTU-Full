@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../cloudinary_upload.dart';
+import '../mail_phn_update_verify.dart';
 import 'package:flutter/services.dart';
 
 class LabTesterProfile extends StatefulWidget {
@@ -14,8 +15,6 @@ class LabTesterProfile extends StatefulWidget {
 
 class _LabTesterProfileState extends State<LabTesterProfile>
     with SingleTickerProviderStateMixin {
-  // joining date removed as requested
-
   // Fields populated from backend
   String name = '';
   String email = '';
@@ -37,6 +36,15 @@ class _LabTesterProfileState extends State<LabTesterProfile>
   // String? _initialProfileUrl; // removed unused
   bool _isChanged = false;
   bool _isSaving = false;
+
+  // Verification state for changing contact info
+  bool _emailChangeVerified = false;
+  String? _emailVerifiedFor;
+  String? _emailOtpTokenForSave;
+  String? _emailOtpForSave;
+
+  bool _phoneChangeVerified = false;
+  String? _phoneVerifiedFor;
 
   @override
   void initState() {
@@ -67,12 +75,45 @@ class _LabTesterProfileState extends State<LabTesterProfile>
   }
 
   void _onChanged() {
-    final currentPhone = _normalizePhoneForBackend(_phoneCtrl.text.trim());
+    // Reset verification if user edits email/phone again.
+    final emailNow = _emailCtrl.text.trim();
+    if (emailNow != email) {
+      if (!_emailChangeVerified || _emailVerifiedFor != emailNow) {
+        _emailChangeVerified = false;
+        _emailVerifiedFor = null;
+        _emailOtpTokenForSave = null;
+        _emailOtpForSave = null;
+      }
+    } else {
+      _emailChangeVerified = false;
+      _emailVerifiedFor = null;
+      _emailOtpTokenForSave = null;
+      _emailOtpForSave = null;
+    }
+
+    final phoneNow = _phoneCtrl.text.trim();
+    final phoneNowNormalized =
+        MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(phoneNow) ??
+        phoneNow;
+    final phoneInitialNormalized =
+        MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(phone) ?? phone;
+    final phoneChanged = phoneNowNormalized != phoneInitialNormalized;
+    if (phoneChanged) {
+      if (!_phoneChangeVerified || _phoneVerifiedFor != phoneNowNormalized) {
+        _phoneChangeVerified = false;
+        _phoneVerifiedFor = null;
+      }
+    } else {
+      _phoneChangeVerified = false;
+      _phoneVerifiedFor = null;
+    }
+
+    final currentPhone = phoneNowNormalized;
 
     final changed =
         _nameCtrl.text.trim() != name ||
         _emailCtrl.text.trim() != email ||
-        currentPhone != _normalizePhoneForBackend(phone) ||
+        currentPhone != phoneInitialNormalized ||
         _specCtrl.text.trim() != designation ||
         _qualCtrl.text.trim() != qualification ||
         _imageBytes != null;
@@ -80,6 +121,125 @@ class _LabTesterProfileState extends State<LabTesterProfile>
     if (changed != _isChanged && mounted) {
       setState(() => _isChanged = changed);
     }
+  }
+
+  bool get _emailChanged => _emailCtrl.text.trim() != email;
+  bool get _phoneChanged {
+    final now = _phoneCtrl.text.trim();
+    final initial = phone;
+    final nowNormalized =
+        MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(now) ?? now;
+    final initialNormalized =
+        MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(initial) ??
+        initial;
+    return nowNormalized != initialNormalized;
+  }
+
+  bool get _emailVerifiedForCurrentValue {
+    final current = _emailCtrl.text.trim();
+    return !_emailChanged ||
+        (_emailChangeVerified &&
+            _emailVerifiedFor == current &&
+            (_emailOtpTokenForSave?.isNotEmpty ?? false) &&
+            (_emailOtpForSave?.isNotEmpty ?? false));
+  }
+
+  bool get _phoneVerifiedForCurrentValue {
+    final currentRaw = _phoneCtrl.text.trim();
+    final currentNormalized =
+        MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(currentRaw) ??
+        currentRaw;
+    return !_phoneChanged ||
+        (_phoneChangeVerified && _phoneVerifiedFor == currentNormalized);
+  }
+
+  bool get _canSave {
+    if (!_isChanged || _isSaving) return false;
+    if (!_emailVerifiedForCurrentValue) return false;
+    if (!_phoneVerifiedForCurrentValue) return false;
+    return true;
+  }
+
+  Future<void> _verifyEmailChange() async {
+    final newEmail = _emailCtrl.text.trim();
+    if (newEmail.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Enter an email first')));
+      return;
+    }
+    if (!_emailChanged) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Email is not changed')));
+      return;
+    }
+
+    try {
+      final payload = await MailPhnUpdateVerify.verifyEmailChange(
+        context: context,
+        client: client,
+        newEmail: newEmail,
+      );
+      if (payload == null || !mounted) return;
+      setState(() {
+        _emailChangeVerified = true;
+        _emailVerifiedFor = newEmail;
+        _emailOtpTokenForSave = payload.otpToken;
+        _emailOtpForSave = payload.otp;
+      });
+      _onChanged();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Email verification failed: $e')));
+    }
+  }
+
+  Future<void> _verifyPhoneChangeDummy() async {
+    final currentPhone = _phoneCtrl.text.trim();
+    if (currentPhone.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a phone number first')),
+      );
+      return;
+    }
+    if (!_phoneChanged) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Phone is not changed')));
+      return;
+    }
+
+    final ok = await MailPhnUpdateVerify.verifyPhoneDummy(
+      context: context,
+      newPhone: currentPhone,
+    );
+    if (ok != true || !mounted) return;
+
+    final normalized = MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(
+      currentPhone,
+    );
+    if (normalized == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Phone must be +8801XXXXXXXXX (14 chars including +)'),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _phoneCtrl.text = normalized;
+      _phoneChangeVerified = true;
+      _phoneVerifiedFor = normalized;
+    });
+    _onChanged();
   }
 
   Future<void> _loadProfile() async {
@@ -106,14 +266,19 @@ class _LabTesterProfileState extends State<LabTesterProfile>
           // ✅ Access fields directly like an object, not a Map
           name = profile.name;
           email = profile.email;
-          phone = profile.phone;
+          final normalizedPhone =
+              MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(
+                profile.phone.trim(),
+              ) ??
+              profile.phone.trim();
+          phone = normalizedPhone;
           designation = profile.designation;
           qualification = profile.qualification;
           _profilePictureUrl = profile.profilePictureUrl;
 
           _nameCtrl.text = name;
           _emailCtrl.text = email; // set email
-          _phoneCtrl.text = phone;
+          _phoneCtrl.text = normalizedPhone;
           _specCtrl.text = designation;
           _qualCtrl.text = qualification;
           // _initialProfileUrl = _profilePictureUrl;
@@ -166,6 +331,19 @@ class _LabTesterProfileState extends State<LabTesterProfile>
   // Save changes locally and upload image; backend persistence not implemented here
   Future<void> _saveProfile() async {
     if (!mounted) return;
+    if (!_emailVerifiedForCurrentValue) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Verify your new email before saving')),
+      );
+      return;
+    }
+    if (!_phoneVerifiedForCurrentValue) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Verify your new phone before saving')),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
     String emailText = _emailCtrl.text.trim();
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
@@ -176,6 +354,7 @@ class _LabTesterProfileState extends State<LabTesterProfile>
           backgroundColor: Colors.red,
         ),
       );
+      if (mounted) setState(() => _isSaving = false);
       return; // stop saving
     }
     String? finalImageUrl = _profilePictureUrl;
@@ -223,7 +402,46 @@ class _LabTesterProfileState extends State<LabTesterProfile>
       }
 
       // ৩. ব্যাকএন্ডে ডেটা সেভ করা
-      final normalized = _normalizePhoneForBackend(_phoneCtrl.text.trim());
+      final normalized = MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(
+        _phoneCtrl.text.trim(),
+      );
+      if (normalized == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Phone must be +8801XXXXXXXXX (14 chars including +)',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isSaving = false);
+        return;
+      }
+
+      // If email changed, update user email first using verified OTP.
+      if (_emailChanged) {
+        final newEmail = _emailCtrl.text.trim();
+        final emailRes = await client.auth.updateMyEmailWithOtp(
+          newEmail,
+          _emailOtpForSave ?? '',
+          _emailOtpTokenForSave ?? '',
+        );
+        if (emailRes != 'OK') {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Email update failed: $emailRes')),
+          );
+          setState(() => _isSaving = false);
+          return;
+        }
+        try {
+          await prefs.setString('user_email', newEmail);
+          await prefs.setString('email', newEmail);
+        } catch (_) {}
+        email = newEmail;
+      }
+
       final success = await client.lab.updateStaffProfile(
         userId: 0,
         name: _nameCtrl.text.trim(),
@@ -237,7 +455,8 @@ class _LabTesterProfileState extends State<LabTesterProfile>
       if (success) {
         setState(() {
           name = _nameCtrl.text.trim();
-          phone = _phoneCtrl.text.trim();
+          phone = normalized;
+          _phoneCtrl.text = normalized;
           designation = _specCtrl.text.trim();
           qualification = _qualCtrl.text.trim();
           _profilePictureUrl = finalImageUrl;
@@ -246,28 +465,13 @@ class _LabTesterProfileState extends State<LabTesterProfile>
           _imageBytes = null; // সেভ হয়ে গেলে লোকাল বাইটস ক্লিয়ার করে দিন
           _pickedFile = null;
         });
-        // If email was changed in the UI, backend may not support changing it via this endpoint.
-        if (_emailCtrl.text.trim() != email) {
-          // Update local email variable and show notice that backend email change may not be applied.
-          email = _emailCtrl.text.trim();
-          // ignore: use_build_context_synchronously
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Profile updated. Note: email change may require admin action.',
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else {
-          // ignore: use_build_context_synchronously
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Profile updated successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
       } else {
         throw Exception('Server update failed');
       }
@@ -504,12 +708,22 @@ class _LabTesterProfileState extends State<LabTesterProfile>
                               _emailCtrl,
                               Icons.email,
                               'Email',
+                              suffix:
+                                  (_emailChanged &&
+                                      !_emailVerifiedForCurrentValue)
+                                  ? _verifySuffixButton(_verifyEmailChange)
+                                  : null,
                             ), // Email field
                             const SizedBox(height: 12),
                             _buildEditableField(
                               _phoneCtrl,
                               Icons.phone,
                               'Phone',
+                              suffix:
+                                  (_phoneChanged &&
+                                      !_phoneVerifiedForCurrentValue)
+                                  ? _verifySuffixButton(_verifyPhoneChangeDummy)
+                                  : null,
                             ),
                             const SizedBox(height: 12),
                             _buildEditableField(
@@ -534,92 +748,117 @@ class _LabTesterProfileState extends State<LabTesterProfile>
 
                     const SizedBox(height: 20),
 
-                    // Buttons: Save Changes (center), Change Password and Logout
-                    Center(
-                      child: Column(
-                        children: [
-                          SizedBox(
-                            height: 44,
-                            width: 220,
-                            child: _isSaving
-                                ? const Center(
-                                    child: CircularProgressIndicator(),
-                                  )
-                                : ElevatedButton(
-                                    onPressed: _isChanged ? _saveProfile : null,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: _isChanged
-                                          ? Colors.green.shade600
-                                          : Colors.grey.shade300,
-                                      foregroundColor: _isChanged
-                                          ? Colors.white
-                                          : Colors.grey.shade600,
-                                      elevation: _isChanged ? 6 : 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 18,
-                                        vertical: 12,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'Save Changes',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: _isChanged
-                                            ? Colors.white
-                                            : Colors.grey.shade600,
-                                      ),
+                    // Buttons: Change Password, Save Changes, Logout
+                    Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 52,
+                                child: OutlinedButton.icon(
+                                  onPressed: () => Navigator.pushNamed(
+                                    context,
+                                    '/change-password',
+                                  ),
+                                  icon: const Icon(
+                                    Icons.lock_reset,
+                                    size: 20,
+                                    color: Colors.deepPurple,
+                                  ),
+                                  label: const Text(
+                                    'Change Password',
+                                    style: TextStyle(
+                                      color: Colors.deepPurple,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              ElevatedButton.icon(
-                                onPressed: () => Navigator.pushNamed(
-                                  context,
-                                  '/change-password',
-                                ),
-                                icon: const Icon(Icons.lock_reset, size: 18),
-                                label: const Text('Change Password'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.deepOrange.shade600,
-                                  foregroundColor: Colors.white,
-                                  elevation: 4,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 12,
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(
+                                      color: Colors.deepPurple.withOpacity(
+                                        0.35,
+                                      ),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 16),
-                              ElevatedButton.icon(
-                                onPressed: _logout,
-                                icon: const Icon(Icons.logout, size: 18),
-                                label: const Text('Logout'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.redAccent.shade700,
-                                  foregroundColor: Colors.white,
-                                  elevation: 2,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: SizedBox(
+                                height: 52,
+                                child: ElevatedButton(
+                                  onPressed: (_canSave && !_isSaving)
+                                      ? _saveProfile
+                                      : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _canSave
+                                        ? Colors.deepPurple
+                                        : Colors.grey.shade300,
+                                    disabledBackgroundColor:
+                                        Colors.grey.shade300,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    elevation: _canSave ? 3 : 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
                                   ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 12,
-                                  ),
+                                  child: _isSaving
+                                      ? const SizedBox(
+                                          height: 18,
+                                          width: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Text(
+                                          'Save Changes',
+                                          style: TextStyle(
+                                            color: _canSave
+                                                ? Colors.white
+                                                : Colors.grey.shade700,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                 ),
                               ),
-                            ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            onPressed: _logout,
+                            icon: const Icon(Icons.logout, color: Colors.red),
+                            label: const Text(
+                              'Logout',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: Colors.red.shade200),
+                              padding: const EdgeInsets.symmetric(vertical: 15),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 40),
@@ -633,13 +872,38 @@ class _LabTesterProfileState extends State<LabTesterProfile>
   Widget _buildEditableField(
     TextEditingController ctrl,
     IconData icon,
-    String label,
-  ) {
+    String label, {
+    Widget? suffix,
+  }) {
+    final lower = label.toLowerCase();
+    final keyboardType = lower.contains('phone')
+        ? TextInputType.phone
+        : (lower.contains('email') ? TextInputType.emailAddress : null);
+
+    final inputFormatters = lower.contains('phone')
+        ? <TextInputFormatter>[
+            MailPhnUpdateVerify.phoneDigitsAndOptionalLeadingPlusFormatter,
+            LengthLimitingTextInputFormatter(14),
+          ]
+        : (lower.contains('email')
+              ? <TextInputFormatter>[
+                  MailPhnUpdateVerify.denyWhitespaceFormatter,
+                ]
+              : null);
+
     return TextField(
       controller: ctrl,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.blueAccent),
+        suffixIcon: suffix == null
+            ? null
+            : Padding(padding: const EdgeInsets.only(right: 8), child: suffix),
+        suffixIconConstraints: suffix == null
+            ? null
+            : const BoxConstraints(minHeight: 36, minWidth: 0),
         filled: true,
         fillColor: Colors.grey[50],
         contentPadding: const EdgeInsets.symmetric(
@@ -654,13 +918,19 @@ class _LabTesterProfileState extends State<LabTesterProfile>
     );
   }
 
+  Widget _verifySuffixButton(VoidCallback onPressed) {
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: const Text('Verify'),
+    );
+  }
+
   // Ensure phone field uses digits only and shows +88 prefix in UI
   // Update where _buildEditableField is called for phone: it uses _phoneCtrl already; no change needed to call site.
 
-  String _normalizePhoneForBackend(String raw) {
-    final d = raw.replaceAll(RegExp(r'\D'), '');
-    if (d.length == 11) return '+88$d';
-    if (d.length == 13 && d.startsWith('88')) return '+$d';
-    return raw;
-  }
 }

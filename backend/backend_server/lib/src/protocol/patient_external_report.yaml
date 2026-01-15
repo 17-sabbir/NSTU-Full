@@ -8,4 +8,5 @@ fields:
   prescribedDoctorId: int
   prescriptionId: int?
   uploadedBy: int
+  reviewed: bool
   createdAt: DateTime?

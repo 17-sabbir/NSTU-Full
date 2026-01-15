@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:flutter/services.dart';
 import '../cloudinary_upload.dart';
+import '../mail_phn_update_verify.dart';
 
 class AdminProfile extends StatefulWidget {
   const AdminProfile({super.key});
@@ -34,6 +35,15 @@ class _AdminProfileState extends State<AdminProfile> {
 
   bool _isChanged = false;
   bool _isSaving = false;
+
+  // Verification state for changing contact info
+  bool _emailChangeVerified = false;
+  String? _emailVerifiedFor;
+  String? _emailOtpTokenForSave;
+  String? _emailOtpForSave;
+
+  bool _phoneChangeVerified = false;
+  String? _phoneVerifiedFor;
 
   final TextEditingController _oldPassword = TextEditingController();
   final TextEditingController _newPassword = TextEditingController();
@@ -71,9 +81,44 @@ class _AdminProfileState extends State<AdminProfile> {
   }
 
   void _onChanged() {
+    // Reset verification if user edits email/phone again.
+    final emailNow = _emailCtrl.text.trim();
+    if (emailNow != email) {
+      if (!_emailChangeVerified || _emailVerifiedFor != emailNow) {
+        _emailChangeVerified = false;
+        _emailVerifiedFor = null;
+        _emailOtpTokenForSave = null;
+        _emailOtpForSave = null;
+      }
+    } else {
+      _emailChangeVerified = false;
+      _emailVerifiedFor = null;
+      _emailOtpTokenForSave = null;
+      _emailOtpForSave = null;
+    }
+
+    final phoneNow = _phoneCtrl.text.trim();
+    final phoneInitial = phone;
+    final phoneNowNormalized =
+        MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(phoneNow) ??
+        phoneNow;
+    final phoneInitialNormalized =
+        MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(phoneInitial) ??
+        phoneInitial;
+    final phoneChanged = phoneNowNormalized != phoneInitialNormalized;
+    if (phoneChanged) {
+      if (!_phoneChangeVerified || _phoneVerifiedFor != phoneNowNormalized) {
+        _phoneChangeVerified = false;
+        _phoneVerifiedFor = null;
+      }
+    } else {
+      _phoneChangeVerified = false;
+      _phoneVerifiedFor = null;
+    }
+
     final changed =
         _nameCtrl.text.trim() != name ||
-        _phoneCtrl.text.trim() != phone ||
+        phoneNowNormalized != phoneInitialNormalized ||
         _emailCtrl.text.trim() != email ||
         _designationCtrl.text.trim() != designation ||
         _qualificationCtrl.text.trim() != qualification ||
@@ -82,6 +127,126 @@ class _AdminProfileState extends State<AdminProfile> {
     if (changed != _isChanged && mounted) {
       setState(() => _isChanged = changed);
     }
+  }
+
+  bool get _emailChanged => _emailCtrl.text.trim() != email;
+  bool get _phoneChanged {
+    final now = _phoneCtrl.text.trim();
+    final initial = phone;
+    final nowNormalized =
+        MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(now) ?? now;
+    final initialNormalized =
+        MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(initial) ??
+        initial;
+    return nowNormalized != initialNormalized;
+  }
+
+  bool get _emailVerifiedForCurrentValue {
+    final current = _emailCtrl.text.trim();
+    return !_emailChanged ||
+        (_emailChangeVerified &&
+            _emailVerifiedFor == current &&
+            (_emailOtpTokenForSave?.isNotEmpty ?? false) &&
+            (_emailOtpForSave?.isNotEmpty ?? false));
+  }
+
+  bool get _phoneVerifiedForCurrentValue {
+    final currentRaw = _phoneCtrl.text.trim();
+    final currentNormalized =
+        MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(currentRaw) ??
+        currentRaw;
+    return !_phoneChanged ||
+        (_phoneChangeVerified && _phoneVerifiedFor == currentNormalized);
+  }
+
+  bool get _canSave {
+    if (!_isChanged || _isSaving) return false;
+    if (!_emailVerifiedForCurrentValue) return false;
+    if (!_phoneVerifiedForCurrentValue) return false;
+    return true;
+  }
+
+  Future<void> _verifyEmailChange() async {
+    final newEmail = _emailCtrl.text.trim();
+    if (newEmail.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Enter an email first')));
+      return;
+    }
+    if (!_emailChanged) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Email is not changed')));
+      return;
+    }
+
+    try {
+      final payload = await MailPhnUpdateVerify.verifyEmailChange(
+        context: context,
+        client: client,
+        newEmail: newEmail,
+      );
+      if (payload == null || !mounted) return;
+      setState(() {
+        _emailChangeVerified = true;
+        _emailVerifiedFor = newEmail;
+        _emailOtpTokenForSave = payload.otpToken;
+        _emailOtpForSave = payload.otp;
+      });
+      _onChanged();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Email verification failed: $e')));
+    }
+  }
+
+  Future<void> _verifyPhoneChangeDummy() async {
+    final currentPhone = _phoneCtrl.text.trim();
+    if (currentPhone.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a phone number first')),
+      );
+      return;
+    }
+    if (!_phoneChanged) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Phone is not changed')));
+      return;
+    }
+
+    final ok = await MailPhnUpdateVerify.verifyPhoneDummy(
+      context: context,
+      newPhone: currentPhone,
+    );
+    if (ok != true || !mounted) return;
+
+    final normalized = MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(
+      currentPhone,
+    );
+    if (normalized == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Phone must be +8801XXXXXXXXX (14 chars including +)'),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      // Keep canonical +8801XXXXXXXXX after verification.
+      _phoneCtrl.text = normalized;
+      _phoneChangeVerified = true;
+      _phoneVerifiedFor = normalized;
+    });
+    _onChanged();
   }
 
   Future<void> _loadProfile() async {
@@ -119,14 +284,19 @@ class _AdminProfileState extends State<AdminProfile> {
         setState(() {
           name = profile.name;
           email = profile.email;
-          phone = profile.phone;
+          final normalizedPhone =
+              MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(
+                profile.phone.trim(),
+              ) ??
+              profile.phone.trim();
+          phone = normalizedPhone;
           _profilePictureUrl = profile.profilePictureUrl ?? '';
           designation = profile.designation ?? '';
           qualification = profile.qualification ?? '';
 
           _nameCtrl.text = name;
           _emailCtrl.text = email;
-          _phoneCtrl.text = phone;
+          _phoneCtrl.text = normalizedPhone;
           _designationCtrl.text = designation;
           _qualificationCtrl.text = qualification;
           _isLoading = false;
@@ -175,6 +345,20 @@ class _AdminProfileState extends State<AdminProfile> {
   Future<void> _saveProfile() async {
     if (!_isChanged) return;
     if (!mounted) return;
+
+    if (!_emailVerifiedForCurrentValue) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Verify your new email before saving')),
+      );
+      return;
+    }
+    if (!_phoneVerifiedForCurrentValue) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Verify your new phone before saving')),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
@@ -215,7 +399,22 @@ class _AdminProfileState extends State<AdminProfile> {
       }
 
       // Call backend update using generated client endpoint
-      final phoneToSend = _normalizePhoneForBackend(_phoneCtrl.text.trim());
+      final phoneToSend =
+          MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(
+            _phoneCtrl.text.trim(),
+          );
+      if (phoneToSend == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Phone must be +8801XXXXXXXXX (14 chars including +)',
+            ),
+          ),
+        );
+        setState(() => _isSaving = false);
+        return;
+      }
       final res = await client.adminEndpoints.updateAdminProfile(
         storedEmail,
         _nameCtrl.text.trim(),
@@ -224,6 +423,29 @@ class _AdminProfileState extends State<AdminProfile> {
         _designationCtrl.text.trim(),
         _qualificationCtrl.text.trim(),
       );
+
+      // Update email after saving other fields (admin endpoint identifies by old email).
+      if (_emailChanged) {
+        final newEmail = _emailCtrl.text.trim();
+        final emailRes = await client.auth.updateMyEmailWithOtp(
+          newEmail,
+          _emailOtpForSave ?? '',
+          _emailOtpTokenForSave ?? '',
+        );
+        if (emailRes != 'OK') {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Email update failed: $emailRes')),
+          );
+          setState(() => _isSaving = false);
+          return;
+        }
+        try {
+          await prefs.setString('user_email', newEmail);
+          await prefs.setString('email', newEmail);
+        } catch (_) {}
+        email = newEmail;
+      }
 
       if (res == 'OK') {
         // refresh
@@ -322,7 +544,6 @@ class _AdminProfileState extends State<AdminProfile> {
         backgroundColor: const Color(0xFF00695C),
         centerTitle: true,
         elevation: 0,
-      
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -461,10 +682,24 @@ class _AdminProfileState extends State<AdminProfile> {
             _buildEditableField(_nameCtrl, Icons.person, 'Full Name'),
             const SizedBox(height: 12),
 
-            _buildEditableField(_phoneCtrl, Icons.phone, 'Phone'),
+            _buildEditableField(
+              _phoneCtrl,
+              Icons.phone,
+              'Phone',
+              suffix: (_phoneChanged && !_phoneVerifiedForCurrentValue)
+                  ? _verifySuffixButton(_verifyPhoneChangeDummy)
+                  : null,
+            ),
             const SizedBox(height: 12),
 
-            _buildEditableField(_emailCtrl, Icons.email, 'Email'),
+            _buildEditableField(
+              _emailCtrl,
+              Icons.email,
+              'Email',
+              suffix: (_emailChanged && !_emailVerifiedForCurrentValue)
+                  ? _verifySuffixButton(_verifyEmailChange)
+                  : null,
+            ),
             const SizedBox(height: 12),
 
             _buildEditableField(_designationCtrl, Icons.badge, 'Designation'),
@@ -484,74 +719,103 @@ class _AdminProfileState extends State<AdminProfile> {
   Widget _buildActionButtons() {
     return Column(
       children: [
-        SizedBox(
-          width: double.infinity,
-          height: 54,
-          child: ElevatedButton.icon(
-            onPressed: _isChanged ? (_isSaving ? null : _saveProfile) : null,
-            icon: _isSaving
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Icon(Icons.check_circle, size: 22),
-            label: Text(
-              _isSaving ? 'Saving...' : 'Save Changes',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00695C),
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: Colors.grey.shade300,
-              disabledForegroundColor: Colors.grey.shade600,
-              elevation: 6,
-              shadowColor: const Color(0xFF00695C).withOpacity(0.4),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
         Row(
           children: [
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () =>
-                    Navigator.pushNamed(context, '/change-password'),
-                icon: const Icon(Icons.lock_reset_rounded, size: 20),
-                label: const Text('Change Password'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.orange.shade800,
-                  side: BorderSide(color: Colors.orange.shade800, width: 1.5),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      Navigator.pushNamed(context, '/change-password'),
+                  icon: const Icon(
+                    Icons.lock_reset_rounded,
+                    size: 20,
+                    color: Colors.deepPurple,
+                  ),
+                  label: const Text(
+                    'Change Password',
+                    style: TextStyle(
+                      color: Colors.deepPurple,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: Colors.deepPurple.withOpacity(0.35),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _logout,
-                icon: const Icon(Icons.logout_rounded, size: 20),
-                label: const Text('Logout'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red.shade700,
-                  side: BorderSide(color: Colors.red.shade700, width: 1.5),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: (_canSave && !_isSaving) ? _saveProfile : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _canSave
+                        ? Colors.deepPurple
+                        : Colors.grey.shade300,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: _canSave ? 3 : 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'Save Changes',
+                          style: TextStyle(
+                            color: _canSave
+                                ? Colors.white
+                                : Colors.grey.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ),
           ],
+        ),
+
+        const SizedBox(height: 14),
+
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: OutlinedButton.icon(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout_rounded, color: Colors.red),
+            label: const Text(
+              'Logout',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: Colors.red.shade200),
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -560,13 +824,60 @@ class _AdminProfileState extends State<AdminProfile> {
   Widget _buildEditableField(
     TextEditingController ctrl,
     IconData icon,
-    String label,
-  ) {
+    String label, {
+    Widget? suffix,
+  }) {
+    final lower = label.toLowerCase();
+    final keyboardType = lower.contains('phone')
+        ? TextInputType.phone
+        : (lower.contains('email') ? TextInputType.emailAddress : null);
+
+    final inputFormatters = lower.contains('phone')
+        ? <TextInputFormatter>[
+            MailPhnUpdateVerify.phoneDigitsAndOptionalLeadingPlusFormatter,
+            LengthLimitingTextInputFormatter(14),
+          ]
+        : (lower.contains('email')
+              ? <TextInputFormatter>[
+                  MailPhnUpdateVerify.denyWhitespaceFormatter,
+                ]
+              : null);
+
     return TextField(
       controller: ctrl,
+      keyboardType: keyboardType,
+      onTap: () {
+        if (!lower.contains('phone')) return;
+
+        final raw = ctrl.text.trim();
+        if (raw.isEmpty) {
+          ctrl.value = const TextEditingValue(
+            text: '+',
+            selection: TextSelection.collapsed(offset: 1),
+          );
+          return;
+        }
+
+        if (!raw.startsWith('+')) {
+          final normalized =
+              MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(raw);
+          if (normalized != null) {
+            ctrl.value = TextEditingValue(
+              text: normalized,
+              selection: TextSelection.collapsed(offset: normalized.length),
+            );
+          }
+        }
+      },
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: const Color(0xFF00695C)),
+        suffixIcon: suffix == null
+            ? null
+            : Padding(padding: const EdgeInsets.only(right: 8), child: suffix),
+        suffixIconConstraints: suffix == null
+            ? null
+            : const BoxConstraints(minHeight: 36, minWidth: 0),
         filled: true,
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(
@@ -584,16 +895,20 @@ class _AdminProfileState extends State<AdminProfile> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
       style: const TextStyle(fontWeight: FontWeight.w500),
-      inputFormatters: label.toLowerCase().contains('phone')
-          ? [FilteringTextInputFormatter.digitsOnly]
-          : null,
+      inputFormatters: inputFormatters,
     );
   }
 
-  String _normalizePhoneForBackend(String raw) {
-    final d = raw.replaceAll(RegExp(r'\D'), '');
-    if (d.length == 11) return '+88$d';
-    if (d.length == 13 && d.startsWith('88')) return '+$d';
-    return raw;
+  Widget _verifySuffixButton(VoidCallback onPressed) {
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: const Text('Verify'),
+    );
   }
+
 }

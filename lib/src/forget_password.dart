@@ -37,6 +37,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
   bool _isVerifying = false; // verifying OTP
   bool _isResetting = false; // resetting password
 
+  static const int _resetTokenExpirySeconds =
+      120; // matches backend (2 minutes)
+
   final tealColor = const Color(0xFF218085);
   final errorColor = const Color(0xFFC0152F);
 
@@ -71,6 +74,12 @@ class _ForgetPasswordState extends State<ForgetPassword> {
     return password.length >= 6;
   }
 
+  bool _looksLikeJwt(String value) {
+    final parts = value.split('.');
+    if (parts.length != 3) return false;
+    return parts.every((p) => p.isNotEmpty);
+  }
+
   // Step 1: Handle email submission
   void handleStep1() {
     if (_emailController.text.isEmpty) {
@@ -86,29 +95,42 @@ class _ForgetPasswordState extends State<ForgetPassword> {
     setState(() => emailError = null);
 
     // Call backend to request reset token + OTP (token returned)
-    _sendResetRequest(_emailController.text.trim());
+    _sendResetRequest(_emailController.text.trim(), navigateToOtpPage: true);
   }
 
-  Future<void> _sendResetRequest(String email) async {
+  Future<void> _sendResetRequest(
+    String email, {
+    required bool navigateToOtpPage,
+  }) async {
     setState(() {
       _isSending = true;
       emailError = null;
     });
 
     try {
-      // dynamic call in case generated method name differs; server returns token string on success
-      final res = await (client.auth as dynamic).requestPasswordReset(email);
+      // Server returns JWT token string on success, or an error message string.
+      final res = await client.auth.requestPasswordReset(email);
 
       // Backend returns token (JWT) string on success, or an error message string.
-      if (res != null && res is String && res.contains('.')) {
+      if (_looksLikeJwt(res)) {
         _resetToken = res;
-        // Move to step 2 and start timer
-        _pageController.nextPage(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-        setState(() => currentStep = 2);
+
+        // Always clear old OTP when issuing a new token/OTP
+        _codeControllers[0].clear();
+        setState(() => codeError = null);
+
+        // Start/refresh timer
         startResendTimer();
+
+        // Only navigate to OTP page for the initial request from Step 1.
+        if (navigateToOtpPage && currentStep != 2) {
+          _pageController.nextPage(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+          setState(() => currentStep = 2);
+        }
+
         _showMessage('Verification code sent to your email');
       } else if (res == 'User not found') {
         // Show inline error on email field so user can correct it
@@ -116,7 +138,9 @@ class _ForgetPasswordState extends State<ForgetPassword> {
           emailError = 'User not found';
         });
       } else {
-        final errorMsg = (res ?? 'Failed to send verification code').toString();
+        final errorMsg = res.isNotEmpty
+            ? res
+            : 'Failed to send verification code';
         _showMessage(errorMsg);
       }
     } catch (e) {
@@ -146,7 +170,6 @@ class _ForgetPasswordState extends State<ForgetPassword> {
     _verifyOtp(code);
   }
 
-
   Future<void> _verifyOtp(String code) async {
     if (_resetToken == null) {
       _showMessage('No verification token found. Please resend the code.');
@@ -156,10 +179,10 @@ class _ForgetPasswordState extends State<ForgetPassword> {
     setState(() => _isVerifying = true);
     try {
       final email = _emailController.text.trim();
-      final res = await (client.auth as dynamic).verifyPasswordReset(
+      final res = await client.auth.verifyPasswordReset(
         email,
         code,
-        _resetToken,
+        _resetToken!,
       );
       if (res == 'OK') {
         // proceed to reset password
@@ -170,7 +193,11 @@ class _ForgetPasswordState extends State<ForgetPassword> {
         setState(() => currentStep = 3);
         _showMessage('Code verified. You may now reset your password.');
       } else {
-        _showMessage(res?.toString() ?? 'Invalid or expired code');
+        _showMessage(
+          res.toString().isNotEmpty
+              ? res.toString()
+              : 'Invalid or expired code',
+        );
       }
     } catch (e) {
       _showMessage('Verification failed: $e');
@@ -215,19 +242,19 @@ class _ForgetPasswordState extends State<ForgetPassword> {
     setState(() => _isResetting = true);
     try {
       final email = _emailController.text.trim();
-      final res = await (client.auth as dynamic).resetPassword(
+      final res = await client.auth.resetPassword(
         email,
-        _resetToken,
+        _resetToken!,
         newPassword,
       );
-      if (res != null && res.toString().toLowerCase().contains('success')) {
+      if (res.toLowerCase().contains('success')) {
         _pageController.nextPage(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
         );
         setState(() => currentStep = 4);
       } else {
-        _showMessage(res?.toString() ?? 'Failed to reset password');
+        _showMessage(res.isNotEmpty ? res : 'Failed to reset password');
       }
     } catch (e) {
       _showMessage('Reset failed: $e');
@@ -271,12 +298,15 @@ class _ForgetPasswordState extends State<ForgetPassword> {
 
   // Start resend timer
   void startResendTimer() {
-    setState(() => resendTimer = 60);
+    setState(() => resendTimer = _resetTokenExpirySeconds);
     _timerObj?.cancel();
     _timerObj = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
-        resendTimer--;
+        if (resendTimer > 0) {
+          resendTimer--;
+        }
         if (resendTimer <= 0) {
+          resendTimer = 0;
           timer.cancel();
         }
       });
@@ -286,7 +316,7 @@ class _ForgetPasswordState extends State<ForgetPassword> {
   // Resend code
   void resendCode() {
     if (resendTimer <= 0) {
-      _sendResetRequest(_emailController.text.trim());
+      _sendResetRequest(_emailController.text.trim(), navigateToOtpPage: false);
     }
   }
 
@@ -377,6 +407,41 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                     ),
             ),
           ),
+          const SizedBox(height: 12),
+          // Back button
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: _isSending
+                  ? null
+                  : () {
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      } else {
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/',
+                          (route) => false,
+                        );
+                      }
+                    },
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: tealColor, width: 2),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'Back',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: tealColor,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -405,6 +470,11 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                 letterSpacing: 8,
                 fontWeight: FontWeight.bold,
               ),
+              onChanged: (_) {
+                if (codeError != null) {
+                  setState(() => codeError = null);
+                }
+              },
               decoration: InputDecoration(
                 hintText: '000000',
                 counterText: '', // Hides the character counter
@@ -435,9 +505,11 @@ class _ForgetPasswordState extends State<ForgetPassword> {
                 style: TextStyle(color: Color(0xFF626C7C), fontSize: 14),
               ),
               TextButton(
-                onPressed: resendTimer <= 0 ? resendCode : null,
+                onPressed: (resendTimer <= 0 && !_isSending)
+                    ? resendCode
+                    : null,
                 child: Text(
-                  'Resend ${resendTimer > 0 ? '(${resendTimer}s)' : ''}',
+                  'Resend ${_isSending ? '(sending...)' : (resendTimer > 0 ? '(${resendTimer}s)' : '')}',
                   style: TextStyle(
                     color: tealColor,
                     fontWeight: FontWeight.w600,
@@ -462,21 +534,21 @@ class _ForgetPasswordState extends State<ForgetPassword> {
               ),
               child: _isVerifying
                   ? const SizedBox(
-                height: 18,
-                width: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Text(
-                'Verify Code',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
+                      'Verify Code',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 12),

@@ -514,12 +514,39 @@ class DoctorEndpoint extends Endpoint {
           prescribedDoctorId: map['prescribed_doctor_id'] as int,
           prescriptionId: map['prescription_id'] as int?,
           uploadedBy: map['uploaded_by'] as int,
+          reviewed: (map['reviewed'] as bool?) ?? false,
           createdAt: map['created_at'] as DateTime?,
         );
       }).toList();
     } catch (e) {
       print('Error fetching reports: $e');
       return [];
+    }
+  }
+
+  /// Track if a test report was reviewed by the assigned doctor.
+  Future<bool> markReportReviewed(Session session, int reportId) async {
+    try {
+      final resolvedDoctorId = requireAuthenticatedUserId(session);
+
+      final updated = await session.db.unsafeExecute(
+        '''
+        UPDATE UploadpatientR
+        SET reviewed = TRUE
+        WHERE report_id = @rid AND prescribed_doctor_id = @did
+        ''',
+        parameters:
+            QueryParameters.named({'rid': reportId, 'did': resolvedDoctorId}),
+      );
+
+      return updated > 0;
+    } catch (e, st) {
+      session.log(
+        'markReportReviewed failed: $e',
+        level: LogLevel.error,
+        stackTrace: st,
+      );
+      return false;
     }
   }
 

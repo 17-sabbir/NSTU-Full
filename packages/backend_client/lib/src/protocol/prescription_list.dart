@@ -17,12 +17,20 @@ abstract class PrescriptionList implements _i1.SerializableModel {
     required this.prescriptionId,
     required this.date,
     required this.doctorName,
+    this.revisedFromPrescriptionId,
+    this.sourceReportId,
+    this.sourceReportType,
+    this.sourceReportCreatedAt,
   });
 
   factory PrescriptionList({
     required int prescriptionId,
     required DateTime date,
     required String doctorName,
+    int? revisedFromPrescriptionId,
+    int? sourceReportId,
+    String? sourceReportType,
+    DateTime? sourceReportCreatedAt,
   }) = _PrescriptionListImpl;
 
   factory PrescriptionList.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -30,6 +38,15 @@ abstract class PrescriptionList implements _i1.SerializableModel {
       prescriptionId: jsonSerialization['prescriptionId'] as int,
       date: _i1.DateTimeJsonExtension.fromJson(jsonSerialization['date']),
       doctorName: jsonSerialization['doctorName'] as String,
+      revisedFromPrescriptionId:
+          jsonSerialization['revisedFromPrescriptionId'] as int?,
+      sourceReportId: jsonSerialization['sourceReportId'] as int?,
+      sourceReportType: jsonSerialization['sourceReportType'] as String?,
+      sourceReportCreatedAt: jsonSerialization['sourceReportCreatedAt'] == null
+          ? null
+          : _i1.DateTimeJsonExtension.fromJson(
+              jsonSerialization['sourceReportCreatedAt'],
+            ),
     );
   }
 
@@ -39,6 +56,14 @@ abstract class PrescriptionList implements _i1.SerializableModel {
 
   String doctorName;
 
+  int? revisedFromPrescriptionId;
+
+  int? sourceReportId;
+
+  String? sourceReportType;
+
+  DateTime? sourceReportCreatedAt;
+
   /// Returns a shallow copy of this [PrescriptionList]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -46,6 +71,10 @@ abstract class PrescriptionList implements _i1.SerializableModel {
     int? prescriptionId,
     DateTime? date,
     String? doctorName,
+    int? revisedFromPrescriptionId,
+    int? sourceReportId,
+    String? sourceReportType,
+    DateTime? sourceReportCreatedAt,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -54,6 +83,12 @@ abstract class PrescriptionList implements _i1.SerializableModel {
       'prescriptionId': prescriptionId,
       'date': date.toJson(),
       'doctorName': doctorName,
+      if (revisedFromPrescriptionId != null)
+        'revisedFromPrescriptionId': revisedFromPrescriptionId,
+      if (sourceReportId != null) 'sourceReportId': sourceReportId,
+      if (sourceReportType != null) 'sourceReportType': sourceReportType,
+      if (sourceReportCreatedAt != null)
+        'sourceReportCreatedAt': sourceReportCreatedAt?.toJson(),
     };
   }
 
@@ -63,15 +98,25 @@ abstract class PrescriptionList implements _i1.SerializableModel {
   }
 }
 
+class _Undefined {}
+
 class _PrescriptionListImpl extends PrescriptionList {
   _PrescriptionListImpl({
     required int prescriptionId,
     required DateTime date,
     required String doctorName,
+    int? revisedFromPrescriptionId,
+    int? sourceReportId,
+    String? sourceReportType,
+    DateTime? sourceReportCreatedAt,
   }) : super._(
          prescriptionId: prescriptionId,
          date: date,
          doctorName: doctorName,
+         revisedFromPrescriptionId: revisedFromPrescriptionId,
+         sourceReportId: sourceReportId,
+         sourceReportType: sourceReportType,
+         sourceReportCreatedAt: sourceReportCreatedAt,
        );
 
   /// Returns a shallow copy of this [PrescriptionList]
@@ -82,11 +127,27 @@ class _PrescriptionListImpl extends PrescriptionList {
     int? prescriptionId,
     DateTime? date,
     String? doctorName,
+    Object? revisedFromPrescriptionId = _Undefined,
+    Object? sourceReportId = _Undefined,
+    Object? sourceReportType = _Undefined,
+    Object? sourceReportCreatedAt = _Undefined,
   }) {
     return PrescriptionList(
       prescriptionId: prescriptionId ?? this.prescriptionId,
       date: date ?? this.date,
       doctorName: doctorName ?? this.doctorName,
+      revisedFromPrescriptionId: revisedFromPrescriptionId is int?
+          ? revisedFromPrescriptionId
+          : this.revisedFromPrescriptionId,
+      sourceReportId: sourceReportId is int?
+          ? sourceReportId
+          : this.sourceReportId,
+      sourceReportType: sourceReportType is String?
+          ? sourceReportType
+          : this.sourceReportType,
+      sourceReportCreatedAt: sourceReportCreatedAt is DateTime?
+          ? sourceReportCreatedAt
+          : this.sourceReportCreatedAt,
     );
   }
 }

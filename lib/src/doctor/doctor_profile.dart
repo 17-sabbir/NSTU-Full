@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:backend_client/backend_client.dart';
 
 import '../cloudinary_upload.dart';
+import '../mail_phn_update_verify.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -43,6 +44,15 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isChanged = false;
   bool _isLoading = true;
   bool _isSaving = false;
+
+  // Verification state for changing contact info
+  bool _emailChangeVerified = false;
+  String? _emailVerifiedFor;
+  String? _emailOtpTokenForSave;
+  String? _emailOtpForSave;
+
+  bool _phoneChangeVerified = false;
+  String? _phoneVerifiedFor;
 
   String? _normalizePhoneLocal(String? phone) {
     if (phone == null) return null;
@@ -94,6 +104,43 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _checkChanges() {
+    // Reset verification if the edited value changes again.
+    final emailNow = _emailController.text.trim();
+    final shouldKeepEmailVerified =
+        _emailChangeVerified &&
+        _emailVerifiedFor == emailNow &&
+        emailNow != initialEmail;
+    final shouldResetEmail =
+        !shouldKeepEmailVerified &&
+        (_emailChangeVerified ||
+            _emailVerifiedFor != null ||
+            _emailOtpTokenForSave != null ||
+            _emailOtpForSave != null);
+
+    final phoneNow = _phoneController.text.trim();
+    final shouldKeepPhoneVerified =
+        _phoneChangeVerified &&
+        _phoneVerifiedFor == phoneNow &&
+        phoneNow != initialPhone;
+    final shouldResetPhone =
+        !shouldKeepPhoneVerified &&
+        (_phoneChangeVerified || _phoneVerifiedFor != null);
+
+    if ((shouldResetEmail || shouldResetPhone) && mounted) {
+      setState(() {
+        if (shouldResetEmail) {
+          _emailChangeVerified = false;
+          _emailVerifiedFor = null;
+          _emailOtpTokenForSave = null;
+          _emailOtpForSave = null;
+        }
+        if (shouldResetPhone) {
+          _phoneChangeVerified = false;
+          _phoneVerifiedFor = null;
+        }
+      });
+    }
+
     final changed =
         _nameController.text != initialName ||
         _emailController.text !=
@@ -113,6 +160,99 @@ class _ProfilePageState extends State<ProfilePage> {
         _isChanged = changed;
       });
     }
+  }
+
+  bool get _emailChanged => _emailController.text.trim() != initialEmail;
+  bool get _phoneChanged => _phoneController.text.trim() != initialPhone;
+
+  bool get _emailVerifiedForCurrentValue {
+    final current = _emailController.text.trim();
+    return !_emailChanged ||
+        (_emailChangeVerified &&
+            _emailVerifiedFor == current &&
+            (_emailOtpTokenForSave?.isNotEmpty ?? false) &&
+            (_emailOtpForSave?.isNotEmpty ?? false));
+  }
+
+  bool get _phoneVerifiedForCurrentValue {
+    final current = _phoneController.text.trim();
+    return !_phoneChanged ||
+        (_phoneChangeVerified && _phoneVerifiedFor == current);
+  }
+
+  bool get _canSave {
+    if (!_isChanged || _isSaving) return false;
+    if (!_emailVerifiedForCurrentValue) return false;
+    if (!_phoneVerifiedForCurrentValue) return false;
+    return true;
+  }
+
+  Future<void> _verifyEmailChange() async {
+    final newEmail = _emailController.text.trim();
+    if (newEmail.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Enter an email first')));
+      return;
+    }
+    if (!_emailChanged) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Email is not changed')));
+      return;
+    }
+
+    try {
+      final payload = await MailPhnUpdateVerify.verifyEmailChange(
+        context: context,
+        client: client,
+        newEmail: newEmail,
+      );
+      if (payload == null || !mounted) return;
+      setState(() {
+        _emailChangeVerified = true;
+        _emailVerifiedFor = newEmail;
+        _emailOtpTokenForSave = payload.otpToken;
+        _emailOtpForSave = payload.otp;
+      });
+      _checkChanges();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Email verification failed: $e')));
+    }
+  }
+
+  Future<void> _verifyPhoneChangeDummy() async {
+    final currentPhone = _phoneController.text.trim();
+    if (currentPhone.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a phone number first')),
+      );
+      return;
+    }
+    if (!_phoneChanged) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Phone is not changed')));
+      return;
+    }
+
+    final ok = await MailPhnUpdateVerify.verifyPhoneDummy(
+      context: context,
+      newPhone: currentPhone,
+    );
+    if (ok != true || !mounted) return;
+    setState(() {
+      _phoneChangeVerified = true;
+      _phoneVerifiedFor = currentPhone;
+    });
+    _checkChanges();
   }
 
   // Build avatar showing local file (mobile), memory bytes (web), or remote URL.
@@ -302,6 +442,20 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _saveProfile() async {
     if (_doctorId == null) return;
     if (!mounted) return;
+
+    if (!_emailVerifiedForCurrentValue) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Verify your new email before saving')),
+      );
+      return;
+    }
+    if (!_phoneVerifiedForCurrentValue) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Verify your new phone before saving')),
+      );
+      return;
+    }
+
     setState(() {
       _isSaving = true;
     });
@@ -315,6 +469,31 @@ class _ProfilePageState extends State<ProfilePage> {
         ).showSnackBar(const SnackBar(content: Text('Invalid email address')));
         setState(() => _isSaving = false);
         return;
+      }
+
+      // If email changed, update it first (requires OTP proof).
+      if (_emailChanged) {
+        final res = await client.auth.updateMyEmailWithOtp(
+          _emailController.text.trim(),
+          _emailOtpForSave ?? '',
+          _emailOtpTokenForSave ?? '',
+        );
+        if (res != 'OK') {
+          if (!mounted) return;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(res)));
+          setState(() => _isSaving = false);
+          return;
+        }
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final newEmail = _emailController.text.trim();
+          if (newEmail.isNotEmpty) {
+            await prefs.setString('user_email', newEmail);
+            await prefs.setString('email', newEmail);
+          }
+        } catch (_) {}
       }
 
       // Phone normalization
@@ -698,12 +877,29 @@ class _ProfilePageState extends State<ProfilePage> {
                       TextField(
                         controller: _emailController,
                         readOnly: false, // made editable
+                        keyboardType: TextInputType.emailAddress,
+                        inputFormatters: [
+                          MailPhnUpdateVerify.denyWhitespaceFormatter,
+                        ],
                         decoration: InputDecoration(
                           labelText: "Email",
                           prefixIcon: const Icon(
                             Icons.email,
                             color: Colors.deepPurple,
                           ),
+                          suffixIcon:
+                              (_emailChanged && !_emailVerifiedForCurrentValue)
+                              ? Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: _verifySuffixButton(
+                                    _verifyEmailChange,
+                                  ),
+                                )
+                              : null,
+                          suffixIconConstraints:
+                              (_emailChanged && !_emailVerifiedForCurrentValue)
+                              ? const BoxConstraints(minHeight: 36, minWidth: 0)
+                              : null,
                           filled: true,
                           fillColor: Colors.grey[100],
                           border: OutlineInputBorder(
@@ -722,6 +918,11 @@ class _ProfilePageState extends State<ProfilePage> {
                         controller: _phoneController,
                         readOnly: false,
                         keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          MailPhnUpdateVerify
+                              .phoneDigitsAndOptionalLeadingPlusFormatter,
+                          LengthLimitingTextInputFormatter(14),
+                        ],
                         // Remove digitsOnly and length limit to allow +88
                         decoration: InputDecoration(
                           labelText: "Phone Number",
@@ -729,6 +930,19 @@ class _ProfilePageState extends State<ProfilePage> {
                             Icons.phone,
                             color: Colors.deepPurple,
                           ),
+                          suffixIcon:
+                              (_phoneChanged && !_phoneVerifiedForCurrentValue)
+                              ? Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: _verifySuffixButton(
+                                    _verifyPhoneChangeDummy,
+                                  ),
+                                )
+                              : null,
+                          suffixIconConstraints:
+                              (_phoneChanged && !_phoneVerifiedForCurrentValue)
+                              ? const BoxConstraints(minHeight: 36, minWidth: 0)
+                              : null,
                           filled: true,
                           fillColor: Colors.grey[50],
                           border: OutlineInputBorder(
@@ -764,7 +978,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       // Qualifications (moved after Designation)
                       TextField(
                         controller: _qualificationsController,
-                        maxLines: 2,
                         readOnly: false,
                         decoration: InputDecoration(
                           labelText: "Qualifications",
@@ -875,15 +1088,31 @@ class _ProfilePageState extends State<ProfilePage> {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          Navigator.pushNamed(context, '/change-password'),
-                      icon: const Icon(Icons.lock_reset, size: 20),
-                      label: const Text("Change Password"),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      height: 52,
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/change-password'),
+                        icon: const Icon(
+                          Icons.lock_reset,
+                          size: 20,
+                          color: Colors.deepPurple,
+                        ),
+                        label: const Text(
+                          "Change Password",
+                          style: TextStyle(
+                            color: Colors.deepPurple,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: Colors.deepPurple.withOpacity(0.35),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                       ),
                     ),
@@ -891,46 +1120,53 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isChanged && !_isSaving ? _saveProfile : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _isChanged
-                            ? Colors.deepPurple
-                            : Colors.grey,
-                        disabledBackgroundColor: Colors.grey.shade300,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: (_canSave && !_isSaving)
+                            ? _saveProfile
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _canSave
+                              ? Colors.deepPurple
+                              : Colors.grey.shade300,
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: _canSave ? 3 : 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                "Save Changes",
+                                style: TextStyle(
+                                  color: _canSave
+                                      ? Colors.white
+                                      : Colors.grey.shade700,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
-                      child: _isSaving
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              "Save Changes",
-                              style: TextStyle(
-                                color: _isChanged
-                                    ? Colors.white
-                                    : Colors.grey.shade700,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
                     ),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
 
               // Logout Button
               SizedBox(
                 width: double.infinity,
+                height: 52,
                 child: OutlinedButton.icon(
                   onPressed: _confirmLogout,
                   icon: const Icon(Icons.logout, color: Colors.red),
@@ -946,7 +1182,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     side: BorderSide(color: Colors.red.shade200),
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
                 ),
@@ -957,6 +1193,18 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _verifySuffixButton(VoidCallback onPressed) {
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: const Text('Verify'),
     );
   }
 }

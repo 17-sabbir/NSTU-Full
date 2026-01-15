@@ -307,7 +307,9 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptions> {
                     pw.Expanded(
                       child: () {
                         final raw = item.dosageTimes ?? '';
-                        final dosage = dosageTimesDisplayBangla(raw);
+                        final dosage = isDosageFourTimes(raw.trim())
+                            ? 'দিনে ৪ বার'
+                            : dosageTimesDisplayBangla(raw);
                         if (_hasBangla(dosage)) {
                           return BanglaText(dosage, fontSize: 11);
                         }
@@ -483,6 +485,30 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptions> {
                                     fontSize: 16,
                                   ),
                                 ),
+                                if (item.revisedFromPrescriptionId != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Text(
+                                      () {
+                                        final type =
+                                            (item.sourceReportType ?? '')
+                                                .trim();
+                                        if (type.isNotEmpty) {
+                                          return 'Updated for: $type';
+                                        }
+                                        final rid = item.sourceReportId;
+                                        if (rid != null) {
+                                          return 'Updated for Report #$rid';
+                                        }
+                                        return 'Updated prescription';
+                                      }(),
+                                      style: TextStyle(
+                                        color: Colors.deepPurple.shade600,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
                                 const SizedBox(height: 6),
                                 Text(
                                   "Date: ${item.date.day}/${item.date.month}/${item.date.year}",

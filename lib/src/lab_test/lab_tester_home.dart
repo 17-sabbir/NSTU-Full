@@ -137,7 +137,7 @@ class _LabTesterHomeState extends State<LabTesterHome> {
       case 0:
         return "Home";
       case 1:
-        return "Upload";
+        return "Report Upload";
       case 2:
         return "Manage Test";
       case 3:
@@ -476,61 +476,7 @@ class _LabTesterHomeState extends State<LabTesterHome> {
   ) {
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      onTap: () {
-        showModalBottomSheet(
-          context: context,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-          ),
-          builder: (context) {
-            final v = ((int.tryParse(count) ?? 0) / 100.0).clamp(0.0, 1.0);
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(icon, color: color),
-                      const SizedBox(width: 8),
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        count,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: color,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  LinearProgressIndicator(
-                    value: v,
-                    color: color,
-                    backgroundColor: color.withAlpha((0.15 * 255).round()),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Tap a row to view details or take action.',
-                    style: TextStyle(color: Colors.grey[700]),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-              ),
-            );
-          },
-        );
-      },
+      onTap: null,
       child: Card(
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

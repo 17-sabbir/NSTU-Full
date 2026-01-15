@@ -3,8 +3,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 
 import '../cloudinary_upload.dart';
+import '../mail_phn_update_verify.dart';
 
 class PatientProfilePage extends StatefulWidget {
   final String? userId;
@@ -24,8 +26,20 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   DateTime? _dateOfBirth;
   String? _gender;
   String? _initialName;
+  String? _initialEmail;
   String? _initialPhone;
   DateTime? _initialDob;
+  String? _initialBloodGroup;
+  String? _initialGender;
+
+  // Verification state for changing contact info
+  bool _emailChangeVerified = false;
+  String? _emailVerifiedFor;
+  String? _emailOtpTokenForSave;
+  String? _emailOtpForSave;
+
+  bool _phoneChangeVerified = false;
+  String? _phoneVerifiedFor;
 
   Uint8List? _profileImageBytes;
   String? _profileImageBase64;
@@ -44,7 +58,9 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     _bloodGroupController = TextEditingController();
 
     _nameController.addListener(_checkChanges);
+    _emailController.addListener(_checkChanges);
     _phoneController.addListener(_checkChanges);
+    _bloodGroupController.addListener(_checkChanges);
     _loadProfileData();
   }
 
@@ -64,18 +80,41 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     try {
       final profile = await client.patient.getPatientProfile();
       if (profile != null) {
+        final normalizedGender = () {
+          final raw = (profile.gender ?? '').trim().toLowerCase();
+          if (raw == 'male') return 'male';
+          if (raw == 'female') return 'female';
+          return null;
+        }();
+        final normalizedPhone =
+            MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(
+              profile.phone.trim(),
+            ) ??
+            profile.phone.trim();
         _initialName = profile.name;
-        _initialPhone = profile.phone;
+        _initialEmail = profile.email;
+        _initialPhone = normalizedPhone;
         _initialDob = profile.dateOfBirth;
+        _initialBloodGroup = profile.bloodGroup ?? '';
+        _initialGender = normalizedGender;
 
         setState(() {
           _nameController.text = profile.name;
           _emailController.text = profile.email;
-          _phoneController.text = profile.phone;
+          _phoneController.text = normalizedPhone;
           _bloodGroupController.text = profile.bloodGroup ?? '';
           _dateOfBirth = profile.dateOfBirth;
-          _gender = profile.gender;
+          _gender = normalizedGender;
           _profileImageBase64 = profile.profilePictureUrl;
+
+          // Reset verification state after refresh.
+          _emailChangeVerified = false;
+          _emailVerifiedFor = null;
+          _emailOtpTokenForSave = null;
+          _emailOtpForSave = null;
+          _phoneChangeVerified = false;
+          _phoneVerifiedFor = null;
+
           _isLoading = false;
         });
       }
@@ -85,16 +124,163 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     }
   }
 
-  void _checkChanges() {
-    final changed =
-        _nameController.text != _initialName ||
-        _phoneController.text != _initialPhone ||
-        _dateOfBirth != _initialDob ||
-        _profileImageBytes != null;
+  bool get _emailChanged {
+    final current = _emailController.text.trim();
+    final initial = (_initialEmail ?? '').trim();
+    return current != initial;
+  }
 
-    if (changed != _isChanged && mounted) {
-      setState(() => _isChanged = changed);
+  bool get _phoneChanged {
+    final current = _phoneController.text.trim();
+    final initial = (_initialPhone ?? '').trim();
+    return current != initial;
+  }
+
+  bool get _emailVerifiedForCurrentValue {
+    if (!_emailChanged) return true;
+    final current = _emailController.text.trim();
+    return _emailChangeVerified &&
+        (_emailVerifiedFor?.trim() == current) &&
+        (_emailOtpTokenForSave?.trim().isNotEmpty ?? false) &&
+        (_emailOtpForSave?.trim().isNotEmpty ?? false);
+  }
+
+  bool get _phoneVerifiedForCurrentValue {
+    if (!_phoneChanged) return true;
+    final normalized = MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(
+      _phoneController.text.trim(),
+    );
+    if (normalized == null) return false;
+    return _phoneChangeVerified && (_phoneVerifiedFor?.trim() == normalized);
+  }
+
+  bool get _canSave {
+    if (!_isChanged) return false;
+    if (!_emailVerifiedForCurrentValue) return false;
+    if (!_phoneVerifiedForCurrentValue) return false;
+    return true;
+  }
+
+  void _checkChanges() {
+    final currentName = _nameController.text.trim();
+    final currentEmail = _emailController.text.trim();
+    final currentPhone = _phoneController.text.trim();
+    final currentBlood = _bloodGroupController.text.trim();
+
+    final nameChanged = currentName != (_initialName ?? '').trim();
+    final emailChanged = currentEmail != (_initialEmail ?? '').trim();
+    final phoneChanged = currentPhone != (_initialPhone ?? '').trim();
+    final bloodChanged = currentBlood != (_initialBloodGroup ?? '').trim();
+    final dobChanged =
+        _dateOfBirth?.millisecondsSinceEpoch !=
+        _initialDob?.millisecondsSinceEpoch;
+    final genderChanged =
+        (_gender ?? '').trim().toLowerCase() !=
+        (_initialGender ?? '').trim().toLowerCase();
+    final imageChanged = _profileImageBytes != null;
+
+    // If user edits contact fields after verification, invalidate verification.
+    if (emailChanged && (_emailVerifiedFor?.trim() != currentEmail)) {
+      _emailChangeVerified = false;
+      _emailVerifiedFor = null;
+      _emailOtpTokenForSave = null;
+      _emailOtpForSave = null;
     }
+
+    final normalizedPhone =
+        MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(currentPhone);
+    if (phoneChanged &&
+        (_phoneVerifiedFor?.trim() != normalizedPhone?.trim())) {
+      _phoneChangeVerified = false;
+      _phoneVerifiedFor = null;
+    }
+
+    final changed =
+        nameChanged ||
+        emailChanged ||
+        phoneChanged ||
+        bloodChanged ||
+        dobChanged ||
+        genderChanged ||
+        imageChanged;
+
+    if (!mounted) return;
+    setState(() {
+      _isChanged = changed;
+    });
+  }
+
+  Future<void> _verifyEmailChange() async {
+    final newEmail = _emailController.text.trim();
+    if (newEmail.isEmpty) {
+      _showDialog('Email Required', 'Please enter an email address first.');
+      return;
+    }
+    if (!_emailChanged) {
+      _showDialog('No Change', 'Email is not changed.');
+      return;
+    }
+    if (!MailPhnUpdateVerify.isValidEmailForProfile(newEmail)) {
+      _showDialog(
+        'Invalid Email',
+        'Email must be a valid address ending with gmail.com or nstu.edu.bd, and contain no spaces.',
+      );
+      return;
+    }
+
+    try {
+      final payload = await MailPhnUpdateVerify.verifyEmailChange(
+        context: context,
+        client: client,
+        newEmail: newEmail,
+      );
+      if (payload == null || !mounted) return;
+      setState(() {
+        _emailChangeVerified = true;
+        _emailVerifiedFor = newEmail;
+        _emailOtpTokenForSave = payload.otpToken;
+        _emailOtpForSave = payload.otp;
+      });
+      _checkChanges();
+    } catch (e) {
+      _showDialog('Error', 'Failed to verify email: $e');
+    }
+  }
+
+  Future<void> _verifyPhoneChangeDummy() async {
+    final currentPhone = _phoneController.text.trim();
+    if (currentPhone.isEmpty) {
+      _showDialog('Phone Required', 'Please enter a phone number first.');
+      return;
+    }
+    if (!_phoneChanged) {
+      _showDialog('No Change', 'Phone number is not changed.');
+      return;
+    }
+
+    final ok = await MailPhnUpdateVerify.verifyPhoneDummy(
+      context: context,
+      newPhone: currentPhone,
+    );
+    if (ok != true || !mounted) return;
+
+    final normalized = MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(
+      currentPhone,
+    );
+    if (normalized == null) {
+      _showDialog(
+        'Invalid Phone',
+        'Phone must be +8801XXXXXXXXX (14 chars including +).',
+      );
+      return;
+    }
+    setState(() {
+      // After verification, keep phone in canonical +8801XXXXXXXXX format.
+      _phoneController.text = normalized;
+      _phoneChangeVerified = true;
+      _phoneVerifiedFor = normalized;
+    });
+    _checkChanges();
   }
 
   Future<void> _pickImage() async {
@@ -123,8 +309,54 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
 
   Future<void> _saveProfile() async {
     if (!_isChanged) return;
+    if (!_emailVerifiedForCurrentValue) {
+      _showDialog(
+        'Verify Email',
+        'Please verify your new email before saving.',
+      );
+      return;
+    }
+    if (!_phoneVerifiedForCurrentValue) {
+      _showDialog(
+        'Verify Phone',
+        'Please verify your new phone before saving.',
+      );
+      return;
+    }
+
+    final normalizedPhone =
+        MailPhnUpdateVerify.normalizeBangladeshPhoneForProfile(
+          _phoneController.text.trim(),
+        );
+    if (normalizedPhone == null) {
+      _showDialog(
+        'Invalid Phone',
+        'Phone must be +8801XXXXXXXXX (14 chars including +).',
+      );
+      return;
+    }
     setState(() => _isSaving = true);
     try {
+      // If email changed, update email first (requires OTP proof).
+      if (_emailChanged) {
+        final res = await client.auth.updateMyEmailWithOtp(
+          _emailController.text.trim(),
+          _emailOtpForSave ?? '',
+          _emailOtpTokenForSave ?? '',
+        );
+        if (res != 'OK') {
+          throw Exception(res);
+        }
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final newEmail = _emailController.text.trim();
+          if (newEmail.isNotEmpty) {
+            await prefs.setString('user_email', newEmail);
+            await prefs.setString('email', newEmail);
+          }
+        } catch (_) {}
+      }
+
       String? imageUrl = _profileImageBase64;
       if (_profileImageBytes != null) {
         imageUrl = await _uploadProfileToCloudinary(_profileImageBytes!);
@@ -133,7 +365,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
       await client.patient.updatePatientProfile(
         0,
         _nameController.text.trim(),
-        _phoneController.text.trim(),
+        normalizedPhone,
         _bloodGroupController.text.isEmpty ? null : _bloodGroupController.text,
         _dateOfBirth,
         _gender,
@@ -180,7 +412,19 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
       await client.auth.logout();
     } catch (_) {}
     final prefs = await SharedPreferences.getInstance();
+    // Preserve the device id so this device remains trusted and won't require
+    // email OTP again on the next login.
+    final preservedDeviceId = prefs.getString('device_id');
     await prefs.clear();
+    if (preservedDeviceId != null && preservedDeviceId.trim().isNotEmpty) {
+      await prefs.setString('device_id', preservedDeviceId.trim());
+    }
+    // Also clear the persisted auth key explicitly (redundant if prefs.clear() ran,
+    // but safe for future refactors).
+    try {
+      // ignore: deprecated_member_use
+      await client.authenticationKeyManager?.remove();
+    } catch (_) {}
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
   }
@@ -226,27 +470,36 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                         controller: _emailController,
                         label: 'Email Address',
                         icon: Icons.mail_outline,
-                        readOnly: true,
+                        keyboardType: TextInputType.emailAddress,
+                        inputFormatters: [
+                          MailPhnUpdateVerify.denyWhitespaceFormatter,
+                        ],
+                        suffix:
+                            (_emailChanged && !_emailVerifiedForCurrentValue)
+                            ? _verifySuffixButton(_verifyEmailChange)
+                            : null,
                       ),
                       _buildModernField(
                         controller: _phoneController,
                         label: 'Phone Number',
                         icon: Icons.phone_android_outlined,
                         keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          MailPhnUpdateVerify
+                              .phoneDigitsAndOptionalLeadingPlusFormatter,
+                          LengthLimitingTextInputFormatter(14),
+                        ],
+                        suffix:
+                            (_phoneChanged && !_phoneVerifiedForCurrentValue)
+                            ? _verifySuffixButton(_verifyPhoneChangeDummy)
+                            : null,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _buildSectionCard(
-                    title: 'Medical Information',
-                    children: [
                       _buildModernField(
                         controller: _bloodGroupController,
                         label: 'Blood Group',
                         icon: Icons.water_drop_outlined,
-                        readOnly: true,
                       ),
-                      _buildGenderDisplay(),
+                      _buildGenderDropdown(),
                       _buildDobDisplay(),
                     ],
                   ),
@@ -369,6 +622,8 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     required IconData icon,
     bool readOnly = false,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    Widget? suffix,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -388,6 +643,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
           readOnly: readOnly,
           onChanged: (_) => _checkChanges(),
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           decoration: InputDecoration(
             filled: true,
             fillColor: readOnly ? const Color(0xFFF3F4F7) : Colors.white,
@@ -396,6 +652,15 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
               color: readOnly ? Colors.grey : const Color(0xFF4A86F7),
               size: 20,
             ),
+            suffixIcon: suffix == null
+                ? null
+                : Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: suffix,
+                  ),
+            suffixIconConstraints: suffix == null
+                ? null
+                : const BoxConstraints(minHeight: 36, minWidth: 0),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 12,
@@ -415,6 +680,18 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     );
   }
 
+  Widget _verifySuffixButton(VoidCallback onPressed) {
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: const Text('Verify'),
+    );
+  }
+
   Widget _buildDobDisplay() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -428,40 +705,63 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
           ),
         ),
         const SizedBox(height: 6),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.cake_outlined,
-                color: Color(0xFF4A86F7),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                _formatDob(_dateOfBirth),
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-            ],
+        InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () async {
+            final now = DateTime.now();
+            final initial = _dateOfBirth ?? DateTime(now.year - 18, 1, 1);
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: initial,
+              firstDate: DateTime(1900, 1, 1),
+              lastDate: now,
+            );
+            if (picked == null) return;
+            if (!mounted) return;
+            setState(() {
+              _dateOfBirth = picked;
+            });
+            _checkChanges();
+          },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.cake_outlined,
+                  color: Color(0xFF4A86F7),
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _formatDob(_dateOfBirth),
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+                const Icon(
+                  Icons.edit_outlined,
+                  size: 18,
+                  color: Color(0xFF4A86F7),
+                ),
+              ],
+            ),
           ),
         ),
+        const SizedBox(height: 16),
       ],
     );
   }
 
-  Widget _buildGenderDisplay() {
-    final gender = (_gender ?? '').trim();
-    final label = gender.isEmpty
-        ? 'Not set'
-        : (gender.toLowerCase() == 'male'
-              ? 'Male'
-              : (gender.toLowerCase() == 'female' ? 'Female' : gender));
+  Widget _buildGenderDropdown() {
+    final current = (_gender ?? '').trim().toLowerCase();
+    final value = (current == 'male' || current == 'female') ? current : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -475,20 +775,39 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
           ),
         ),
         const SizedBox(height: 6),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.wc_outlined, color: Color(0xFF4A86F7), size: 20),
-              const SizedBox(width: 12),
-              Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-            ],
+        DropdownButtonFormField<String>(
+          value: value,
+          items: const [
+            DropdownMenuItem(value: 'male', child: Text('Male')),
+            DropdownMenuItem(value: 'female', child: Text('Female')),
+          ],
+          onChanged: (v) {
+            if (!mounted) return;
+            setState(() {
+              _gender = v;
+            });
+            _checkChanges();
+          },
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            prefixIcon: const Icon(
+              Icons.wc_outlined,
+              color: Color(0xFF4A86F7),
+              size: 20,
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -502,20 +821,30 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           ...children,
         ],
       ),
@@ -526,8 +855,9 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white.withOpacity(0.22),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -551,110 +881,106 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   Widget _buildActionButtons() {
     return Column(
       children: [
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _isChanged ? _saveProfile : null,
-            icon: const Icon(Icons.save_outlined),
-            label: _isSaving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text(
-                    'Save Changes',
+        Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      Navigator.pushNamed(context, '/change-password'),
+                  icon: const Icon(
+                    Icons.lock_reset,
+                    size: 20,
+                    color: Colors.deepPurple,
+                  ),
+                  label: const Text(
+                    'Change Password',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.deepPurple,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: Colors.deepPurple.withOpacity(0.35),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: (_canSave && !_isSaving) ? _saveProfile : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _canSave
+                        ? Colors.deepPurple
+                        : Colors.grey.shade300,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    elevation: _canSave ? 3 : 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'Save Changes',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: _canSave
+                                ? Colors.white
+                                : Colors.grey.shade700,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: OutlinedButton.icon(
+            onPressed: _confirmLogout,
+            icon: const Icon(Icons.logout_rounded, color: Colors.red),
+            label: const Text(
+              'Logout',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF4A86F7),
-              disabledForegroundColor: Colors.grey,
-              side: BorderSide(
-                color: _isChanged ? const Color(0xFF4A86F7) : Colors.grey,
-              ),
+              side: BorderSide(color: Colors.red.shade200),
+              padding: const EdgeInsets.symmetric(vertical: 15),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
               ),
-              minimumSize: const Size.fromHeight(48),
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isNarrow = constraints.maxWidth < 420;
-
-            final changePasswordButton = OutlinedButton.icon(
-              onPressed: () => Navigator.pushNamed(context, '/change-password'),
-              icon: const Icon(Icons.lock_reset, color: Color(0xFF4A86F7)),
-              label: const Text(
-                'Change Password',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Color(0xFF4A86F7),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF4A86F7)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                minimumSize: const Size.fromHeight(48),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-              ),
-            );
-
-            final logoutButton = OutlinedButton.icon(
-              onPressed: _confirmLogout,
-              icon: const Icon(Icons.logout_rounded, color: Colors.red),
-              label: const Text(
-                'Logout',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.red,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                minimumSize: const Size.fromHeight(48),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-              ),
-            );
-
-            if (isNarrow) {
-              return Column(
-                children: [
-                  SizedBox(width: double.infinity, child: changePasswordButton),
-                  const SizedBox(height: 12),
-                  SizedBox(width: double.infinity, child: logoutButton),
-                ],
-              );
-            }
-
-            return Row(
-              children: [
-                Expanded(child: changePasswordButton),
-                const SizedBox(width: 12),
-                Expanded(child: logoutButton),
-              ],
-            );
-          },
         ),
       ],
     );

@@ -6,9 +6,14 @@ import 'package:serverpod/serverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:backend_server/src/generated/protocol.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
-import 'package:uuid/uuid.dart';
 
 class AuthEndpoint extends Endpoint {
+  int? _authenticatedUserId(Session session) {
+    final auth = session.authenticated;
+    if (auth == null) return null;
+    return int.tryParse(auth.userIdentifier);
+  }
+
   String? _jwtSecret(Session session) {
     final fromPasswords = session.passwords['jwtSecret'];
     if (fromPasswords != null && fromPasswords.trim().isNotEmpty) {
@@ -47,81 +52,11 @@ class AuthEndpoint extends Endpoint {
   static const Duration _otpTtl = Duration(minutes: 2);
   static const int _otpTtlSeconds = 120;
 
-  String? _normalizeDeviceId(String? deviceId) {
-    final v = deviceId?.trim();
-    if (v == null || v.isEmpty) return null;
-    // Prevent absurdly large values from being stored.
-    if (v.length > 200) return null;
-    return v;
-  }
-
-  String _hashDeviceId(String deviceId) {
-    return sha256.convert(utf8.encode(deviceId)).toString();
-  }
-
-  Future<void> _ensureTrustedDeviceTable(Session session) async {
-    // Best-effort: unmanaged SQL tables.
-    try {
-      await session.db.unsafeExecute(
-        '''
-        CREATE TABLE IF NOT EXISTS user_trusted_devices (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL,
-          device_id_hash TEXT NOT NULL,
-          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-          last_used_at TIMESTAMP NOT NULL DEFAULT NOW(),
-          CONSTRAINT user_trusted_devices_user_device_unique UNIQUE (user_id, device_id_hash)
-        )
-        ''',
-      );
-    } catch (_) {}
-  }
-
-  Future<bool> _isDeviceTrusted(
-    Session session, {
-    required int userId,
-    required String deviceIdHash,
-  }) async {
-    try {
-      final res = await session.db.unsafeQuery(
-        '''
-        SELECT 1
-        FROM user_trusted_devices
-        WHERE user_id = @uid AND device_id_hash = @h
-        LIMIT 1
-        ''',
-        parameters: QueryParameters.named({'uid': userId, 'h': deviceIdHash}),
-      );
-      return res.isNotEmpty;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<void> _upsertTrustedDevice(
-    Session session, {
-    required int userId,
-    required String deviceIdHash,
-  }) async {
-    try {
-      await session.db.unsafeExecute(
-        '''
-        INSERT INTO user_trusted_devices (user_id, device_id_hash)
-        VALUES (@uid, @h)
-        ON CONFLICT (user_id, device_id_hash)
-        DO UPDATE SET last_used_at = NOW()
-        ''',
-        parameters: QueryParameters.named({'uid': userId, 'h': deviceIdHash}),
-      );
-    } catch (_) {}
-  }
-
   String? _issueAuthToken(
     Session session, {
     required String email,
     required String userId,
     required String role,
-    required int tokenVersion,
   }) {
     final jwtSecret = _jwtSecret(session);
     if (jwtSecret == null) return null;
@@ -130,7 +65,6 @@ class AuthEndpoint extends Endpoint {
       {
         'uid': int.tryParse(userId) ?? userId,
         'role': role,
-        'tv': tokenVersion,
         'jti': _uuid.v4(),
       },
       issuer: 'dishari',
@@ -144,19 +78,13 @@ class AuthEndpoint extends Endpoint {
   Future<void> _ensureSecurityColumns(Session session) async {
     // This project uses unmanaged SQL tables; keep it resilient.
     // Postgres supports IF NOT EXISTS.
+    // Track whether this email has been verified once via login email OTP.
+    // After it's true, future logins will not require OTP again.
     try {
       await session.db.unsafeExecute(
-        'ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version integer NOT NULL DEFAULT 0',
+        'ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_verified boolean NOT NULL DEFAULT FALSE',
       );
     } catch (_) {}
-
-    try {
-      await session.db.unsafeExecute(
-        'ALTER TABLE users ADD COLUMN IF NOT EXISTS require_login_email_otp boolean NOT NULL DEFAULT FALSE',
-      );
-    } catch (_) {}
-
-    await _ensureTrustedDeviceTable(session);
   }
 
   String _decodeDbValue(dynamic value) {
@@ -172,7 +100,6 @@ class AuthEndpoint extends Endpoint {
     if (value is List<int>) return int.tryParse(utf8.decode(value));
     return int.tryParse(value.toString());
   }
-
 
   int? _calculateAgeFromDob(DateTime? dob) {
     if (dob == null) return null;
@@ -190,6 +117,7 @@ class AuthEndpoint extends Endpoint {
     required String purpose,
     String? email,
     String? phone,
+    int? userId,
   }) async {
     final jwtSecret = _jwtSecret(session);
     if (jwtSecret == null) {
@@ -209,6 +137,7 @@ class AuthEndpoint extends Endpoint {
     };
     if (email != null) payload['email'] = email;
     if (phone != null) payload['phone'] = phone;
+    if (userId != null) payload['uid'] = userId;
 
     final token = JWT(
       payload,
@@ -235,6 +164,7 @@ class AuthEndpoint extends Endpoint {
     required String token,
     String? email,
     String? phone,
+    int? userId,
   }) async {
     final jwtSecret = _jwtSecret(session);
     if (jwtSecret == null) {
@@ -245,19 +175,166 @@ class AuthEndpoint extends Endpoint {
       final jwt = JWT.verify(token, SecretKey(jwtSecret));
       final payload = jwt.payload;
       if (payload['purpose'] != purpose) return 'Invalid or expired OTP';
-      if ((payload['otp'] ?? '').toString() != otp)
+      if ((payload['otp'] ?? '').toString() != otp) {
         return 'Invalid or expired OTP';
+      }
       if (email != null && (payload['email'] ?? '').toString() != email) {
         return 'Invalid or expired OTP';
       }
       if (phone != null && (payload['phone'] ?? '').toString() != phone) {
         return 'Invalid or expired OTP';
       }
+      if (userId != null) {
+        final uidRaw = payload['uid'];
+        final uid = uidRaw is int ? uidRaw : int.tryParse('${uidRaw ?? ''}');
+        if (uid == null || uid != userId) return 'Invalid or expired OTP';
+      }
       return null;
     } catch (e) {
       session.log('OTP JWT verification failed: $e', level: LogLevel.warning);
       return 'Invalid or expired OTP';
     }
+  }
+
+  // ---------------- PROFILE EMAIL CHANGE (VERIFY THEN SAVE) ----------------
+  /// Sends an OTP to [newEmail] for verifying profile email change.
+  /// Requires an authenticated user.
+  Future<OtpChallengeResponse> requestProfileEmailChangeOtp(
+    Session session,
+    String newEmail,
+  ) async {
+    final uid = _authenticatedUserId(session);
+    if (uid == null) {
+      return OtpChallengeResponse(success: false, error: 'Not authenticated');
+    }
+
+    final normalizedEmail = newEmail.trim();
+    if (normalizedEmail.isEmpty) {
+      return OtpChallengeResponse(
+        success: false,
+        error: 'Email is required.',
+      );
+    }
+
+    // Ensure the new email is not taken by another user.
+    try {
+      final existing = await session.db.unsafeQuery(
+        '''
+        SELECT 1
+        FROM users
+        WHERE lower(email) = lower(@e)
+          AND user_id <> @uid
+        LIMIT 1
+        ''',
+        parameters: QueryParameters.named({'e': normalizedEmail, 'uid': uid}),
+      );
+      if (existing.isNotEmpty) {
+        return OtpChallengeResponse(
+          success: false,
+          error: 'Email already exists.',
+        );
+      }
+    } catch (_) {}
+
+    final challenge = await _createOtpToken(
+      session: session,
+      purpose: 'profile_email_change',
+      email: normalizedEmail,
+      userId: uid,
+    );
+    if (!challenge.success) return challenge;
+
+    final sent = await _sendOtpWithResend(
+      session,
+      normalizedEmail,
+      challenge.debugOtp ?? '',
+      isReset: false,
+    );
+    if (!sent) {
+      return OtpChallengeResponse(
+        success: false,
+        error: 'Failed to send OTP. Please try again later.',
+      );
+    }
+
+    return OtpChallengeResponse(
+      success: true,
+      token: challenge.token,
+      expiresInSeconds: _otpTtlSeconds,
+    );
+  }
+
+  /// Verify OTP for profile email change (does not update DB).
+  Future<bool> verifyProfileEmailChangeOtp(
+    Session session,
+    String newEmail,
+    String otp,
+    String otpToken,
+  ) async {
+    final uid = _authenticatedUserId(session);
+    if (uid == null) return false;
+
+    final normalizedEmail = newEmail.trim();
+    final err = await _validateOtpToken(
+      session: session,
+      purpose: 'profile_email_change',
+      otp: otp,
+      token: otpToken,
+      email: normalizedEmail,
+      userId: uid,
+    );
+    return err == null;
+  }
+
+  /// Update the authenticated user's email, requiring OTP proof.
+  /// Also marks `email_otp_verified = TRUE` because the new email was verified.
+  Future<String> updateMyEmailWithOtp(
+    Session session,
+    String newEmail,
+    String otp,
+    String otpToken,
+  ) async {
+    final uid = _authenticatedUserId(session);
+    if (uid == null) return 'Not authenticated';
+
+    await _ensureSecurityColumns(session);
+
+    final normalizedEmail = newEmail.trim();
+    if (normalizedEmail.isEmpty) return 'Email is required.';
+
+    final err = await _validateOtpToken(
+      session: session,
+      purpose: 'profile_email_change',
+      otp: otp,
+      token: otpToken,
+      email: normalizedEmail,
+      userId: uid,
+    );
+    if (err != null) return err;
+
+    final existing = await session.db.unsafeQuery(
+      '''
+      SELECT 1
+      FROM users
+      WHERE lower(email) = lower(@e)
+        AND user_id <> @uid
+      LIMIT 1
+      ''',
+      parameters: QueryParameters.named({'e': normalizedEmail, 'uid': uid}),
+    );
+    if (existing.isNotEmpty) return 'Email already exists.';
+
+    await session.db.unsafeExecute(
+      '''
+      UPDATE users
+      SET email = @e,
+          email_otp_verified = TRUE
+      WHERE user_id = @uid
+      ''',
+      parameters: QueryParameters.named({'e': normalizedEmail, 'uid': uid}),
+    );
+
+    return 'OK';
   }
 
   static final Map<String, List<DateTime>> _rateLimit = {};
@@ -298,13 +375,11 @@ class AuthEndpoint extends Endpoint {
     try {
       await _ensureSecurityColumns(session);
 
-
       final result = await session.db.unsafeQuery(
         '''
       SELECT u.user_id, u.name, u.email, u.password_hash, u.role::text AS role, u.is_active,
               u.phone, p.blood_group, p.date_of_birth, u.profile_picture_url,
-             COALESCE(u.require_login_email_otp, FALSE) AS require_login_email_otp,
-             COALESCE(u.token_version, 0) AS token_version
+             COALESCE(u.email_otp_verified, FALSE) AS email_otp_verified
       FROM users u
       LEFT JOIN patient_profiles p ON p.user_id = u.user_id
       WHERE u.email = @e
@@ -333,46 +408,20 @@ class AuthEndpoint extends Endpoint {
       final decodedRole = _decodeDbValue(row['role']).toUpperCase();
       final userId = _decodeDbValue(row['user_id']);
 
-      final userIdInt = int.tryParse(userId);
-      final tokenVersion = _decodeDbInt(row['token_version']) ?? 0;
-      final requireLoginEmailOtp = (row['require_login_email_otp'] == true);
+      final emailOtpVerified = (row['email_otp_verified'] == true);
 
-      final normalizedDeviceId = _normalizeDeviceId(deviceId);
-      final deviceHash =
-          normalizedDeviceId == null ? null : _hashDeviceId(normalizedDeviceId);
-
-      bool deviceTrusted = false;
-      if (userIdInt != null && deviceHash != null) {
-        deviceTrusted = await _isDeviceTrusted(
-          session,
-          userId: userIdInt,
-          deviceIdHash: deviceHash,
-        );
-      }
-
-      final shouldRequireEmailOtp = requireLoginEmailOtp || !deviceTrusted;
-
-      // If device is trusted and user didn't explicitly logout, issue token directly.
-      if (!shouldRequireEmailOtp) {
+      // Require email OTP only until the email has been verified once.
+      if (emailOtpVerified) {
         final token = _issueAuthToken(
           session,
           email: email,
           userId: userId,
           role: decodedRole,
-          tokenVersion: tokenVersion,
         );
         if (token == null) {
           return LoginResponse(
             success: false,
             error: 'Server auth is not configured (missing JWT secret).',
-          );
-        }
-
-        if (userIdInt != null && deviceHash != null) {
-          await _upsertTrustedDevice(
-            session,
-            userId: userIdInt,
-            deviceIdHash: deviceHash,
           );
         }
 
@@ -388,8 +437,7 @@ class AuthEndpoint extends Endpoint {
         );
       }
 
-      // Require OTP only if user explicitly logged out, OR this is a first-time
-      // login on this device/browser.
+      // First-ever login verification for this email.
       final challenge = await _createOtpToken(
         session: session,
         purpose: 'login_email',
@@ -525,7 +573,7 @@ class AuthEndpoint extends Endpoint {
       final result = await session.db.unsafeQuery(
         '''
         SELECT user_id, name, email, role::text AS role, is_active, phone,
-               COALESCE(token_version, 0) AS token_version
+               COALESCE(email_otp_verified, FALSE) AS email_otp_verified
         FROM users
         WHERE email = @e
         LIMIT 1
@@ -551,37 +599,25 @@ class AuthEndpoint extends Endpoint {
         );
       }
 
-      // Clear OTP requirement now that email OTP is verified.
+      // Mark email as verified now that login email OTP is verified.
       await session.db.unsafeExecute(
-        'UPDATE users SET require_login_email_otp = FALSE WHERE email = @e',
+        'UPDATE users SET email_otp_verified = TRUE WHERE email = @e',
         parameters: QueryParameters.named({'e': email}),
       );
 
       final userId = _decodeDbValue(row['user_id']);
       final decodedRole = _decodeDbValue(row['role']).toUpperCase();
-      final tokenVersion = _decodeDbInt(row['token_version']) ?? 0;
 
       final authToken = _issueAuthToken(
         session,
         email: email,
         userId: userId,
         role: decodedRole,
-        tokenVersion: tokenVersion,
       );
       if (authToken == null) {
         return LoginResponse(
           success: false,
           error: 'Server auth is not configured (missing JWT secret).',
-        );
-      }
-
-      final normalizedDeviceId = _normalizeDeviceId(deviceId);
-      final userIdInt = int.tryParse(userId);
-      if (normalizedDeviceId != null && userIdInt != null) {
-        await _upsertTrustedDevice(
-          session,
-          userId: userIdInt,
-          deviceIdHash: _hashDeviceId(normalizedDeviceId),
         );
       }
 
@@ -599,25 +635,16 @@ class AuthEndpoint extends Endpoint {
     }
   }
 
-  /// Logout: invalidate current JWTs (token_version++) and force email OTP on next login.
+  /// Logout: client should delete its auth token.
+  ///
+  /// Note: we intentionally do not store per-session token revocation state.
+  /// This keeps the DB minimal as requested (only tracks `email_otp_verified`).
   Future<bool> logout(Session session) async {
     try {
       await _ensureSecurityColumns(session);
 
       final auth = session.authenticated;
       if (auth == null) return false;
-      final userId = int.tryParse(auth.userIdentifier);
-      if (userId == null) return false;
-
-      await session.db.unsafeExecute(
-        '''
-        UPDATE users
-        SET token_version = COALESCE(token_version, 0) + 1,
-            require_login_email_otp = TRUE
-        WHERE user_id = @uid
-        ''',
-        parameters: QueryParameters.named({'uid': userId}),
-      );
       return true;
     } catch (e, st) {
       session.log('logout failed: $e\n$st', level: LogLevel.error);
@@ -777,7 +804,6 @@ class AuthEndpoint extends Endpoint {
     final hashed = sha256.convert(utf8.encode(password)).toString();
 
     int? generatedId;
-    int tokenVersion = 0;
 
     try {
       await session.db.unsafeExecute('BEGIN');
@@ -786,7 +812,7 @@ class AuthEndpoint extends Endpoint {
         '''
         INSERT INTO users (name, email, password_hash, phone, role, is_active)
         VALUES (@n, @e, @p, @ph, @r::user_role, TRUE)
-        RETURNING user_id, COALESCE(token_version, 0) AS token_version
+        RETURNING user_id
         ''',
         parameters: QueryParameters.named({
           'n': name,
@@ -804,7 +830,6 @@ class AuthEndpoint extends Endpoint {
       }
       final insertedRow = insertResult.first.toColumnMap();
       generatedId = _decodeDbInt(insertedRow['user_id']);
-      tokenVersion = _decodeDbInt(insertedRow['token_version']) ?? 0;
       if (generatedId == null) {
         await session.db.unsafeExecute('ROLLBACK');
         return LoginResponse(
@@ -859,19 +884,18 @@ class AuthEndpoint extends Endpoint {
           error: 'Server auth is not configured (missing JWT secret).');
     }
 
-    final authToken = JWT(
-      {
-        'uid': generatedId,
-        'role': role.toUpperCase(),
-        'tv': tokenVersion,
-        'jti': _uuid.v4(),
-      },
-      issuer: 'dishari',
-      subject: email,
-    ).sign(
-      SecretKey(jwtSecret),
-      expiresIn: const Duration(days: 30),
+    final authToken = _issueAuthToken(
+      session,
+      email: email,
+      userId: generatedId.toString(),
+      role: role.toUpperCase(),
     );
+    if (authToken == null) {
+      return LoginResponse(
+        success: false,
+        error: 'Server auth is not configured (missing JWT secret).',
+      );
+    }
 
     return LoginResponse(
       success: true,
@@ -1045,7 +1069,6 @@ class AuthEndpoint extends Endpoint {
       email: email,
     );
     if (err != null) return err;
-
 
     // Ensure phone uniqueness if phone provided
     try {

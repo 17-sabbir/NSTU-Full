@@ -2,12 +2,14 @@ import 'package:flutter/foundation.dart'; // kIsWeb
 import 'package:flutter/material.dart';
 // Clipboard
 import 'package:backend_client/backend_client.dart'; // আপনার ক্লায়েন্ট ইমপোর্ট করুন
+import 'dart:async';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../download_pdf_image_from_link.dart';
 import '../platform_temp_file.dart';
+import 'dosage_times.dart';
 
 class TestReportsView extends StatefulWidget {
   final int doctorId;
@@ -141,6 +143,17 @@ class _TestReportsViewState extends State<TestReportsView> {
   }
 
   Future<void> _onReviewReport(PatientExternalReport report) async {
+    if (report.reportId != null && report.reviewed != true) {
+      if (mounted) {
+        setState(() {
+          report.reviewed = true;
+        });
+      }
+      unawaited(
+        client.doctor.markReportReviewed(report.reportId!).catchError((_) {}),
+      );
+    }
+
     sheetOpen = true;
     isPrefillLoading = true;
     isSubmitting = false;
@@ -173,6 +186,74 @@ class _TestReportsViewState extends State<TestReportsView> {
       if (itemCtrls.isEmpty) addEmptyRow();
     }
 
+    String normalizeWhitespace(String input) {
+      return input.replaceAll(RegExp(r'\s+'), ' ').trim();
+    }
+
+    String normalizeDosageForStorage(String raw) {
+      final normalized = raw.trim();
+      if (normalized.isEmpty) return '';
+
+      // Allow quick entry: "4" means special 4 times.
+      if (normalized == '4') return '1+1+1+1';
+      if (isDosageFourTimes(normalized)) return '1+1+1+1';
+
+      // Convert Bangla/English text (e.g., "সকাল, রাত") to numeric storage format.
+      final map = decodeDosageTimesToBanglaMap(normalized);
+      final encoded = encodeDosageTimesFromBanglaMap(map);
+
+      // If nothing selected (0+0+0), treat as empty.
+      if (encoded == '0+0+0') return '';
+      return encoded;
+    }
+
+    String buildSnapshotKey() {
+      final advice = normalizeWhitespace(adviceController.text);
+
+      final parts = <String>[];
+      for (final m in itemCtrls) {
+        final name = normalizeWhitespace(
+          (m['name'] as TextEditingController).text,
+        );
+        if (name.isEmpty) continue;
+
+        final durationText = normalizeWhitespace(
+          (m['duration'] as TextEditingController).text,
+        );
+        final duration = int.tryParse(durationText);
+
+        final dosage = normalizeWhitespace(
+          (m['dosage'] as TextEditingController).text,
+        );
+        final dosageStorage = normalizeDosageForStorage(dosage);
+
+        final mealTiming = (m['mealTiming'] as ValueNotifier<String?>).value;
+        final mealTime = normalizeWhitespace(
+          (m['mealTime'] as TextEditingController).text,
+        );
+
+        final normalizedTiming = (mealTiming != null && mealTiming.isNotEmpty)
+            ? mealTiming
+            : (mealTime.isNotEmpty ? 'before' : null);
+
+        final combinedMealTiming =
+            (normalizedTiming == null || normalizedTiming.isEmpty)
+            ? ''
+            : (mealTime.isEmpty
+                  ? normalizedTiming
+                  : '${mealTime.toLowerCase()} ${normalizedTiming.toLowerCase()}');
+
+        parts.add(
+          '${name.toLowerCase()}|${duration ?? -1}|${dosageStorage.toLowerCase()}|$combinedMealTiming',
+        );
+      }
+      parts.sort();
+
+      return '$advice||${parts.join('||')}';
+    }
+
+    String? initialSnapshotKey;
+
     List<PrescribedItem> buildItems(int prescriptionId) {
       final items = <PrescribedItem>[];
 
@@ -180,7 +261,9 @@ class _TestReportsViewState extends State<TestReportsView> {
         final name = (m['name'] as TextEditingController).text.trim();
         final durationText = (m['duration'] as TextEditingController).text
             .trim();
-        final dosageTimes = (m['dosage'] as TextEditingController).text.trim();
+        final dosageTimesRaw = (m['dosage'] as TextEditingController).text
+            .trim();
+        final dosageTimes = normalizeDosageForStorage(dosageTimesRaw);
         final mealTiming = (m['mealTiming'] as ValueNotifier<String?>).value;
         final mealTime = (m['mealTime'] as TextEditingController).text.trim();
 
@@ -233,7 +316,10 @@ class _TestReportsViewState extends State<TestReportsView> {
         );
 
         if (detail == null) {
-          setSheetState(() => addEmptyRow());
+          setSheetState(() {
+            addEmptyRow();
+          });
+          initialSnapshotKey = buildSnapshotKey();
           return;
         }
 
@@ -245,6 +331,9 @@ class _TestReportsViewState extends State<TestReportsView> {
 
         for (final item in detail.items) {
           final dosageText = item.dosageTimes ?? '';
+          // UI should always show numeric storage pattern like 1+0+1 (or 1+1+1+1)
+          // even if legacy records contain text like "সকাল, রাত".
+          final dosageDisplay = normalizeDosageForStorage(dosageText);
 
           final raw = (item.mealTiming ?? '').trim();
           final lower = raw.toLowerCase();
@@ -282,7 +371,7 @@ class _TestReportsViewState extends State<TestReportsView> {
               ),
               'mealTime': TextEditingController(text: timePart),
               'mealTiming': ValueNotifier<String?>(selectedTiming),
-              'dosage': TextEditingController(text: dosageText),
+              'dosage': TextEditingController(text: dosageDisplay),
             });
           });
         }
@@ -290,9 +379,15 @@ class _TestReportsViewState extends State<TestReportsView> {
         if (itemCtrls.isEmpty) {
           setSheetState(() => addEmptyRow());
         }
+
+        // Capture initial state after prefill so we can block submitting when unchanged
+        initialSnapshotKey = buildSnapshotKey();
       } catch (e) {
         debugPrint('Prefill error: $e');
-        setSheetState(() => addEmptyRow());
+        setSheetState(() {
+          addEmptyRow();
+        });
+        initialSnapshotKey = buildSnapshotKey();
       }
     }
 
@@ -567,6 +662,7 @@ class _TestReportsViewState extends State<TestReportsView> {
                         const SizedBox(height: 12),
                         TextField(
                           controller: adviceController,
+                          onChanged: (_) => setSheetState(() {}),
                           decoration: InputDecoration(
                             labelText: 'New Advice',
                             filled: true,
@@ -681,6 +777,7 @@ class _TestReportsViewState extends State<TestReportsView> {
 
                                   TextField(
                                     controller: nameCtrl,
+                                    onChanged: (_) => setSheetState(() {}),
                                     decoration: InputDecoration(
                                       labelText: 'Medication Name',
                                       filled: true,
@@ -696,6 +793,8 @@ class _TestReportsViewState extends State<TestReportsView> {
                                       Expanded(
                                         child: TextField(
                                           controller: dosageCtrl,
+                                          onChanged: (_) =>
+                                              setSheetState(() {}),
                                           decoration: InputDecoration(
                                             labelText: 'Dosage Times',
                                             filled: true,
@@ -713,6 +812,8 @@ class _TestReportsViewState extends State<TestReportsView> {
                                         child: TextField(
                                           controller: durationCtrl,
                                           keyboardType: TextInputType.number,
+                                          onChanged: (_) =>
+                                              setSheetState(() {}),
                                           decoration: InputDecoration(
                                             labelText: 'Duration',
                                             filled: true,
@@ -733,6 +834,8 @@ class _TestReportsViewState extends State<TestReportsView> {
                                         width: 120,
                                         child: TextField(
                                           controller: mealTimeCtrl,
+                                          onChanged: (_) =>
+                                              setSheetState(() {}),
                                           decoration: InputDecoration(
                                             labelText: 'Time',
                                             filled: true,
@@ -842,10 +945,48 @@ class _TestReportsViewState extends State<TestReportsView> {
                         ),
 
                         const SizedBox(height: 8),
+                        Builder(
+                          builder: (_) {
+                            final snap = initialSnapshotKey;
+                            if (snap == null) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Text(
+                                  'Loading prescription…',
+                                  style: TextStyle(
+                                    color: Colors.blueGrey.shade700,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              );
+                            }
+
+                            final hasChanges = buildSnapshotKey() != snap;
+                            if (!hasChanges) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Text(
+                                  'Update advice/medicines to Submit.',
+                                  style: TextStyle(
+                                    color: Colors.red.shade400,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              );
+                            }
+
+                            return const SizedBox.shrink();
+                          },
+                        ),
                         SizedBox(
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: isSubmitting
+                            onPressed:
+                                (isSubmitting ||
+                                    initialSnapshotKey == null ||
+                                    buildSnapshotKey() == initialSnapshotKey)
                                 ? null
                                 : () async {
                                     final advice = adviceController.text.trim();
@@ -1074,6 +1215,7 @@ class _TestReportsViewState extends State<TestReportsView> {
                       : '${createdAt.year.toString().padLeft(4, '0')}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')}';
 
                   final isPdf = report.filePath.toLowerCase().endsWith('.pdf');
+                  final isReviewed = report.reviewed == true;
 
                   return InkWell(
                     borderRadius: BorderRadius.circular(16),
@@ -1081,9 +1223,15 @@ class _TestReportsViewState extends State<TestReportsView> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: isReviewed
+                            ? const Color(0xFFF1FBF4)
+                            : Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey.shade200),
+                        border: Border.all(
+                          color: isReviewed
+                              ? Colors.green.shade200
+                              : Colors.grey.shade200,
+                        ),
                         boxShadow: const [
                           BoxShadow(
                             color: Color(0x0B000000),
@@ -1098,16 +1246,20 @@ class _TestReportsViewState extends State<TestReportsView> {
                             width: 46,
                             height: 46,
                             decoration: BoxDecoration(
-                              color: isPdf
-                                  ? const Color(0x1AFF0000)
-                                  : const Color(0x1A607D8B),
+                              color: isReviewed
+                                  ? const Color(0x1A2E7D32)
+                                  : (isPdf
+                                        ? const Color(0x1AFF0000)
+                                        : const Color(0x1A607D8B)),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Icon(
                               isPdf
                                   ? Icons.picture_as_pdf
                                   : Icons.insert_drive_file,
-                              color: isPdf ? Colors.red : Colors.blueGrey,
+                              color: isReviewed
+                                  ? Colors.green
+                                  : (isPdf ? Colors.red : Colors.blueGrey),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -1141,17 +1293,21 @@ class _TestReportsViewState extends State<TestReportsView> {
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  Colors.blue.shade600,
-                                  Colors.blue.shade400,
+                                  (isReviewed
+                                      ? Colors.green.shade700
+                                      : Colors.blue.shade600),
+                                  (isReviewed
+                                      ? Colors.green.shade500
+                                      : Colors.blue.shade400),
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Text(
-                              'Review',
-                              style: TextStyle(
+                            child: Text(
+                              isReviewed ? 'Reviewed' : 'Review',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,
                               ),

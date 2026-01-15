@@ -6,6 +6,7 @@ import 'package:backend_client/backend_client.dart';
 import 'package:dishari/src/doctor/prescription_page.dart';
 import 'dosage_times.dart';
 
+
 class PatientRecordsPage extends StatefulWidget {
   const PatientRecordsPage({super.key});
 
@@ -255,7 +256,7 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          "Patient Record",
+          "Patients Record",
           style: TextStyle(
             color: Colors.blueAccent,
             fontWeight: FontWeight.bold,

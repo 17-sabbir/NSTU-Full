@@ -22,6 +22,7 @@ abstract class PatientExternalReport implements _i1.SerializableModel {
     required this.prescribedDoctorId,
     this.prescriptionId,
     required this.uploadedBy,
+    required this.reviewed,
     this.createdAt,
   });
 
@@ -34,6 +35,7 @@ abstract class PatientExternalReport implements _i1.SerializableModel {
     required int prescribedDoctorId,
     int? prescriptionId,
     required int uploadedBy,
+    required bool reviewed,
     DateTime? createdAt,
   }) = _PatientExternalReportImpl;
 
@@ -51,6 +53,7 @@ abstract class PatientExternalReport implements _i1.SerializableModel {
       prescribedDoctorId: jsonSerialization['prescribedDoctorId'] as int,
       prescriptionId: jsonSerialization['prescriptionId'] as int?,
       uploadedBy: jsonSerialization['uploadedBy'] as int,
+      reviewed: jsonSerialization['reviewed'] as bool,
       createdAt: jsonSerialization['createdAt'] == null
           ? null
           : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
@@ -73,6 +76,8 @@ abstract class PatientExternalReport implements _i1.SerializableModel {
 
   int uploadedBy;
 
+  bool reviewed;
+
   DateTime? createdAt;
 
   /// Returns a shallow copy of this [PatientExternalReport]
@@ -87,6 +92,7 @@ abstract class PatientExternalReport implements _i1.SerializableModel {
     int? prescribedDoctorId,
     int? prescriptionId,
     int? uploadedBy,
+    bool? reviewed,
     DateTime? createdAt,
   });
   @override
@@ -101,6 +107,7 @@ abstract class PatientExternalReport implements _i1.SerializableModel {
       'prescribedDoctorId': prescribedDoctorId,
       if (prescriptionId != null) 'prescriptionId': prescriptionId,
       'uploadedBy': uploadedBy,
+      'reviewed': reviewed,
       if (createdAt != null) 'createdAt': createdAt?.toJson(),
     };
   }
@@ -123,6 +130,7 @@ class _PatientExternalReportImpl extends PatientExternalReport {
     required int prescribedDoctorId,
     int? prescriptionId,
     required int uploadedBy,
+    required bool reviewed,
     DateTime? createdAt,
   }) : super._(
          reportId: reportId,
@@ -133,6 +141,7 @@ class _PatientExternalReportImpl extends PatientExternalReport {
          prescribedDoctorId: prescribedDoctorId,
          prescriptionId: prescriptionId,
          uploadedBy: uploadedBy,
+         reviewed: reviewed,
          createdAt: createdAt,
        );
 
@@ -149,6 +158,7 @@ class _PatientExternalReportImpl extends PatientExternalReport {
     int? prescribedDoctorId,
     Object? prescriptionId = _Undefined,
     int? uploadedBy,
+    bool? reviewed,
     Object? createdAt = _Undefined,
   }) {
     return PatientExternalReport(
@@ -162,6 +172,7 @@ class _PatientExternalReportImpl extends PatientExternalReport {
           ? prescriptionId
           : this.prescriptionId,
       uploadedBy: uploadedBy ?? this.uploadedBy,
+      reviewed: reviewed ?? this.reviewed,
       createdAt: createdAt is DateTime? ? createdAt : this.createdAt,
     );
   }

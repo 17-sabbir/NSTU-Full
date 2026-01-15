@@ -150,7 +150,6 @@ class PatientEndpoint extends Endpoint {
     String? profileImageUrl,
   ) async {
     try {
-
       final resolvedUserId = requireAuthenticatedUserId(session);
 
       return await session.db.transaction((transaction) async {
@@ -253,7 +252,38 @@ class PatientEndpoint extends Endpoint {
       Session session, int userId) async {
     final resolvedUserId = requireAuthenticatedUserId(session);
     final query = '''
-      SELECT p.prescription_id, p.prescription_date, u.name as doctor_name
+      SELECT
+        p.prescription_id,
+        p.prescription_date,
+        u.name as doctor_name,
+        p.revised_from_id AS revised_from_prescription_id,
+        (
+          SELECT r.report_id
+          FROM UploadpatientR r
+          WHERE r.patient_id = p.patient_id
+            AND p.revised_from_id IS NOT NULL
+            AND r.prescription_id = p.revised_from_id
+          ORDER BY r.created_at DESC
+          LIMIT 1
+        ) AS source_report_id,
+        (
+          SELECT r.type
+          FROM UploadpatientR r
+          WHERE r.patient_id = p.patient_id
+            AND p.revised_from_id IS NOT NULL
+            AND r.prescription_id = p.revised_from_id
+          ORDER BY r.created_at DESC
+          LIMIT 1
+        ) AS source_report_type,
+        (
+          SELECT r.created_at
+          FROM UploadpatientR r
+          WHERE r.patient_id = p.patient_id
+            AND p.revised_from_id IS NOT NULL
+            AND r.prescription_id = p.revised_from_id
+          ORDER BY r.created_at DESC
+          LIMIT 1
+        ) AS source_report_created_at
       FROM prescriptions p
       JOIN users u ON p.doctor_id = u.user_id
       WHERE p.patient_id = @userId
@@ -272,6 +302,10 @@ class PatientEndpoint extends Endpoint {
         prescriptionId: map['prescription_id'],
         date: map['prescription_date'] as DateTime,
         doctorName: _safeString(map['doctor_name']),
+        revisedFromPrescriptionId: map['revised_from_prescription_id'] as int?,
+        sourceReportId: map['source_report_id'] as int?,
+        sourceReportType: map['source_report_type'] as String?,
+        sourceReportCreatedAt: map['source_report_created_at'] as DateTime?,
       );
     }).toList();
   }
@@ -289,7 +323,9 @@ class PatientEndpoint extends Endpoint {
 
       final secureUrl = fileUrl.trim();
       if (!(secureUrl.startsWith('http://') ||
-          secureUrl.startsWith('https://'))) return false;
+          secureUrl.startsWith('https://'))) {
+        return false;
+      }
 
       // ১২ ঘণ্টা রিপ্লেস লজিক: চেক করুন এই প্রেসক্রিপশনের জন্য কোনো রিপোর্ট অলরেডি আছে কি না
       final existing = await session.db.unsafeQuery(
@@ -362,8 +398,9 @@ class PatientEndpoint extends Endpoint {
       final result = await session.db.unsafeQuery(
         '''
         SELECT 
+          report_id,
           patient_id, type, report_date, file_path, 
-          prescribed_doctor_id, prescription_id, uploaded_by, created_at
+          prescribed_doctor_id, prescription_id, uploaded_by, reviewed, created_at
         FROM UploadpatientR
         WHERE patient_id = @userId
         ORDER BY created_at DESC
@@ -374,6 +411,7 @@ class PatientEndpoint extends Endpoint {
       return result.map((r) {
         final row = r.toColumnMap();
         return PatientExternalReport(
+          reportId: row['report_id'] as int?,
           patientId: row['patient_id'],
           type: _safeString(row['type']),
           reportDate: row['report_date'] as DateTime,
@@ -381,6 +419,7 @@ class PatientEndpoint extends Endpoint {
           prescribedDoctorId: row['prescribed_doctor_id'],
           prescriptionId: row['prescription_id'],
           uploadedBy: row['uploaded_by'],
+          reviewed: (row['reviewed'] as bool?) ?? false,
           createdAt: row['created_at'] as DateTime?,
         );
       }).toList();
@@ -401,10 +440,38 @@ class PatientEndpoint extends Endpoint {
       final rows = await session.db.unsafeQuery(
         '''
         SELECT
-          p.id               AS prescription_id,
+          p.prescription_id,
           p.prescription_date,
-          u.name             AS doctor_name
-        FROM prescription p
+          u.name AS doctor_name,
+          p.revised_from_id AS revised_from_prescription_id,
+          (
+            SELECT r.report_id
+            FROM UploadpatientR r
+            WHERE r.patient_id = p.patient_id
+              AND p.revised_from_id IS NOT NULL
+              AND r.prescription_id = p.revised_from_id
+            ORDER BY r.created_at DESC
+            LIMIT 1
+          ) AS source_report_id,
+          (
+            SELECT r.type
+            FROM UploadpatientR r
+            WHERE r.patient_id = p.patient_id
+              AND p.revised_from_id IS NOT NULL
+              AND r.prescription_id = p.revised_from_id
+            ORDER BY r.created_at DESC
+            LIMIT 1
+          ) AS source_report_type,
+          (
+            SELECT r.created_at
+            FROM UploadpatientR r
+            WHERE r.patient_id = p.patient_id
+              AND p.revised_from_id IS NOT NULL
+              AND r.prescription_id = p.revised_from_id
+            ORDER BY r.created_at DESC
+            LIMIT 1
+          ) AS source_report_created_at
+        FROM prescriptions p
         JOIN users u ON u.user_id = p.doctor_id
         WHERE p.patient_id = @pid
         ORDER BY p.prescription_date DESC
@@ -418,6 +485,11 @@ class PatientEndpoint extends Endpoint {
           prescriptionId: map['prescription_id'] as int,
           date: map['prescription_date'] as DateTime,
           doctorName: _safeString(map['doctor_name']),
+          revisedFromPrescriptionId:
+              map['revised_from_prescription_id'] as int?,
+          sourceReportId: map['source_report_id'] as int?,
+          sourceReportType: map['source_report_type'] as String?,
+          sourceReportCreatedAt: map['source_report_created_at'] as DateTime?,
         );
       }).toList();
     } catch (e, stack) {
@@ -440,7 +512,35 @@ class PatientEndpoint extends Endpoint {
         SELECT 
           p.prescription_id, 
           p.prescription_date,
-          u.name AS doctor_name
+          u.name AS doctor_name,
+          p.revised_from_id AS revised_from_prescription_id,
+          (
+            SELECT r.report_id
+            FROM UploadpatientR r
+            WHERE r.patient_id = p.patient_id
+              AND p.revised_from_id IS NOT NULL
+              AND r.prescription_id = p.revised_from_id
+            ORDER BY r.created_at DESC
+            LIMIT 1
+          ) AS source_report_id,
+          (
+            SELECT r.type
+            FROM UploadpatientR r
+            WHERE r.patient_id = p.patient_id
+              AND p.revised_from_id IS NOT NULL
+              AND r.prescription_id = p.revised_from_id
+            ORDER BY r.created_at DESC
+            LIMIT 1
+          ) AS source_report_type,
+          (
+            SELECT r.created_at
+            FROM UploadpatientR r
+            WHERE r.patient_id = p.patient_id
+              AND p.revised_from_id IS NOT NULL
+              AND r.prescription_id = p.revised_from_id
+            ORDER BY r.created_at DESC
+            LIMIT 1
+          ) AS source_report_created_at
         FROM prescriptions p
         JOIN users u ON u.user_id = p.doctor_id
         WHERE p.patient_id = @pid
@@ -455,6 +555,11 @@ class PatientEndpoint extends Endpoint {
           prescriptionId: map['prescription_id'] as int,
           date: map['prescription_date'] as DateTime,
           doctorName: _safeString(map['doctor_name']),
+          revisedFromPrescriptionId:
+              map['revised_from_prescription_id'] as int?,
+          sourceReportId: map['source_report_id'] as int?,
+          sourceReportType: map['source_report_type'] as String?,
+          sourceReportCreatedAt: map['source_report_created_at'] as DateTime?,
         );
       }).toList();
     } catch (e, stack) {

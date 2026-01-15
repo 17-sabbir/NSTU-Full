@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:serverpod/serverpod.dart';
-import 'package:uuid/uuid.dart';
 
 const _uuid = Uuid();
 
@@ -30,10 +29,9 @@ String? _jwtSecret(Session session) {
 ///
 /// Expected JWT payload:
 /// - `uid`: int (our `users.user_id`)
-/// - `tv`: int token version (must match `users.token_version`)
 /// - `jti`: string unique id
 ///
-/// This implementation validates against DB state so logout can invalidate tokens.
+/// This implementation validates against DB state to ensure the user is active.
 Future<AuthenticationInfo?> jwtAuthenticationHandler(
   Session session,
   String token,
@@ -53,13 +51,9 @@ Future<AuthenticationInfo?> jwtAuthenticationHandler(
     final userId = uid is int ? uid : int.tryParse(uid?.toString() ?? '');
     if (userId == null) return null;
 
-    final tvRaw = jwt.payload['tv'];
-    final tokenVersion = tvRaw is int ? tvRaw : int.tryParse('${tvRaw ?? ''}');
-    if (tokenVersion == null) return null;
-
-    // Validate user is active and token version matches.
+    // Validate user is active.
     final rows = await session.db.unsafeQuery(
-      'SELECT is_active, token_version FROM users WHERE user_id = @uid LIMIT 1',
+      'SELECT is_active FROM users WHERE user_id = @uid LIMIT 1',
       parameters: QueryParameters.named({'uid': userId}),
     );
     if (rows.isEmpty) return null;
@@ -67,11 +61,6 @@ Future<AuthenticationInfo?> jwtAuthenticationHandler(
 
     final isActive = row['is_active'] == true;
     if (!isActive) return null;
-
-    final dbTv = row['token_version'];
-    final dbTokenVersion = dbTv is int ? dbTv : int.tryParse('${dbTv ?? ''}');
-    if (dbTokenVersion == null) return null;
-    if (dbTokenVersion != tokenVersion) return null;
 
     final jti = (jwt.payload['jti'] ?? _uuid.v4()).toString();
 

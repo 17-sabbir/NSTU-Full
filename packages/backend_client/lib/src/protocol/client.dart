@@ -24,9 +24,9 @@ import 'package:backend_client/src/protocol/inventory_audit_log.dart' as _i11;
 import 'package:backend_client/src/protocol/admin_dashboard_overview.dart'
     as _i12;
 import 'package:backend_client/src/protocol/dashboard_analytics.dart' as _i13;
-import 'package:backend_client/src/protocol/login_response.dart' as _i14;
 import 'package:backend_client/src/protocol/otp_challenge_response.dart'
-    as _i15;
+    as _i14;
+import 'package:backend_client/src/protocol/login_response.dart' as _i15;
 import 'package:backend_client/src/protocol/dispenser_profile_r.dart' as _i16;
 import 'package:backend_client/src/protocol/prescription.dart' as _i17;
 import 'package:backend_client/src/protocol/prescription_detail.dart' as _i18;
@@ -444,11 +444,52 @@ class EndpointAuth extends _i1.EndpointRef {
   @override
   String get name => 'auth';
 
-  _i2.Future<_i14.LoginResponse> login(
+  /// Sends an OTP to [newEmail] for verifying profile email change.
+  /// Requires an authenticated user.
+  _i2.Future<_i14.OtpChallengeResponse> requestProfileEmailChangeOtp(
+    String newEmail,
+  ) => caller.callServerEndpoint<_i14.OtpChallengeResponse>(
+    'auth',
+    'requestProfileEmailChangeOtp',
+    {'newEmail': newEmail},
+  );
+
+  /// Verify OTP for profile email change (does not update DB).
+  _i2.Future<bool> verifyProfileEmailChangeOtp(
+    String newEmail,
+    String otp,
+    String otpToken,
+  ) => caller.callServerEndpoint<bool>(
+    'auth',
+    'verifyProfileEmailChangeOtp',
+    {
+      'newEmail': newEmail,
+      'otp': otp,
+      'otpToken': otpToken,
+    },
+  );
+
+  /// Update the authenticated user's email, requiring OTP proof.
+  /// Also marks `email_otp_verified = TRUE` because the new email was verified.
+  _i2.Future<String> updateMyEmailWithOtp(
+    String newEmail,
+    String otp,
+    String otpToken,
+  ) => caller.callServerEndpoint<String>(
+    'auth',
+    'updateMyEmailWithOtp',
+    {
+      'newEmail': newEmail,
+      'otp': otp,
+      'otpToken': otpToken,
+    },
+  );
+
+  _i2.Future<_i15.LoginResponse> login(
     String email,
     String password, {
     String? deviceId,
-  }) => caller.callServerEndpoint<_i14.LoginResponse>(
+  }) => caller.callServerEndpoint<_i15.LoginResponse>(
     'auth',
     'login',
     {
@@ -461,10 +502,10 @@ class EndpointAuth extends _i1.EndpointRef {
   /// Signup requirement redesign: only phone verification (OTP) during signup.
   /// No email OTP is required here.
   /// Since no SMS API, OTP is returned as debugOtp for UI popup.
-  _i2.Future<_i15.OtpChallengeResponse> startSignupPhoneOtp(
+  _i2.Future<_i14.OtpChallengeResponse> startSignupPhoneOtp(
     String email,
     String phone,
-  ) => caller.callServerEndpoint<_i15.OtpChallengeResponse>(
+  ) => caller.callServerEndpoint<_i14.OtpChallengeResponse>(
     'auth',
     'startSignupPhoneOtp',
     {
@@ -475,12 +516,12 @@ class EndpointAuth extends _i1.EndpointRef {
 
   /// Verify login OTP after password was correct but user required OTP.
   /// Returns a normal LoginResponse containing the session token.
-  _i2.Future<_i14.LoginResponse> verifyLoginOtp(
+  _i2.Future<_i15.LoginResponse> verifyLoginOtp(
     String email,
     String otp,
     String otpToken, {
     String? deviceId,
-  }) => caller.callServerEndpoint<_i14.LoginResponse>(
+  }) => caller.callServerEndpoint<_i15.LoginResponse>(
     'auth',
     'verifyLoginOtp',
     {
@@ -491,7 +532,10 @@ class EndpointAuth extends _i1.EndpointRef {
     },
   );
 
-  /// Logout: invalidate current JWTs (token_version++) and force email OTP on next login.
+  /// Logout: client should delete its auth token.
+  ///
+  /// Note: we intentionally do not store per-session token revocation state.
+  /// This keeps the DB minimal as requested (only tracks `email_otp_verified`).
   _i2.Future<bool> logout() => caller.callServerEndpoint<bool>(
     'auth',
     'logout',
@@ -532,12 +576,12 @@ class EndpointAuth extends _i1.EndpointRef {
 
   /// After signup email OTP verified, start phone verification.
   /// Since no SMS API, OTP is returned as debugOtp for UI popup.
-  _i2.Future<_i15.OtpChallengeResponse> verifySignupEmailAndStartPhoneOtp(
+  _i2.Future<_i14.OtpChallengeResponse> verifySignupEmailAndStartPhoneOtp(
     String email,
     String emailOtp,
     String emailOtpToken,
     String phone,
-  ) => caller.callServerEndpoint<_i15.OtpChallengeResponse>(
+  ) => caller.callServerEndpoint<_i14.OtpChallengeResponse>(
     'auth',
     'verifySignupEmailAndStartPhoneOtp',
     {
@@ -550,7 +594,7 @@ class EndpointAuth extends _i1.EndpointRef {
 
   /// Finalize signup by verifying phone OTP, then creating the user.
   /// Returns LoginResponse with session token (auto-login after signup).
-  _i2.Future<_i14.LoginResponse> completeSignupWithPhoneOtp(
+  _i2.Future<_i15.LoginResponse> completeSignupWithPhoneOtp(
     String email,
     String phone,
     String phoneOtp,
@@ -561,7 +605,7 @@ class EndpointAuth extends _i1.EndpointRef {
     String? bloodGroup,
     DateTime? dateOfBirth,
     String? gender,
-  ) => caller.callServerEndpoint<_i14.LoginResponse>(
+  ) => caller.callServerEndpoint<_i15.LoginResponse>(
     'auth',
     'completeSignupWithPhoneOtp',
     {
@@ -866,6 +910,14 @@ class EndpointDoctor extends _i1.EndpointRef {
     'getReportsForDoctor',
     {'doctorId': doctorId},
   );
+
+  /// Track if a test report was reviewed by the assigned doctor.
+  _i2.Future<bool> markReportReviewed(int reportId) =>
+      caller.callServerEndpoint<bool>(
+        'doctor',
+        'markReportReviewed',
+        {'reportId': reportId},
+      );
 
   _i2.Future<int> revisePrescription({
     required int originalPrescriptionId,

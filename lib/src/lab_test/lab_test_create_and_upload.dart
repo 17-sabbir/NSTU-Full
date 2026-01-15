@@ -104,7 +104,7 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload> {
             // Pick File button
             if (r.submittedAt == null)
               IconButton(
-                icon: const Icon(Icons.attach_file, color: Colors.orange),
+                icon: const Icon(Icons.file_upload_outlined, color: Colors.orange),
                 onPressed: () async {
                   final res = await FilePicker.platform.pickFiles(
                     type: FileType.custom,

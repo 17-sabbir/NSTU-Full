@@ -28,9 +28,9 @@ import 'package:backend_server/src/generated/inventory_audit_log.dart' as _i12;
 import 'package:backend_server/src/generated/admin_dashboard_overview.dart'
     as _i13;
 import 'package:backend_server/src/generated/dashboard_analytics.dart' as _i14;
-import 'package:backend_server/src/generated/login_response.dart' as _i15;
 import 'package:backend_server/src/generated/otp_challenge_response.dart'
-    as _i16;
+    as _i15;
+import 'package:backend_server/src/generated/login_response.dart' as _i16;
 import 'package:backend_server/src/generated/dispenser_profile_r.dart' as _i17;
 import 'package:backend_server/src/generated/prescription.dart' as _i18;
 import 'package:backend_server/src/generated/prescription_detail.dart' as _i19;
@@ -1250,7 +1250,112 @@ class _AuthEndpoint {
 
   final _i2.SerializationManager _serializationManager;
 
-  _i3.Future<_i15.LoginResponse> login(
+  _i3.Future<_i15.OtpChallengeResponse> requestProfileEmailChangeOtp(
+    _i1.TestSessionBuilder sessionBuilder,
+    String newEmail,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'auth',
+            method: 'requestProfileEmailChangeOtp',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'auth',
+          methodName: 'requestProfileEmailChangeOtp',
+          parameters: _i1.testObjectToJson({'newEmail': newEmail}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<_i15.OtpChallengeResponse>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<bool> verifyProfileEmailChangeOtp(
+    _i1.TestSessionBuilder sessionBuilder,
+    String newEmail,
+    String otp,
+    String otpToken,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'auth',
+            method: 'verifyProfileEmailChangeOtp',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'auth',
+          methodName: 'verifyProfileEmailChangeOtp',
+          parameters: _i1.testObjectToJson({
+            'newEmail': newEmail,
+            'otp': otp,
+            'otpToken': otpToken,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<bool>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<String> updateMyEmailWithOtp(
+    _i1.TestSessionBuilder sessionBuilder,
+    String newEmail,
+    String otp,
+    String otpToken,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'auth',
+            method: 'updateMyEmailWithOtp',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'auth',
+          methodName: 'updateMyEmailWithOtp',
+          parameters: _i1.testObjectToJson({
+            'newEmail': newEmail,
+            'otp': otp,
+            'otpToken': otpToken,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<String>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<_i16.LoginResponse> login(
     _i1.TestSessionBuilder sessionBuilder,
     String email,
     String password, {
@@ -1279,7 +1384,7 @@ class _AuthEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i15.LoginResponse>);
+                as _i3.Future<_i16.LoginResponse>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -1287,7 +1392,7 @@ class _AuthEndpoint {
     });
   }
 
-  _i3.Future<_i16.OtpChallengeResponse> startSignupPhoneOtp(
+  _i3.Future<_i15.OtpChallengeResponse> startSignupPhoneOtp(
     _i1.TestSessionBuilder sessionBuilder,
     String email,
     String phone,
@@ -1314,7 +1419,7 @@ class _AuthEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i16.OtpChallengeResponse>);
+                as _i3.Future<_i15.OtpChallengeResponse>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -1322,7 +1427,7 @@ class _AuthEndpoint {
     });
   }
 
-  _i3.Future<_i15.LoginResponse> verifyLoginOtp(
+  _i3.Future<_i16.LoginResponse> verifyLoginOtp(
     _i1.TestSessionBuilder sessionBuilder,
     String email,
     String otp,
@@ -1353,7 +1458,7 @@ class _AuthEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i15.LoginResponse>);
+                as _i3.Future<_i16.LoginResponse>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -1467,7 +1572,7 @@ class _AuthEndpoint {
     });
   }
 
-  _i3.Future<_i16.OtpChallengeResponse> verifySignupEmailAndStartPhoneOtp(
+  _i3.Future<_i15.OtpChallengeResponse> verifySignupEmailAndStartPhoneOtp(
     _i1.TestSessionBuilder sessionBuilder,
     String email,
     String emailOtp,
@@ -1498,7 +1603,7 @@ class _AuthEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i16.OtpChallengeResponse>);
+                as _i3.Future<_i15.OtpChallengeResponse>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -1506,7 +1611,7 @@ class _AuthEndpoint {
     });
   }
 
-  _i3.Future<_i15.LoginResponse> completeSignupWithPhoneOtp(
+  _i3.Future<_i16.LoginResponse> completeSignupWithPhoneOtp(
     _i1.TestSessionBuilder sessionBuilder,
     String email,
     String phone,
@@ -1549,7 +1654,7 @@ class _AuthEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i15.LoginResponse>);
+                as _i3.Future<_i16.LoginResponse>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -2361,6 +2466,37 @@ class _DoctorEndpoint {
                   _localCallContext.arguments,
                 )
                 as _i3.Future<List<_i24.PatientExternalReport>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<bool> markReportReviewed(
+    _i1.TestSessionBuilder sessionBuilder,
+    int reportId,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'doctor',
+            method: 'markReportReviewed',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'doctor',
+          methodName: 'markReportReviewed',
+          parameters: _i1.testObjectToJson({'reportId': reportId}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<bool>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();

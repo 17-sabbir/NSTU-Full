@@ -288,7 +288,7 @@ class _PatientLabTestAvailabilityState
                               ),
                             ),
                             label: const Text(
-                              "Book Test ?",
+                              "Details",
                               style: TextStyle(color: Colors.white),
                             ),
                           ),
