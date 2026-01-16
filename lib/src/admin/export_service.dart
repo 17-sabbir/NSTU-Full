@@ -4,7 +4,254 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:backend_client/backend_client.dart';
+
 class ExportService {
+  static Future<void> exportMedicineStockUsageRangeAsPDF({
+    required List<MedicineStockRangeRow> items,
+    List<LabTestRangeRow>? labTests,
+    required DateTime from,
+    required DateTime to,
+    required pw.Font font,
+  }) async {
+    final pdf = pw.Document();
+
+    final baseStyle = pw.TextStyle(font: font);
+    final h1 = baseStyle.copyWith(fontSize: 20, fontWeight: pw.FontWeight.bold);
+    final h2 = baseStyle.copyWith(fontSize: 14, fontWeight: pw.FontWeight.bold);
+    final smallMuted = baseStyle.copyWith(
+      fontSize: 9,
+      color: PdfColors.grey600,
+    );
+
+    String fmt(DateTime d) => d.toString().split(' ').first;
+
+    pw.Widget tableCell(String text, {bool isHeader = false}) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.all(8),
+        child: pw.Text(
+          text,
+          style: isHeader
+              ? baseStyle.copyWith(fontWeight: pw.FontWeight.bold)
+              : baseStyle.copyWith(fontSize: 11),
+        ),
+      );
+    }
+
+    final safeItems = List<MedicineStockRangeRow>.from(items)
+      ..sort((a, b) => b.used.compareTo(a.used));
+
+    final safeLabTests = List<LabTestRangeRow>.from(labTests ?? const [])
+      ..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
+
+    final labTotalCount = safeLabTests.fold<int>(0, (p, e) => p + e.count);
+    final labTotalAmount = safeLabTests.fold<double>(
+      0,
+      (p, e) => p + e.totalAmount,
+    );
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(54),
+          theme: pw.ThemeData.withFont(base: font, bold: font),
+        ),
+        header: (_) => pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'Dishari - Date Range Report',
+              style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Text('Generated: ${fmt(DateTime.now())}', style: smallMuted),
+          ],
+        ),
+        build: (_) {
+          return [
+            pw.SizedBox(height: 12),
+            pw.Text('Medicine Stock (Date Range)', style: h1),
+            pw.SizedBox(height: 6),
+            pw.Text('From: ${fmt(from)}    To: ${fmt(to)}', style: smallMuted),
+            pw.SizedBox(height: 16),
+            pw.Text('Summary', style: h2),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              'Total unique medicines: ${safeItems.length}',
+              style: baseStyle.copyWith(fontSize: 11),
+            ),
+            pw.SizedBox(height: 14),
+            pw.Text('Medicines', style: h2),
+            pw.SizedBox(height: 6),
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300),
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                  children: [
+                    tableCell('Medicine', isHeader: true),
+                    tableCell('From Qty', isHeader: true),
+                    tableCell('Used', isHeader: true),
+                    tableCell('To Qty', isHeader: true),
+                  ],
+                ),
+                ...safeItems.map(
+                  (m) => pw.TableRow(
+                    children: [
+                      tableCell(m.medicineName),
+                      tableCell(m.fromQuantity.toString()),
+                      tableCell(m.used.toString()),
+                      tableCell(m.toQuantity.toString()),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            if (safeLabTests.isNotEmpty) ...[
+              pw.SizedBox(height: 20),
+              pw.Text('Lab Tests (Date Range)', style: h1),
+              pw.SizedBox(height: 6),
+              pw.Text(
+                'From: ${fmt(from)}    To: ${fmt(to)}',
+                style: smallMuted,
+              ),
+              pw.SizedBox(height: 16),
+              pw.Text('Summary', style: h2),
+              pw.SizedBox(height: 6),
+              pw.Text(
+                'Total tests: $labTotalCount   Total amount: ${labTotalAmount.toStringAsFixed(0)} taka',
+                style: baseStyle.copyWith(fontSize: 11),
+              ),
+              pw.SizedBox(height: 14),
+              pw.Text('Tests', style: h2),
+              pw.SizedBox(height: 6),
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey300),
+                children: [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                    ),
+                    children: [
+                      tableCell('Test', isHeader: true),
+                      tableCell('Count', isHeader: true),
+                      tableCell('Total (taka)', isHeader: true),
+                    ],
+                  ),
+                  ...safeLabTests.map(
+                    (t) => pw.TableRow(
+                      children: [
+                        tableCell(t.testName),
+                        tableCell(t.count.toString()),
+                        tableCell('${t.totalAmount.toStringAsFixed(0)} taka'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ];
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+  }
+
+  static Future<void> exportMedicineUsageRangeAsPDF({
+    required List<TopMedicine> items,
+    required DateTime from,
+    required DateTime to,
+    required pw.Font font,
+  }) async {
+    final pdf = pw.Document();
+
+    final baseStyle = pw.TextStyle(font: font);
+    final h1 = baseStyle.copyWith(fontSize: 20, fontWeight: pw.FontWeight.bold);
+    final h2 = baseStyle.copyWith(fontSize: 14, fontWeight: pw.FontWeight.bold);
+    final smallMuted = baseStyle.copyWith(
+      fontSize: 9,
+      color: PdfColors.grey600,
+    );
+
+    String fmt(DateTime d) => d.toString().split(' ').first;
+
+    pw.Widget tableCell(String text, {bool isHeader = false}) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.all(8),
+        child: pw.Text(
+          text,
+          style: isHeader
+              ? baseStyle.copyWith(fontWeight: pw.FontWeight.bold)
+              : baseStyle.copyWith(fontSize: 11),
+        ),
+      );
+    }
+
+    final safeItems = List<TopMedicine>.from(items)
+      ..sort((a, b) => b.used.compareTo(a.used));
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(54),
+          theme: pw.ThemeData.withFont(base: font, bold: font),
+        ),
+        header: (_) => pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'Dishari - Medicine Usage Report',
+              style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Text('Generated: ${fmt(DateTime.now())}', style: smallMuted),
+          ],
+        ),
+        build: (_) {
+          return [
+            pw.SizedBox(height: 12),
+            pw.Text('Medicine Usage (Date Range)', style: h1),
+            pw.SizedBox(height: 6),
+            pw.Text('From: ${fmt(from)}    To: ${fmt(to)}', style: smallMuted),
+            pw.SizedBox(height: 16),
+            pw.Text('Summary', style: h2),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              'Total unique medicines: ${safeItems.length}',
+              style: baseStyle.copyWith(fontSize: 11),
+            ),
+            pw.SizedBox(height: 14),
+            pw.Text('Medicines', style: h2),
+            pw.SizedBox(height: 6),
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300),
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                  children: [
+                    tableCell('Medicine', isHeader: true),
+                    tableCell('Used Qty', isHeader: true),
+                  ],
+                ),
+                ...safeItems.map(
+                  (m) => pw.TableRow(
+                    children: [
+                      tableCell(m.medicineName),
+                      tableCell(m.used.toString()),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ];
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+  }
+
   static Future<void> exportDashboardAsPDF({
     required DashboardAnalytics analytics,
     required pw.Font font,
@@ -26,7 +273,7 @@ class ExportService {
     pw.Widget buildWatermark() {
       return pw.Center(
         child: pw.Transform.rotate(
-          angle: math.pi/4,
+          angle: math.pi / 4,
           child: pw.Opacity(
             opacity: 0.10,
             child: pw.Text(
@@ -74,65 +321,78 @@ class ExportService {
       {'label': 'Others', 'value': 20.0, 'color': PdfColors.red},
     ];
 
-
     pdf.addPage(
       pw.MultiPage(
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(70),
-          theme: pw.ThemeData.withFont(
-            base: font,
-            bold: font,
-          ),
-          buildBackground: (context) => pw.FullPage(
-            ignoreMargins: true,
-            child: buildWatermark(),
-          ),
+          theme: pw.ThemeData.withFont(base: font, bold: font),
+          buildBackground: (context) =>
+              pw.FullPage(ignoreMargins: true, child: buildWatermark()),
         ),
         header: (ctx) => pw.Container(
           padding: const pw.EdgeInsets.only(bottom: 8),
           decoration: const pw.BoxDecoration(
-              border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300))),
+            border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300)),
+          ),
           child: pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text('Dishari - Admin Dashboard',
-                  style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold)),
-              pw.Text('Report Generated: ${DateTime.now().toString().split(' ')[0]}',
-                  style: smallMuted),
+              pw.Text(
+                'Dishari - Admin Dashboard',
+                style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
+              ),
+              pw.Text(
+                'Report Generated: ${DateTime.now().toString().split(' ')[0]}',
+                style: smallMuted,
+              ),
             ],
           ),
         ),
         build: (context) {
-          final ratio = (analytics.patientCount /
-              (analytics.doctorCount == 0 ? 1 : analytics.doctorCount))
-              .toStringAsFixed(0);
+          final ratio =
+              (analytics.patientCount /
+                      (analytics.doctorCount == 0 ? 1 : analytics.doctorCount))
+                  .toStringAsFixed(0);
 
           return [
             // 1. Header Banner
             pw.Container(
               padding: const pw.EdgeInsets.all(20),
               decoration: pw.BoxDecoration(
-                  color: primary, borderRadius: pw.BorderRadius.circular(12)),
+                color: primary,
+                borderRadius: pw.BorderRadius.circular(12),
+              ),
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text('Dashboard Analytics',
-                          style: baseStyle.copyWith(
-                              fontSize: 22,
-                              fontWeight: pw.FontWeight.bold,
-                              color: PdfColors.white)),
-                      pw.Text('Overview of patients, activity and inventory',
-                          style: baseStyle.copyWith(
-                              color: PdfColors.white, fontSize: 11)),
+                      pw.Text(
+                        'Dashboard Analytics',
+                        style: baseStyle.copyWith(
+                          fontSize: 22,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.white,
+                        ),
+                      ),
+                      pw.Text(
+                        'Overview of patients, activity and inventory',
+                        style: baseStyle.copyWith(
+                          color: PdfColors.white,
+                          fontSize: 11,
+                        ),
+                      ),
                     ],
                   ),
-                  pw.Text('Month: ${months[selectedMonthIndex]}',
-                      style: baseStyle.copyWith(
-                          color: PdfColors.white, fontSize: 10)),
+                  pw.Text(
+                    'Month: ${months[selectedMonthIndex]}',
+                    style: baseStyle.copyWith(
+                      color: PdfColors.white,
+                      fontSize: 10,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -201,11 +461,17 @@ class ExportService {
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text('Total Doctors: ${analytics.doctorCount}', style: body),
-                pw.Text('Total Patients: ${analytics.patientCount}', style: body),
-                pw.Text('Ratio: 1 : $ratio',
-                    style: body.copyWith(
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.amber800)),
+                pw.Text(
+                  'Total Patients: ${analytics.patientCount}',
+                  style: body,
+                ),
+                pw.Text(
+                  'Ratio: 1 : $ratio',
+                  style: body.copyWith(
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.amber800,
+                  ),
+                ),
               ],
             ),
             pw.SizedBox(height: 10),
@@ -213,23 +479,28 @@ class ExportService {
               height: 10,
               width: double.infinity,
               decoration: pw.BoxDecoration(
-                  borderRadius: pw.BorderRadius.circular(5),
-                  color: PdfColors.grey200),
+                borderRadius: pw.BorderRadius.circular(5),
+                color: PdfColors.grey200,
+              ),
               child: pw.Row(
                 children: [
                   pw.Expanded(
                     flex: analytics.doctorCount,
                     child: pw.Container(
-                        decoration: pw.BoxDecoration(
-                            color: PdfColors.indigo,
-                            borderRadius: pw.BorderRadius.circular(5))),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.indigo,
+                        borderRadius: pw.BorderRadius.circular(5),
+                      ),
+                    ),
                   ),
                   pw.Expanded(
                     flex: analytics.patientCount,
                     child: pw.Container(
-                        decoration: pw.BoxDecoration(
-                            color: success,
-                            borderRadius: pw.BorderRadius.circular(5))),
+                      decoration: pw.BoxDecoration(
+                        color: success,
+                        borderRadius: pw.BorderRadius.circular(5),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -245,13 +516,19 @@ class ExportService {
                   decoration: const pw.BoxDecoration(color: PdfColors.grey100),
                   children: [
                     pw.Padding(
-                        padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text('Category',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Category',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                      ),
+                    ),
                     pw.Padding(
-                        padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text('Count / Revenue',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Count / Total (taka)',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                      ),
+                    ),
                   ],
                 ),
                 ...[
@@ -259,15 +536,24 @@ class ExportService {
                   ['Teacher/Family', monthData.teacher],
                   ['Outside', monthData.outside],
                   ['Total Patients', monthData.total],
-                  ['Revenue', '\$${monthData.revenue}']
-                ].map((r) => pw.TableRow(children: [
-                  pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text(r[0].toString(), style: body)),
-                  pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text(r[1].toString(), style: body)),
-                ])),
+                  [
+                    'Total (taka)',
+                    '${monthData.revenue.toStringAsFixed(0)} taka',
+                  ],
+                ].map(
+                  (r) => pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text(r[0].toString(), style: body),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text(r[1].toString(), style: body),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
             pw.SizedBox(height: 25),
@@ -282,10 +568,13 @@ class ExportService {
                   child: pw.Chart(
                     grid: pw.PieGrid(),
                     datasets: diseasesData
-                        .map((e) => pw.PieDataSet(
-                        value: e['value'] as double,
-                        color: e['color'] as PdfColor,
-                        drawSurface: true))
+                        .map(
+                          (e) => pw.PieDataSet(
+                            value: e['value'] as double,
+                            color: e['color'] as PdfColor,
+                            drawSurface: true,
+                          ),
+                        )
                         .toList(),
                   ),
                 ),
@@ -293,20 +582,28 @@ class ExportService {
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: diseasesData
-                      .map((e) => pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                    child: pw.Row(children: [
-                      pw.Container(
-                          width: 8,
-                          height: 8,
-                          decoration: pw.BoxDecoration(
-                              color: e['color'] as PdfColor,
-                              shape: pw.BoxShape.circle)),
-                      pw.SizedBox(width: 8),
-                      pw.Text('${e['label']}: ${e['value']}%',
-                          style: body),
-                    ]),
-                  ))
+                      .map(
+                        (e) => pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                          child: pw.Row(
+                            children: [
+                              pw.Container(
+                                width: 8,
+                                height: 8,
+                                decoration: pw.BoxDecoration(
+                                  color: e['color'] as PdfColor,
+                                  shape: pw.BoxShape.circle,
+                                ),
+                              ),
+                              pw.SizedBox(width: 8),
+                              pw.Text(
+                                '${e['label']}: ${e['value']}%',
+                                style: body,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
                       .toList(),
                 ),
               ],
@@ -321,29 +618,71 @@ class ExportService {
                 pw.TableRow(
                   decoration: const pw.BoxDecoration(color: PdfColors.grey100),
                   children: [
-                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Medicine', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Prev.', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Current', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Used', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Status', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Medicine',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Current',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Used',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text(
+                        'Status',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                      ),
+                    ),
                   ],
                 ),
                 ...analytics.stockReport.map((item) {
-                  final double percentage = item.previous > 0 ? (item.current / item.previous) * 100 : 0;
-                  final bool isLow = percentage < 30;
+                  final denom = (item.used + item.current).toDouble();
+                  final double usedRate = denom <= 0
+                      ? 0.0
+                      : (item.used / denom) * 100;
+                  final bool isOut = item.current <= 0;
+                  final bool isLow = !isOut && usedRate >= 70;
+                  final statusText = isOut ? 'Out' : (isLow ? 'Low' : 'Good');
+                  final statusColor = isOut
+                      ? PdfColors.grey
+                      : (isLow ? PdfColors.red : PdfColors.green);
 
                   return pw.TableRow(
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(item.itemName, style: body)),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${item.previous}', style: body)),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${item.current}', style: body)),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${item.used}', style: body)),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6),
-                          child: pw.Text(isLow ? 'Low' : 'Good', style: body.copyWith(color: isLow ? PdfColors.red : PdfColors.green))),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text(item.itemName, style: body),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text('${item.current}', style: body),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text('${item.used}', style: body),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(6),
+                        child: pw.Text(
+                          '$statusText (${usedRate.toStringAsFixed(0)}%)',
+                          style: body.copyWith(color: statusColor),
+                        ),
+                      ),
                     ],
                   );
-
-
                 }),
               ],
             ),
@@ -354,5 +693,4 @@ class ExportService {
 
     await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
-
 }

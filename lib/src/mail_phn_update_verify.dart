@@ -121,6 +121,10 @@ class MailPhnUpdateVerify {
           if (started) return;
           started = true;
           timer = Timer.periodic(const Duration(seconds: 1), (_) {
+            if (!ctx.mounted) {
+              timer?.cancel();
+              return;
+            }
             final start = issuedAt;
             if (start == null) return;
             final elapsed = DateTime.now().difference(start).inSeconds;
@@ -140,11 +144,13 @@ class MailPhnUpdateVerify {
                 final sent = await requestOtp();
                 if (sent) {
                   otpCtrl.clear();
-                  setStateDialog(() {
-                    remaining = _effectiveTtlSeconds(challenge);
-                  });
+                  if (!ctx.mounted) return;
+                  setStateDialog(
+                    () => remaining = _effectiveTtlSeconds(challenge),
+                  );
                 }
               } finally {
+                if (!ctx.mounted) return;
                 setStateDialog(() => verifying = false);
               }
             }
@@ -198,6 +204,7 @@ class MailPhnUpdateVerify {
                   EmailOtpVerificationPayload(otp: otp, otpToken: token),
                 );
               } finally {
+                if (!ctx.mounted) return;
                 setStateDialog(() => verifying = false);
               }
             }

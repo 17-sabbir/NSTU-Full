@@ -44,6 +44,7 @@ class _StaffRosteringState extends State<StaffRostering> {
     final idStr = prefs.getString('user_id') ?? '0';
     return int.tryParse(idStr) ?? 0;
   }
+
   // Loading and error states
   bool _loading = true;
   String? _loadError;
@@ -126,7 +127,6 @@ class _StaffRosteringState extends State<StaffRostering> {
         _staffNameToId[label] = idStr;
       }
     }
-
   }
 
   Future<void> _fetchRoster() async {
@@ -199,7 +199,10 @@ class _StaffRosteringState extends State<StaffRostering> {
         final newControllers = table
             .map((r) => TextEditingController(text: r['staff_name'] ?? ''))
             .toList();
-        final newFocusNodes = List.generate(newControllers.length, (_) => FocusNode());
+        final newFocusNodes = List.generate(
+          newControllers.length,
+          (_) => FocusNode(),
+        );
 
         // Immediately assign new lists so the build will pick them up on next frame
         _controllers[id] = newControllers;
@@ -208,6 +211,7 @@ class _StaffRosteringState extends State<StaffRostering> {
 
       // Let the framework rebuild with new controllers, then dispose old ones to avoid used-after-dispose
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         for (var id in ['doctor', 'nurse', 'staff']) {
           final oldC = oldControllers[id];
           final oldF = oldFocusNodes[id];
@@ -443,11 +447,14 @@ class _StaffRosteringState extends State<StaffRostering> {
                           await client.adminEndpoints.createAuditLog(
                             adminId: currentAdminId,
                             action: 'ROSTER_DELETED',
-                            targetId: rosterId as String, // কার রোস্টার কাটা হলো
+                            targetId:
+                                rosterId as String, // কার রোস্টার কাটা হলো
                           );
-                        }else {
+                        } else {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Failed to delete from database')),
+                            const SnackBar(
+                              content: Text('Failed to delete from database'),
+                            ),
                           );
                           return;
                         }
@@ -596,6 +603,12 @@ class _StaffRosteringState extends State<StaffRostering> {
   Widget build(BuildContext context) {
     try {
       return Scaffold(
+        appBar: AppBar(
+          title: const Text('Staff Rostering'),
+          backgroundColor: const Color(0xFF00695C),
+          foregroundColor: Colors.white,
+          centerTitle: true,
+        ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(

@@ -1,17 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
-import 'user_management.dart';
-import 'inventory_management.dart';
-import 'reports_analytics.dart';
-import 'history_screen.dart';
-import 'staff_rostering.dart';
-import 'admin_profile.dart';
-import 'admin_ambulance.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
-
   @override
   State<AdminDashboard> createState() => AdminDashboardState();
 }
@@ -35,12 +27,71 @@ class AdminDashboardState extends State<AdminDashboard> {
   bool _isLoadingRecentActivity = true;
   List<AuditEntry> _recentAuditLogs = const [];
 
+  // Auth guard state
+  bool _checkingAuth = true;
+  bool _authorized = false;
+
   @override
   void initState() {
     super.initState();
-    _loadAdminProfile();
-    _loadDashboardOverview();
-    _loadRecentActivity();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _verifyAdmin();
+    });
+  }
+
+  Future<void> _goToNamedRoute(String routeName) async {
+    final current = ModalRoute.of(context)?.settings.name;
+    if (current == routeName) return;
+    await Navigator.pushNamed(context, routeName);
+  }
+
+  Future<void> _verifyAdmin() async {
+    try {
+      // ignore: deprecated_member_use
+      final authKey = await client.authenticationKeyManager?.get();
+      if (authKey == null || authKey.isEmpty) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final storedUserId = prefs.getString('user_id');
+      if (storedUserId == null || storedUserId.trim().isEmpty) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
+      String role = '';
+      try {
+        role = (await client.patient.getUserRole(0)).toUpperCase();
+      } catch (e) {
+        debugPrint('Failed to fetch user role: $e');
+      }
+
+      if (role != 'ADMIN') {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _authorized = true;
+        _checkingAuth = false;
+      });
+
+      // Load all admin dashboard data only after auth is verified.
+      _loadAdminProfile();
+      _loadDashboardOverview();
+      _loadRecentActivity();
+    } catch (e) {
+      debugPrint('Admin auth check failed: $e');
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/');
+    }
   }
 
   Future<void> _loadDashboardOverview() async {
@@ -134,43 +185,58 @@ class AdminDashboardState extends State<AdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingAuth) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (!_authorized) {
+      return Scaffold(
+        body: Center(
+          child: ElevatedButton(
+            onPressed: () => Navigator.pushReplacementNamed(context, '/'),
+            child: const Text('Unauthorized - Go to Login'),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: backgroundLight,
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 40), // Top spacing safely
-              _buildHeader(),
-              const SizedBox(height: 20),
-              _buildSectionTitle('Dashboard Overview'),
-              const SizedBox(height: 12),
-              _buildOverviewCards(),
-              const SizedBox(height: 24),
-              _buildSectionTitle('Quick Actions'),
-              const SizedBox(height: 12),
-              _buildQuickActionsGrid(context),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildSectionTitle('Recent Activity'),
-                  TextButton(
-                    onPressed: () {
-                      _loadRecentActivity();
-                    },
-                    child: const Text(
-                      'Refresh',
-                      style: TextStyle(color: Color(0xFF00695C)),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 20),
+                _buildSectionTitle('Dashboard Overview'),
+                const SizedBox(height: 12),
+                _buildOverviewCards(),
+                const SizedBox(height: 24),
+                _buildSectionTitle('Quick Actions'),
+                const SizedBox(height: 12),
+                _buildQuickActionsGrid(context),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildSectionTitle('Recent Activity'),
+                    TextButton(
+                      onPressed: () {
+                        _loadRecentActivity();
+                      },
+                      child: const Text(
+                        'Refresh',
+                        style: TextStyle(color: Color(0xFF00695C)),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _buildRecentActivityList(),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _buildRecentActivityList(),
+              ],
+            ),
           ),
         ),
       ),
@@ -194,11 +260,7 @@ class AdminDashboardState extends State<AdminDashboard> {
 
     return InkWell(
       onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const AdminProfile()),
-        );
-        // Refresh profile when returning from AdminProfile screen
+        await _goToNamedRoute('/admin/profile');
         _loadAdminProfile();
       },
       child: Container(
@@ -385,42 +447,42 @@ class AdminDashboardState extends State<AdminDashboard> {
         'icon': Icons.group_add_outlined,
         'color': Colors.blue.shade700,
         'bg': Colors.blue.shade50,
-        'page': const UserManagement(),
+        'route': '/admin/users',
       },
       {
         'title': 'Inventory',
         'icon': Icons.inventory_2_outlined,
         'color': Colors.orange.shade700,
         'bg': Colors.orange.shade50,
-        'page': const InventoryManagement(),
+        'route': '/admin/inventory',
       },
       {
         'title': 'Roster',
         'icon': Icons.calendar_month_outlined,
         'color': Colors.purple.shade700,
         'bg': Colors.purple.shade50,
-        'page': const StaffRostering(),
+        'route': '/admin/roster',
       },
       {
         'title': 'Report',
         'icon': Icons.assessment_outlined,
         'color': Colors.teal.shade700,
         'bg': Colors.teal.shade50,
-        'page': const ReportsAnalytics(),
+        'route': '/admin/reports',
       },
       {
         'title': 'History',
         'icon': Icons.history,
         'color': Colors.indigo.shade700,
         'bg': Colors.indigo.shade50,
-        'page': const HistoryScreen(),
+        'route': '/admin/history',
       },
       {
         'title': 'Ambulance',
         'icon': Icons.local_shipping_outlined,
         'color': Colors.red.shade700,
         'bg': Colors.red.shade50,
-        'page': const AdminAmbulance(),
+        'route': '/admin/ambulance',
       },
     ];
 
@@ -439,20 +501,7 @@ class AdminDashboardState extends State<AdminDashboard> {
 
         return InkWell(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => Scaffold(
-                  appBar: AppBar(
-                    title: Text(action['title']),
-                    backgroundColor: const Color(0xFF00695C),
-                    foregroundColor: Colors.white,
-                    centerTitle: true,
-                  ),
-                  body: action['page'],
-                ),
-              ),
-            );
+            _goToNamedRoute(action['route'] as String);
           },
           child: Container(
             decoration: BoxDecoration(

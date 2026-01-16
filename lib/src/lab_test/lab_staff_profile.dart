@@ -501,7 +501,11 @@ class _LabTesterProfileState extends State<LabTesterProfile>
 
       // 3. Clear shared preferences
       final prefs = await SharedPreferences.getInstance();
+      final preservedDeviceId = prefs.getString('device_id');
       await prefs.clear();
+      if (preservedDeviceId != null && preservedDeviceId.trim().isNotEmpty) {
+        await prefs.setString('device_id', preservedDeviceId.trim());
+      }
 
       if (!mounted) return;
 
@@ -932,5 +936,4 @@ class _LabTesterProfileState extends State<LabTesterProfile>
 
   // Ensure phone field uses digits only and shows +88 prefix in UI
   // Update where _buildEditableField is called for phone: it uses _phoneCtrl already; no change needed to call site.
-
 }

@@ -215,7 +215,7 @@ class ManageTestState extends State<ManageTest> {
                     controller: studentFeeCtrl,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
-                      labelText: 'Student Fee (৳)',
+                      labelText: 'Student Fee (taka)',
                       prefixIcon: const Icon(Icons.person, size: 20),
                       border: const OutlineInputBorder(),
                       errorText: studentFeeError,
@@ -231,7 +231,7 @@ class ManageTestState extends State<ManageTest> {
                     controller: teacherFeeCtrl,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
-                      labelText: 'Teacher Fee (৳)',
+                      labelText: 'Teacher Fee (taka)',
                       prefixIcon: const Icon(Icons.school, size: 20),
                       border: const OutlineInputBorder(),
                       errorText: teacherFeeError,
@@ -247,7 +247,7 @@ class ManageTestState extends State<ManageTest> {
                     controller: outsideFeeCtrl,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
-                      labelText: 'Outside Fee (৳)',
+                      labelText: 'Outside Fee (taka)',
                       prefixIcon: const Icon(Icons.public, size: 20),
                       border: const OutlineInputBorder(),
                       errorText: outsideFeeError,
@@ -354,7 +354,7 @@ class ManageTestState extends State<ManageTest> {
                       ),
                     ),
                     subtitle: Text(
-                      "Student: ৳${t.studentFee} | Teacher: ৳${t.teacherFee}",
+                      "Student: ${t.studentFee} taka | Teacher: ${t.teacherFee} taka",
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -362,7 +362,9 @@ class ManageTestState extends State<ManageTest> {
                         Switch(
                           value: t.available,
                           activeThumbColor: Colors.green,
-                          activeTrackColor: Colors.greenAccent.withAlpha((0.3 * 255).round()),
+                          activeTrackColor: Colors.greenAccent.withAlpha(
+                            (0.3 * 255).round(),
+                          ),
                           onChanged: (v) {
                             t.available = v;
                             _handleUpdate(t);

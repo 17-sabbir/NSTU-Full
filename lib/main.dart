@@ -9,6 +9,7 @@ import 'src/admin/reports_analytics.dart';
 import 'src/admin/staff_rostering.dart';
 import 'src/admin/user_management.dart';
 import 'src/admin/admin_dashboard.dart';
+import 'src/admin/admin_ambulance.dart';
 
 // Doctor imports
 import 'src/doctor/patient_records.dart';
@@ -75,6 +76,7 @@ class MyApp extends StatelessWidget {
         '/admin/reports': (context) => const ReportsAnalytics(),
         '/admin/history': (context) => const HistoryScreen(),
         '/admin/roster': (context) => const StaffRostering(),
+        '/admin/ambulance': (context) => const AdminAmbulance(),
 
         // Doctor routes (grouped under /doctor)
         '/doctor': (context) => const DoctorDashboard(),

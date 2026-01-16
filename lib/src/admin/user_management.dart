@@ -171,13 +171,7 @@ class _UserManagementState extends State<UserManagement> {
   }
 
   Widget _buildCategorySelector() {
-    final categories = [
-      'Admin',
-      'Doctor',
-      'Dispenser',
-      'Lab Staff',
-      'Patient',
-    ];
+    final categories = ['Admin', 'Doctor', 'Dispenser', 'Lab Staff', 'Patient'];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -224,6 +218,12 @@ class _UserManagementState extends State<UserManagement> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('User Management'),
+        backgroundColor: const Color(0xFF00695C),
+        foregroundColor: Colors.white,
+        centerTitle: true,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -535,7 +535,9 @@ class _UserManagementState extends State<UserManagement> {
         bool _isCreating = false;
         String? _errorMessage;
 
-        final emailRegex = RegExp(r"^[\w.+\-]+@[a-zA-Z0-9\-]+\.[a-zA-Z0-9.\-]+");
+        final emailRegex = RegExp(
+          r"^[\w.+\-]+@[a-zA-Z0-9\-]+\.[a-zA-Z0-9.\-]+",
+        );
         bool _obscurePassword = true;
 
         return StatefulBuilder(
@@ -553,7 +555,9 @@ class _UserManagementState extends State<UserManagement> {
                       controller: nameController,
                       decoration: InputDecoration(
                         labelText: "Full Name",
-                        errorText: _isNameValid ? null : "Name must be at least 4 characters",
+                        errorText: _isNameValid
+                            ? null
+                            : "Name must be at least 4 characters",
                       ),
                     ),
                     TextField(
@@ -571,7 +575,9 @@ class _UserManagementState extends State<UserManagement> {
                       decoration: InputDecoration(
                         labelText: 'Phone (11 digits)',
                         prefixText: '+88 ',
-                        errorText: _isPhoneValid ? null : "Phone must be 11 digits starting with 01",
+                        errorText: _isPhoneValid
+                            ? null
+                            : "Phone must be 11 digits starting with 01",
                         counterText: '',
                       ),
                     ),
@@ -582,12 +588,20 @@ class _UserManagementState extends State<UserManagement> {
                       decoration: InputDecoration(
                         labelText: "Initial Password",
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
                           onPressed: () {
-                            setStateDialog(() => _obscurePassword = !_obscurePassword);
+                            setStateDialog(
+                              () => _obscurePassword = !_obscurePassword,
+                            );
                           },
                         ),
-                        errorText: _isPasswordValid ? null : "Password must be at least 6 characters",
+                        errorText: _isPasswordValid
+                            ? null
+                            : "Password must be at least 6 characters",
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -595,25 +609,40 @@ class _UserManagementState extends State<UserManagement> {
                       value: role,
                       items: const [
                         DropdownMenuItem(value: "Admin", child: Text("Admin")),
-                        DropdownMenuItem(value: "Doctor", child: Text("Doctor")),
-                        DropdownMenuItem(value: "Dispenser", child: Text("Dispenser")),
-                        DropdownMenuItem(value: "Lab Staff", child: Text("Lab Staff")),
+                        DropdownMenuItem(
+                          value: "Doctor",
+                          child: Text("Doctor"),
+                        ),
+                        DropdownMenuItem(
+                          value: "Dispenser",
+                          child: Text("Dispenser"),
+                        ),
+                        DropdownMenuItem(
+                          value: "Lab Staff",
+                          child: Text("Lab Staff"),
+                        ),
                       ],
                       onChanged: (value) => setStateDialog(() => role = value!),
-                      decoration: const InputDecoration(labelText: "Select Role"),
+                      decoration: const InputDecoration(
+                        labelText: "Select Role",
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Icon(
-                          passOk ? Icons.check_circle : Icons.check_circle_outline,
+                          passOk
+                              ? Icons.check_circle
+                              : Icons.check_circle_outline,
                           color: passOk ? Colors.green : Colors.black38,
                           size: 16,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           'Password must be at least 6 characters',
-                          style: TextStyle(color: passOk ? Colors.green : Colors.black54),
+                          style: TextStyle(
+                            color: passOk ? Colors.green : Colors.black54,
+                          ),
                         ),
                       ],
                     ),
@@ -636,107 +665,118 @@ class _UserManagementState extends State<UserManagement> {
                   onPressed: _isCreating
                       ? null
                       : () async {
-                    bool isValid = true;
-                    final name = nameController.text.trim();
-                    final email = emailController.text.trim();
-                    final password = passwordController.text;
-                    final phoneDigits = phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+                          bool isValid = true;
+                          final name = nameController.text.trim();
+                          final email = emailController.text.trim();
+                          final password = passwordController.text;
+                          final phoneDigits = phoneController.text.replaceAll(
+                            RegExp(r'[^0-9]'),
+                            '',
+                          );
 
-                    // Reset error
-                    setStateDialog(() {
-                      _errorMessage = null;
-                    });
+                          // Reset error
+                          setStateDialog(() {
+                            _errorMessage = null;
+                          });
 
-                    // Validation
-                    if (name.length < 4) {
-                      isValid = false;
-                      setStateDialog(() {
-                        _isNameValid = false;
-                        _errorMessage = "Name must be at least 4 characters";
-                      });
-                    } else {
-                      _isNameValid = true;
-                    }
+                          // Validation
+                          if (name.length < 4) {
+                            isValid = false;
+                            setStateDialog(() {
+                              _isNameValid = false;
+                              _errorMessage =
+                                  "Name must be at least 4 characters";
+                            });
+                          } else {
+                            _isNameValid = true;
+                          }
 
-                    if (!emailRegex.hasMatch(email) ||
-                        !(email.endsWith('nstu.edu.bd') || email.endsWith('@gmail.com'))) {
-                      isValid = false;
-                      setStateDialog(() {
-                        _isEmailValid = false;
-                        _errorMessage = "Enter a valid email";
-                      });
-                    } else {
-                      _isEmailValid = true;
-                    }
+                          if (!emailRegex.hasMatch(email) ||
+                              !(email.endsWith('nstu.edu.bd') ||
+                                  email.endsWith('@gmail.com'))) {
+                            isValid = false;
+                            setStateDialog(() {
+                              _isEmailValid = false;
+                              _errorMessage = "Enter a valid email";
+                            });
+                          } else {
+                            _isEmailValid = true;
+                          }
 
-                    if (phoneDigits.length != 11 || !phoneDigits.startsWith('01')) {
-                      isValid = false;
-                      setStateDialog(() {
-                        _isPhoneValid = false;
-                        _errorMessage = "Phone must be 11 digits starting with 01";
-                      });
-                    } else {
-                      _isPhoneValid = true;
-                    }
+                          if (phoneDigits.length != 11 ||
+                              !phoneDigits.startsWith('01')) {
+                            isValid = false;
+                            setStateDialog(() {
+                              _isPhoneValid = false;
+                              _errorMessage =
+                                  "Phone must be 11 digits starting with 01";
+                            });
+                          } else {
+                            _isPhoneValid = true;
+                          }
 
-                    if (password.length < 6) {
-                      isValid = false;
-                      setStateDialog(() {
-                        _isPasswordValid = false;
-                        _errorMessage = "Password must be at least 6 characters";
-                      });
-                    } else {
-                      _isPasswordValid = true;
-                    }
+                          if (password.length < 6) {
+                            isValid = false;
+                            setStateDialog(() {
+                              _isPasswordValid = false;
+                              _errorMessage =
+                                  "Password must be at least 6 characters";
+                            });
+                          } else {
+                            _isPasswordValid = true;
+                          }
 
-                    if (!isValid) return;
+                          if (!isValid) return;
 
-                    setStateDialog(() => _isCreating = true);
+                          setStateDialog(() => _isCreating = true);
 
-                    final dbRole = _mapRoleToDb(role);
+                          final dbRole = _mapRoleToDb(role);
 
-                    try {
-                      // Call server endpoint
-                      final res = await client.adminEndpoints.createUserWithPassword(
-                        name,
-                        email,
-                        password,
-                        dbRole,
-                        '+88$phoneDigits',
-                      );
+                          try {
+                            // Call server endpoint
+                            final res = await client.adminEndpoints
+                                .createUserWithPassword(
+                                  name,
+                                  email,
+                                  password,
+                                  dbRole,
+                                  '+88$phoneDigits',
+                                );
 
-                      // Check if server returned numeric user ID
-                      final newUserId = int.tryParse(res);
-                      if (newUserId != null) {
-                        final currentAdminId = await _getAdminId();
-                        // Create audit log
-                        await client.adminEndpoints.createAuditLog(
-                          adminId: currentAdminId,
-                          action: 'USER_CREATED',
-                          targetId: res,
-                        );
-                        Navigator.pop(context);
-                        await _fetchUsers();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('$role $name created successfully'),
-                          ),
-                        );
-                      } else {
-                        // Show server error message
-                        setStateDialog(() {
-                          _errorMessage = res;
-                        });
-                      }
-                    } catch (e) {
-                      // Network/server exception
-                      setStateDialog(() {
-                        _errorMessage = 'Network or server error: $e';
-                      });
-                    } finally {
-                      setStateDialog(() => _isCreating = false);
-                    }
-                  },
+                            // Check if server returned numeric user ID
+                            final newUserId = int.tryParse(res);
+                            if (newUserId != null) {
+                              final currentAdminId = await _getAdminId();
+                              // Create audit log
+                              await client.adminEndpoints.createAuditLog(
+                                adminId: currentAdminId,
+                                action: 'USER_CREATED',
+                                targetId: res,
+                              );
+                              Navigator.pop(context);
+                              await _fetchUsers();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '$role $name created successfully',
+                                  ),
+                                ),
+                              );
+                            } else {
+                              // Show server error message
+                              setStateDialog(() {
+                                _errorMessage = res;
+                              });
+                            }
+                          } catch (e) {
+                            // Network/server exception
+                            setStateDialog(() {
+                              _errorMessage = 'Network or server error: $e';
+                            });
+                          } finally {
+                            setStateDialog(() => _isCreating = false);
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
                   ),
@@ -752,7 +792,6 @@ class _UserManagementState extends State<UserManagement> {
       },
     );
   }
-
 
   Future<void> _launchPhone(String phone) async {
     if (phone.isEmpty) return;

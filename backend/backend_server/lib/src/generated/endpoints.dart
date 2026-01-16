@@ -904,6 +904,99 @@ class Endpoints extends _i1.EndpointDispatch {
                           as _i4.AdminReportEndpoints)
                       .getDashboardAnalytics(session),
         ),
+        'getMedicineUsageByDateRange': _i1.MethodConnector(
+          name: 'getMedicineUsageByDateRange',
+          params: {
+            'from': _i1.ParameterDescription(
+              name: 'from',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+            'to': _i1.ParameterDescription(
+              name: 'to',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminReportEndpoints']
+                          as _i4.AdminReportEndpoints)
+                      .getMedicineUsageByDateRange(
+                        session,
+                        params['from'],
+                        params['to'],
+                      ),
+        ),
+        'getMedicineStockUsageByDateRange': _i1.MethodConnector(
+          name: 'getMedicineStockUsageByDateRange',
+          params: {
+            'from': _i1.ParameterDescription(
+              name: 'from',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+            'toExclusive': _i1.ParameterDescription(
+              name: 'toExclusive',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminReportEndpoints']
+                          as _i4.AdminReportEndpoints)
+                      .getMedicineStockUsageByDateRange(
+                        session,
+                        params['from'],
+                        params['toExclusive'],
+                      ),
+        ),
+        'getDispensedAvailableDates': _i1.MethodConnector(
+          name: 'getDispensedAvailableDates',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminReportEndpoints']
+                          as _i4.AdminReportEndpoints)
+                      .getDispensedAvailableDates(session),
+        ),
+        'getLabTestTotalsByDateRange': _i1.MethodConnector(
+          name: 'getLabTestTotalsByDateRange',
+          params: {
+            'from': _i1.ParameterDescription(
+              name: 'from',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+            'toExclusive': _i1.ParameterDescription(
+              name: 'toExclusive',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminReportEndpoints']
+                          as _i4.AdminReportEndpoints)
+                      .getLabTestTotalsByDateRange(
+                        session,
+                        params['from'],
+                        params['toExclusive'],
+                      ),
+        ),
       },
     );
     connectors['auth'] = _i1.EndpointConnector(
@@ -1676,6 +1769,25 @@ class Endpoints extends _i1.EndpointDispatch {
                     prescriptionId: params['prescriptionId'],
                     dispenserId: params['dispenserId'],
                     items: params['items'],
+                  ),
+        ),
+        'getDispenserDispenseHistory': _i1.MethodConnector(
+          name: 'getDispenserDispenseHistory',
+          params: {
+            'limit': _i1.ParameterDescription(
+              name: 'limit',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
+                  .getDispenserDispenseHistory(
+                    session,
+                    limit: params['limit'],
                   ),
         ),
       },

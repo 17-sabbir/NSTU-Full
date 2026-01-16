@@ -28,6 +28,10 @@ adminInventoryEndpoints:
 adminReportEndpoints:
   - getAdminDashboardOverview:
   - getDashboardAnalytics:
+  - getMedicineUsageByDateRange:
+  - getMedicineStockUsageByDateRange:
+  - getDispensedAvailableDates:
+  - getLabTestTotalsByDateRange:
 auth:
   - requestProfileEmailChangeOtp:
   - verifyProfileEmailChangeOtp:
@@ -57,6 +61,7 @@ dispenser:
   - getStockByFirstWord:
   - searchInventoryItems:
   - dispensePrescription:
+  - getDispenserDispenseHistory:
 doctor:
   - getDoctorHomeData:
   - getDoctorInfo:

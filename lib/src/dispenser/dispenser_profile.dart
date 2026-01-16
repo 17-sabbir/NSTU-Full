@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:backend_client/backend_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -68,7 +67,40 @@ class _DispenserProfileState extends State<DispenserProfile> {
     _phoneCtrl.addListener(_onChanged);
     _qualificationCtrl.addListener(_onChanged);
 
-    _loadProfile();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _verifyAndLoad();
+    });
+  }
+
+  Future<void> _verifyAndLoad() async {
+    try {
+      // ignore: deprecated_member_use
+      final authKey = await client.authenticationKeyManager?.get();
+      if (authKey == null || authKey.isEmpty) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
+      String role = '';
+      try {
+        role = (await client.patient.getUserRole(0)).toUpperCase();
+      } catch (e) {
+        debugPrint('Failed to fetch user role: $e');
+      }
+
+      if (role != 'DISPENSER' && role != 'NURSE') {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
+      await _loadProfile();
+    } catch (e) {
+      debugPrint('Dispenser profile auth check failed: $e');
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/');
+    }
   }
 
   @override
@@ -275,46 +307,54 @@ class _DispenserProfileState extends State<DispenserProfile> {
     _onChanged();
   }
 
-
-
-  Future<void> _confirmLogout() async {
-    final shouldLogout = await showDialog<bool>(
+void _confirmLogout() {
+    showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text("Logout"),
+        content: const Text("Are you sure you want to log out?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Cancel"),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Logout', style: TextStyle(color: Colors.red)),
+            onPressed: () async {
+            
+              Navigator.pop(dialogContext);
+
+              try {
+
+                await client.authenticationKeyManager?.remove();
+                try {
+                  await client.auth.logout();
+                } catch (_) {}
+
+                // ৩. SharedPreferences ক্লিয়ার করা
+                final prefs = await SharedPreferences.getInstance();
+                final deviceId = prefs.getString('device_id');
+                await prefs.clear();
+                if (deviceId != null)
+                  await prefs.setString('device_id', deviceId);
+
+                // ৪. অ্যাপ রিসেট এবং লগইন পেজে পাঠানো
+                // rootNavigator: true নিশ্চিত করে যে পুরো অ্যাপ রিলোড হচ্ছে
+                if (mounted) {
+                  Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).pushNamedAndRemoveUntil('/', (route) => false);
+                }
+              } catch (e) {
+                debugPrint("Logout error: $e");
+                if (mounted) Navigator.pushReplacementNamed(context, '/');
+              }
+            },
+            child: const Text("Logout", style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
-
-    if (shouldLogout != true) return;
-
-    try {
-      try {
-        await client.auth.logout();
-      } catch (_) {}
-      // ignore: deprecated_member_use
-      await client.authenticationKeyManager?.remove();
-    } catch (_) {}
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('user_id');
-      await prefs.remove('user_role');
-      await prefs.remove('user_email');
-    } catch (_) {}
-
-    if (!mounted) return;
-    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
   }
 
   Future<void> _pickImage() async {

@@ -254,6 +254,11 @@ class _HomePageState extends State<HomePage> {
       countdownSeconds = 120;
       canResend = false;
       timer = Timer.periodic(const Duration(seconds: 1), (t) {
+        // Cancel if dialog is gone (important for web hot restart).
+        if (!context.mounted) {
+          t.cancel();
+          return;
+        }
         if (!mounted) {
           t.cancel();
           return;

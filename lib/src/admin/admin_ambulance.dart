@@ -134,6 +134,12 @@ class _AdminAmbulanceState extends State<AdminAmbulance> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Ambulance'),
+        backgroundColor: _primaryTeal,
+        foregroundColor: Colors.white,
+        centerTitle: true,
+      ),
       body: FutureBuilder<List<AmbulanceContact>>(
         future: _ambulances,
         builder: (context, snapshot) {

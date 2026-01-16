@@ -47,13 +47,18 @@ class _MedicineItemState extends State<MedicineItem> {
 
   int _maxQty() {
     final med = widget.medicine;
-    return med.prescribedQty > 0 ? med.prescribedQty : 9999;
+    // Never dispense more than prescribed.
+    final byPrescription = med.prescribedQty > 0 ? med.prescribedQty : 0;
+    if (med.itemId == null) return byPrescription;
+
+    // Also cap by available stock to avoid backend failure.
+    final byStock = med.stock > 0 ? med.stock : 0;
+    return byPrescription < byStock ? byPrescription : byStock;
   }
 
   int _currentQty() {
-    final med = widget.medicine;
-    if (med.dispenseQty > 0) return med.dispenseQty;
-    return med.prescribedQty;
+    // Must allow 0 (skip dispensing) and preserve it.
+    return widget.medicine.dispenseQty;
   }
 
   void _setQty(int next) {

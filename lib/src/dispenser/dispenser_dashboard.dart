@@ -3,6 +3,7 @@ import 'dispenser_medicine_item.dart';
 import 'dispenser_profile.dart';
 import 'dispenser_inventory.dart';
 import 'package:backend_client/backend_client.dart';
+import 'package:intl/intl.dart';
 
 // Use Map-based structures for prescriptions and logs to avoid custom classes
 typedef PrescriptionMap = Map<String, dynamic>;
@@ -21,13 +22,18 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
   bool _isLoading = false;
   int _selectedIndex = 0;
   String _searchQuery = '';
+  bool _authChecked = false;
+  bool _authorized = false;
+
   final List<int> _navigationHistory = [0]; // Track tab navigation
 
   static const _brandTeal = Color(0xFF1F9E98);
 
   DispenserProfileR? _profile;
   bool _homeLoading = false;
-  List<InventoryAuditLog> _homeLogs = [];
+  List<DispenseHistoryEntry> _dispenseHistory = [];
+  List<InventoryAuditLog> stockHistory = [];
+  bool stockHistoryLoading = false;
 
   final List<PrescriptionMap> _allPrescriptions = [];
 
@@ -64,43 +70,55 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     return 0;
   }
 
-  @override
+@override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _verifyDispenser();
-      _loadPendingPrescriptions();
-      _loadHome();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final ok = await _verifyDispenser();
+      if (!mounted) return;
+
+      setState(() {
+        _authorized = ok;
+        _authChecked = true;
+      });
+
+      if (ok) {
+        await Future.wait([_loadPendingPrescriptions(), _loadHome()]);
+      }
     });
   }
 
-  Future<void> _verifyDispenser() async {
+
+  Future<bool> _verifyDispenser() async {
     try {
-      // ignore: deprecated_member_use
       final authKey = await client.authenticationKeyManager?.get();
+      // সেশন না থাকলে সাথে সাথে বের হয়ে যাবে, কোনো এরর মেসেজ দেখাবে না
       if (authKey == null || authKey.isEmpty) {
-        if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/');
-        return;
+        if (mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+        }
+        return false;
       }
+
       String role = '';
       try {
         role = (await client.patient.getUserRole(0)).toUpperCase();
-      } catch (e) {
-        debugPrint('Failed to fetch user role: $e');
+      } catch (_) {
+      
+        if (mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+        }
+        return false;
       }
-      if (role == 'DISPENSER' || role == 'NURSE') {
-        // allowed
-      } else {
-        if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/');
-        return;
-      }
-    } catch (e) {
-      debugPrint('Dispenser auth failed: $e');
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/');
-      return;
+
+      if (role == 'DISPENSER' || role == 'NURSE') return true;
+
+      if (mounted) Navigator.pushReplacementNamed(context, '/');
+      return false;
+    } catch (_) {
+      if (mounted) Navigator.pushReplacementNamed(context, '/');
+      return false;
     }
   }
 
@@ -111,16 +129,23 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     try {
       final results = await Future.wait([
         client.dispenser.getDispenserProfile(),
+        client.dispenser.getDispenserDispenseHistory(limit: 30),
         client.dispenser.getDispenserHistory(),
       ]);
 
       final profile = results[0] as DispenserProfileR?;
-      final logs = results[1] as List<InventoryAuditLog>;
+      final dispenseHistory = results[1] as List<DispenseHistoryEntry>;
+      final logs = results[2] as List<InventoryAuditLog>;
+
+      final since = DateTime.now().subtract(const Duration(days: 30));
+      final filtered = logs.where((x) => x.timestamp.isAfter(since)).toList();
 
       if (!mounted) return;
       setState(() {
         _profile = profile;
-        _homeLogs = logs;
+        _dispenseHistory = dispenseHistory;
+        stockHistory = filtered;
+        stockHistoryLoading = false;
         _homeLoading = false;
       });
     } catch (e) {
@@ -143,6 +168,7 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
       final mapped = serverList.map((p) {
         return <String, dynamic>{
           'id': (p.id ?? 0).toString(),
+          'patientId': p.patientId,
           'name': p.name ?? '',
           'doctorId': p.doctorId,
           'doctorName': p.doctorName ?? '',
@@ -223,6 +249,27 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     }
   }
 
+  Future<void> loadStockHistory() async {
+    if (!mounted) return;
+    setState(() => stockHistoryLoading = true);
+
+    try {
+      final logs = await client.dispenser.getDispenserHistory();
+      final since = DateTime.now().subtract(const Duration(days: 30));
+      final filtered = logs.where((x) => x.timestamp.isAfter(since)).toList();
+
+      if (!mounted) return;
+      setState(() {
+        stockHistory = filtered;
+        stockHistoryLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => stockHistoryLoading = false);
+      debugPrint('Failed to load stock history: $e');
+    }
+  }
+
   Future<void> _dispensePrescription() async {
     final meds = _currentPrescription!['medicines'] as List<Medicine>;
 
@@ -273,8 +320,8 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
       );
 
       if (success) {
-        _loadPendingPrescriptions();
-        setState(() => _currentPrescription = null);
+        await Future.wait([_loadPendingPrescriptions(), _loadHome()]);
+        if (mounted) setState(() => _currentPrescription = null);
       }
     } catch (e) {
       // ignore: use_build_context_synchronously
@@ -295,26 +342,28 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
 
   Future<void> _refresh() async {
     await Future.wait([_loadPendingPrescriptions(), _loadHome()]);
+    // ensure stock history also refreshes
+    await loadStockHistory();
   }
 
   int _countDispensedToday() {
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day);
     final end = start.add(const Duration(days: 1));
-    return _homeLogs
-        .where((l) => l.action == 'DISPENSE')
-        .where((l) => l.timestamp.isAfter(start) && l.timestamp.isBefore(end))
+    return _dispenseHistory
+        .where(
+          (d) => d.dispensedAt.isAfter(start) && d.dispensedAt.isBefore(end),
+        )
         .length;
   }
 
-  List<InventoryAuditLog> _last7DaysLogs() {
+  List<DispenseHistoryEntry> _last7DaysDispenses() {
     final since = DateTime.now().subtract(const Duration(days: 7));
-    return _homeLogs.where((l) => l.timestamp.isAfter(since)).toList();
+    return _dispenseHistory.where((d) => d.dispensedAt.isAfter(since)).toList();
   }
 
   Widget _statCard({
-    required String title,
-    required String value,
+    required String text,
     required IconData icon,
     required Color background,
     required Color iconBg,
@@ -330,29 +379,15 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.grey.shade800,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.w800,
-                    height: 1.0,
-                  ),
-                ),
-              ],
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.grey.shade800,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
             ),
           ),
           Container(
@@ -373,24 +408,34 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     final profile = _profile;
     final pending = _allPrescriptions.length;
     final dispensedToday = _countDispensedToday();
-    final recent = _last7DaysLogs();
+    final recent = _last7DaysDispenses();
 
     return RefreshIndicator(
       onRefresh: _refresh,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
+
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
+              constraints: const BoxConstraints(minHeight: 110),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF1F9E98), Color(0xFF38B8B2)],
+                  colors: [Colors.blue, Colors.blueAccent],
                 ),
                 borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
+
               child: Row(
                 children: [
                   CircleAvatar(
@@ -452,17 +497,16 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
                   return Column(
                     children: [
                       _statCard(
-                        title: 'Pending Prescriptions',
-                        value: '$pending',
+                        text: 'Pending Prescriptions $pending',
                         icon: Icons.access_time,
                         background: const Color(0xFFF7F1E6),
                         iconBg: const Color(0xFFF3DDB1),
                         iconColor: const Color(0xFFF59E0B),
                       ),
+
                       const SizedBox(height: 12),
                       _statCard(
-                        title: 'Dispensed Today',
-                        value: '$dispensedToday',
+                        text: 'Dispensed Today $dispensedToday',
                         icon: Icons.check_circle,
                         background: const Color(0xFFEAF7EF),
                         iconBg: const Color(0xFFBFE8CC),
@@ -476,23 +520,22 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
                   children: [
                     Expanded(
                       child: _statCard(
-                        title: 'Pending Prescriptions',
-                        value: '$pending',
+                        text: 'Pending Prescriptions   $pending',
                         icon: Icons.access_time,
                         background: const Color(0xFFF7F1E6),
                         iconBg: const Color(0xFFF3DDB1),
                         iconColor: const Color(0xFFF59E0B),
                       ),
+
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _statCard(
-                        title: 'Dispensed Today',
-                        value: '$dispensedToday',
+                        text: 'Dispensed Today   $dispensedToday',
                         icon: Icons.check_circle,
                         background: const Color(0xFFEAF7EF),
                         iconBg: const Color(0xFFBFE8CC),
-                        iconColor: const Color(0xFF16A34A),
+                        iconColor: const Color.fromARGB(255, 86, 86, 86),
                       ),
                     ),
                   ],
@@ -539,37 +582,115 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
                   separatorBuilder: (_, __) =>
                       Divider(height: 1, color: Colors.grey.shade200),
                   itemBuilder: (context, index) {
-                    final log = recent[index];
-                    final isDispensed = log.action == 'DISPENSE';
-                    final color = isDispensed
-                        ? Colors.orange
-                        : (log.action == 'ADD_STOCK'
-                              ? Colors.green
-                              : Colors.blue);
-                    final icon = isDispensed
-                        ? Icons.outbox
-                        : (log.action == 'ADD_STOCK'
-                              ? Icons.add_business
-                              : Icons.history);
+                    final d = recent[index];
+                    final itemsText = d.items.isEmpty
+                        ? 'No items'
+                        : d.items
+                              .take(3)
+                              .map((i) => '${i.medicineName} × ${i.quantity}')
+                              .join(', ');
+                    final moreCount = d.items.length - 3;
+                    final subtitle = moreCount > 0
+                        ? '$itemsText +$moreCount more'
+                        : itemsText;
 
                     return ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: color.withOpacity(0.12),
-                        child: Icon(icon, color: color),
+                        backgroundColor: Colors.orange.withOpacity(0.12),
+                        child: const Icon(Icons.outbox, color: Colors.orange),
                       ),
                       title: Text(
-                        (log.userName ?? 'Unknown Item'),
+                        d.patientName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        '${log.action} • Stock: ${log.oldQuantity} → ${log.newQuantity}',
+                        'Rx #${d.prescriptionId} • $subtitle',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       trailing: Text(
-                        '${log.timestamp.day}/${log.timestamp.month}',
+                        DateFormat('dd/MM/yyyy').format(d.dispensedAt),
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 18),
+            Text(
+              'Stock History (Last 1 Month)',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade900,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            if (stockHistoryLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (stockHistory.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Text(
+                  'No stock activity in last 30 days',
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
+              )
+            else
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: stockHistory.length > 8 ? 8 : stockHistory.length,
+                  separatorBuilder: (_, __) =>
+                      Divider(height: 1, color: Colors.grey.shade200),
+                  itemBuilder: (context, index) {
+                    final h = stockHistory[index];
+
+                    final title = h.userName ?? 'Unknown Item';
+                    final action = h.action;
+                    final oldQ = h.oldQuantity ?? 0;
+                    final newQ = h.newQuantity ?? 0;
+
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.blue.withOpacity(0.12),
+                        child: const Icon(
+                          Icons.inventory_2_outlined,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      title: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        '$action • $oldQ → $newQ',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Text(
+                        DateFormat('dd/MM/yyyy').format(h.timestamp),
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
                     );
@@ -1265,6 +1386,15 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
 
   @override
   Widget build(BuildContext context) {
+
+     if (!_authChecked) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (!_authorized) {
+      return const Scaffold(); // empty, redirect already done
+    }
+
     // ignore: deprecated_member_use
     return WillPopScope(
       onWillPop: _onWillPop,

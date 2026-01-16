@@ -1159,35 +1159,46 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
-              const SizedBox(width: 5),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Radio<String>(
-                    value: 'before',
-                    groupValue: medicine.mealTiming,
-                    onChanged: (v) => setState(() {
-                      medicine.mealTiming = v;
-                      _markUnsaved();
-                    }),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Radio<String>(
+                            value: 'before',
+                            groupValue: medicine.mealTiming,
+                            onChanged: (v) => setState(() {
+                              medicine.mealTiming = v;
+                              _markUnsaved();
+                            }),
+                          ),
+                          const Text('খাবার আগে'),
+                        ],
+                      ),
+                      const SizedBox(width: 12),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Radio<String>(
+                            value: 'after',
+                            groupValue: medicine.mealTiming,
+                            onChanged: (v) => setState(() {
+                              medicine.mealTiming = v;
+                              _markUnsaved();
+                            }),
+                          ),
+                          const Text('খাবার পরে'),
+                        ],
+                      ),
+                    ],
                   ),
-                  const Text('খাবার আগে'),
-                ],
-              ),
-              const SizedBox(width: 5),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Radio<String>(
-                    value: 'after',
-                    groupValue: medicine.mealTiming,
-                    onChanged: (v) => setState(() {
-                      medicine.mealTiming = v;
-                      _markUnsaved();
-                    }),
-                  ),
-                  const Text('খাবার পরে'),
-                ],
+                ),
               ),
             ],
           ),
@@ -1211,39 +1222,45 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                 ),
               ),
               const SizedBox(width: 12),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Radio<String>(
-                        value: 'দিন',
-                        groupValue: medicine.durationUnit,
-                        onChanged: (v) => setState(() {
-                          medicine.durationUnit = v ?? 'দিন';
-                          _markUnsaved();
-                        }),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Radio<String>(
+                            value: 'দিন',
+                            groupValue: medicine.durationUnit,
+                            onChanged: (v) => setState(() {
+                              medicine.durationUnit = v ?? 'দিন';
+                              _markUnsaved();
+                            }),
+                          ),
+                          const Text('দিন'),
+                        ],
                       ),
-                      const Text('দিন'),
+                      const SizedBox(width: 12),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Radio<String>(
+                            value: 'মাস',
+                            groupValue: medicine.durationUnit,
+                            onChanged: (v) => setState(() {
+                              medicine.durationUnit = v ?? 'দিন';
+                              _markUnsaved();
+                            }),
+                          ),
+                          const Text('মাস'),
+                        ],
+                      ),
                     ],
                   ),
-                  const SizedBox(width: 8),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Radio<String>(
-                        value: 'মাস',
-                        groupValue: medicine.durationUnit,
-                        onChanged: (v) => setState(() {
-                          medicine.durationUnit = v ?? 'দিন';
-                          _markUnsaved();
-                        }),
-                      ),
-                      const Text('মাস'),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ],
           ),
@@ -1571,7 +1588,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                                       padding: EdgeInsets.all(10),
                                       child: SizedBox(
                                         width: 16,
-                                        height: 16,
+
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
                                         ),

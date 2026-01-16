@@ -291,7 +291,7 @@ class DispenserEndpoint extends Endpoint {
   Future<List<Prescription>> getPendingPrescriptions(Session session) async {
     try {
       final result = await session.db.unsafeQuery('''
-      SELECT p.prescription_id, p.doctor_id,u.name AS doctor_name, p.name, p.mobile_number, p.prescription_date
+      SELECT p.prescription_id, p.patient_id, p.doctor_id,u.name AS doctor_name, p.name, p.mobile_number, p.prescription_date
       FROM prescriptions p
       LEFT JOIN users u ON u.user_id = p.doctor_id
       WHERE NOT EXISTS (
@@ -310,6 +310,14 @@ class DispenserEndpoint extends Endpoint {
         return int.tryParse(v.toString()) ?? 0;
       }
 
+      int? toNullableInt(dynamic v) {
+        if (v == null) return null;
+        if (v is int) return v;
+        if (v is num) return v.toInt();
+        final parsed = int.tryParse(v.toString());
+        return parsed;
+      }
+
       DateTime? toDate(dynamic v) {
         if (v == null) return null;
         if (v is DateTime) return v;
@@ -321,6 +329,7 @@ class DispenserEndpoint extends Endpoint {
 
         return Prescription(
           id: toInt(map['prescription_id']),
+          patientId: toNullableInt(map['patient_id']),
           doctorId: toInt(map['doctor_id']),
           doctorName: map['doctor_name']?.toString(),
           name: map['name']?.toString(),
@@ -366,8 +375,13 @@ class DispenserEndpoint extends Endpoint {
         doctorName: row['doctor_name'],
         prescription: Prescription(
           id: row['prescription_id'],
+          patientId: row['patient_id'],
           doctorId: row['doctor_id'],
+          doctorName: row['doctor_name'],
           name: row['name'],
+          age: row['age'],
+          mobileNumber: row['mobile_number'],
+          gender: row['gender'],
           prescriptionDate: row['prescription_date'],
         ),
         items: itemsResult.map((r) {
@@ -393,10 +407,12 @@ class DispenserEndpoint extends Endpoint {
     try {
       String firstWord = medicineName.split(' ')[0];
       final result = await session.db.unsafeQuery('''
-      SELECT i.item_id, i.item_name, s.current_quantity, i.unit
+      SELECT i.item_id, i.item_name, s.current_quantity, i.unit, c.category_name
       FROM inventory_item i
+      JOIN inventory_category c ON c.category_id = i.category_id
       JOIN inventory_stock s ON s.item_id = i.item_id
       WHERE i.item_name ILIKE @query
+        AND c.category_name ILIKE 'medicine%'
       LIMIT 1;
     ''', parameters: QueryParameters.named({'query': '$firstWord%'}));
 
@@ -408,7 +424,7 @@ class DispenserEndpoint extends Endpoint {
         currentQuantity: row['current_quantity'],
         unit: row['unit'] ?? '',
         minimumStock: 0,
-        categoryName: '',
+        categoryName: row['category_name']?.toString() ?? '',
         canRestockDispenser: true,
       );
     } catch (e) {
@@ -422,10 +438,12 @@ class DispenserEndpoint extends Endpoint {
     try {
       final result = await session.db.unsafeQuery('''
       SELECT 
-        i.item_id, i.item_name, i.unit, s.current_quantity
+        i.item_id, i.item_name, i.unit, s.current_quantity, c.category_name
       FROM inventory_item i
+      JOIN inventory_category c ON c.category_id = i.category_id
       JOIN inventory_stock s ON s.item_id = i.item_id
       WHERE i.item_name ILIKE @query
+        AND c.category_name ILIKE 'medicine%'
       LIMIT 10
     ''', parameters: QueryParameters.named({'query': '%$query%'}));
 
@@ -437,7 +455,7 @@ class DispenserEndpoint extends Endpoint {
           unit: map['unit'] ?? '',
           currentQuantity: map['current_quantity'] ?? 0,
           minimumStock: 0,
-          categoryName: '',
+          categoryName: map['category_name']?.toString() ?? '',
           canRestockDispenser: true,
         );
       }).toList();
@@ -467,14 +485,26 @@ class DispenserEndpoint extends Endpoint {
         final dispenseResult = await session.db.unsafeQuery('''
           INSERT INTO prescription_dispense (prescription_id, dispenser_id, status)
           VALUES (@pid, @did, TRUE)
-          RETURNING dispense_id
+          RETURNING dispense_id, dispensed_at
         ''',
             parameters: QueryParameters.named({
               'pid': prescriptionId,
               'did': resolvedUserId,
             }));
 
-        final int dispenseId = dispenseResult.first.first as int;
+        final dispenseRow = dispenseResult.first.toColumnMap();
+        final int dispenseId = dispenseRow['dispense_id'] as int;
+        final DateTime dispensedAt = dispenseRow['dispensed_at'] as DateTime;
+
+        String formatYmdHm(DateTime dt) {
+          final local = dt.toLocal();
+          final y = local.year.toString().padLeft(4, '0');
+          final mo = local.month.toString().padLeft(2, '0');
+          final d = local.day.toString().padLeft(2, '0');
+          final h = local.hour.toString().padLeft(2, '0');
+          final mi = local.minute.toString().padLeft(2, '0');
+          return '$y-$mo-$d $h:$mi';
+        }
 
         // ২. প্রতিটি আইটেম প্রসেস করা
         for (var item in items) {
@@ -530,12 +560,125 @@ class DispenserEndpoint extends Endpoint {
               }));
         }
 
+        // ৬. Patient notification (if patient_id exists)
+        try {
+          final presRows = await session.db.unsafeQuery(
+            '''
+            SELECT patient_id, name, mobile_number
+            FROM prescriptions
+            WHERE prescription_id = @pid
+            LIMIT 1
+            ''',
+            parameters: QueryParameters.named({'pid': prescriptionId}),
+          );
+
+          if (presRows.isNotEmpty) {
+            final p = presRows.first.toColumnMap();
+            final int? patientId = p['patient_id'] as int?;
+
+            if (patientId != null) {
+              final itemsText = items
+                  .map((i) => '• ${i.medicineName} × ${i.quantity}')
+                  .join('\n');
+
+              final title = 'Medicines dispensed';
+              final message =
+                  'Your medicines have been dispensed.\nDispensed at: ${formatYmdHm(dispensedAt)}\nPrescription ID: $prescriptionId\nItems:\n$itemsText';
+
+              await session.db.unsafeExecute(
+                '''
+                INSERT INTO notifications (user_id, title, message, is_read, created_at)
+                VALUES (@uid, @t, @m, FALSE, NOW())
+                ''',
+                parameters: QueryParameters.named({
+                  'uid': patientId,
+                  't': title,
+                  'm': message,
+                }),
+              );
+            }
+          }
+        } catch (e) {
+          session.log('Notification insert skipped/failed: $e');
+        }
+
         return true; // সব সফল হলে ট্রানজ্যাকশন কমিট হবে
       } catch (e) {
         session.log('Transaction failed: $e');
         return false; // কোনো এরর হলে সব আগের অবস্থায় ফিরে যাবে (Rollback)
       }
     });
+  }
+
+  /// Detailed dispense history (patient + items) for current dispenser
+  Future<List<DispenseHistoryEntry>> getDispenserDispenseHistory(
+    Session session, {
+    int limit = 50,
+  }) async {
+    try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
+
+      final dispenses = await session.db.unsafeQuery(
+        '''
+        SELECT
+          pd.dispense_id,
+          pd.prescription_id,
+          pd.dispensed_at,
+          p.patient_id,
+          COALESCE(NULLIF(u.name, ''), NULLIF(p.name, ''), 'Unknown') AS patient_name,
+          COALESCE(u.phone, p.mobile_number, '') AS mobile_number
+        FROM prescription_dispense pd
+        JOIN prescriptions p ON p.prescription_id = pd.prescription_id
+        LEFT JOIN users u ON u.user_id = p.patient_id
+        WHERE pd.dispenser_id = @uid
+        ORDER BY pd.dispensed_at DESC
+        LIMIT @lim
+        ''',
+        parameters:
+            QueryParameters.named({'uid': resolvedUserId, 'lim': limit}),
+      );
+
+      final entries = <DispenseHistoryEntry>[];
+      for (final row in dispenses) {
+        final m = row.toColumnMap();
+        final int dispenseId = (m['dispense_id'] as int);
+
+        final itemRows = await session.db.unsafeQuery(
+          '''
+          SELECT medicine_name, quantity, is_alternative
+          FROM dispensed_items
+          WHERE dispense_id = @did
+          ORDER BY dispensed_item_id ASC
+          ''',
+          parameters: QueryParameters.named({'did': dispenseId}),
+        );
+
+        final items = itemRows.map((ir) {
+          final im = ir.toColumnMap();
+          return DispensedItemSummary(
+            medicineName: _safeString(im['medicine_name']),
+            quantity: (im['quantity'] as int?) ?? 0,
+            isAlternative: (im['is_alternative'] as bool?) ?? false,
+          );
+        }).toList();
+
+        entries.add(
+          DispenseHistoryEntry(
+            dispenseId: dispenseId,
+            prescriptionId: (m['prescription_id'] as int),
+            patientId: m['patient_id'] as int?,
+            patientName: _safeString(m['patient_name']),
+            mobileNumber: _safeString(m['mobile_number']),
+            dispensedAt: (m['dispensed_at'] as DateTime),
+            items: items,
+          ),
+        );
+      }
+
+      return entries;
+    } catch (e) {
+      return [];
+    }
   }
 
   /// 3️⃣ Helper

@@ -150,6 +150,7 @@ class _TestReportsViewState extends State<TestReportsView> {
         });
       }
       unawaited(
+        // ignore: body_might_complete_normally_catch_error
         client.doctor.markReportReviewed(report.reportId!).catchError((_) {}),
       );
     }

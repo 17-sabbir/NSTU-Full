@@ -301,6 +301,10 @@ class _ForgetPasswordState extends State<ForgetPassword> {
     setState(() => resendTimer = _resetTokenExpirySeconds);
     _timerObj?.cancel();
     _timerObj = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       setState(() {
         if (resendTimer > 0) {
           resendTimer--;

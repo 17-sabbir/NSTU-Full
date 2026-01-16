@@ -582,7 +582,7 @@ class AdminEndpoints extends Endpoint {
 
   Future<List<AuditEntry>> getAuditLogs(Session session) async {
     try {
-      final result = await session.db.unsafeQuery('''
+      final result = await session.db.unsafeQuery("""
       SELECT 
         al.audit_id, 
         al.action, 
@@ -592,10 +592,12 @@ class AdminEndpoints extends Endpoint {
         u2.name as target_name  -- যার ওপর অ্যাকশন নেওয়া হয়েছে তার নাম
       FROM audit_log al
       JOIN users u1 ON CAST(al.user_id AS bigint) = u1.user_id 
-      LEFT JOIN users u2 ON CAST(al.target_id AS bigint) = u2.user_id -- target_id থেকে নাম খোঁজা
+      LEFT JOIN users u2 ON (
+        CASE WHEN al.target_id ~ '^[0-9]+\$' THEN al.target_id::bigint END
+      ) = u2.user_id -- target_id numeric হলে নাম খোঁজা
       ORDER BY al.created_at DESC
       LIMIT 100
-      ''');
+      """);
 
       return result.map((row) {
         final map = row.toColumnMap();
@@ -628,7 +630,7 @@ class AdminEndpoints extends Endpoint {
       final safeLimit = limit <= 0 ? 20 : limit.clamp(1, 200);
 
       final result = await session.db.unsafeQuery(
-        '''
+        """
       SELECT 
         al.audit_id, 
         al.action, 
@@ -638,11 +640,13 @@ class AdminEndpoints extends Endpoint {
         u2.name as target_name
       FROM audit_log al
       JOIN users u1 ON CAST(al.user_id AS bigint) = u1.user_id 
-      LEFT JOIN users u2 ON CAST(al.target_id AS bigint) = u2.user_id
+      LEFT JOIN users u2 ON (
+        CASE WHEN al.target_id ~ '^[0-9]+\$' THEN al.target_id::bigint END
+      ) = u2.user_id
       WHERE al.created_at >= NOW() - (@h * INTERVAL '1 hour')
       ORDER BY al.created_at DESC
       LIMIT @lim
-      ''',
+      """,
         parameters: QueryParameters.named({'h': safeHours, 'lim': safeLimit}),
       );
 

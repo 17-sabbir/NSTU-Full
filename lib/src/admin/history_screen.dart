@@ -11,64 +11,122 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   final Color primaryColor = const Color(0xFF00796B); // Deep Teal
-  List<InventoryAuditLog> historyItems = [];
-  List<AuditEntry> _generalLogs = [];
-  bool _loading = false;
+  static const int _initialLoadCount = 10;
+  static const int _loadMoreCount = 50;
 
-  // Pagination এর জন্য ভেরিয়েবল (আপনার এন্ডপয়েন্টে এগুলো প্রয়োজন)
-  final int _limit = 20;
-  final int _offset = 0;
+  final List<InventoryAuditLog> _inventoryLogs = [];
+  final List<AuditEntry> _allGeneralLogs = [];
+  int _generalVisibleCount = 0;
+
+  int _inventoryOffset = 0;
+  bool _inventoryHasMore = true;
+  bool _inventoryLoadingMore = false;
+
+  bool _loading = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchAllData();
+    _refreshAll();
   }
 
-  Future<void> _fetchAllData() async {
-    setState(() => _loading = true);
-    // একসাথে দুই ধরণের ডেটাই ফেচ করা হবে
-    await Future.wait([_fetchInventoryHistory(), _fetchGeneralAuditHistory()]);
-    if (mounted) setState(() => _loading = false);
-  }
-
-  Future<void> _fetchInventoryHistory() async {
+  Future<void> _refreshAll() async {
     if (!mounted) return;
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _inventoryLogs.clear();
+      _allGeneralLogs.clear();
+      _generalVisibleCount = 0;
+      _inventoryOffset = 0;
+      _inventoryHasMore = true;
+      _inventoryLoadingMore = false;
+    });
 
+    await Future.wait([_loadInitialInventory(), _loadAllGeneralLogs()]);
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+  }
+
+  Future<void> _loadInitialInventory() async {
     try {
-
       final res = await client.adminInventoryEndpoints.getInventoryAuditLogs(
-        _limit,
-        _offset,
+        _initialLoadCount,
+        0,
       );
-
-      if (mounted) {
-        setState(() {
-          historyItems = res;
-        });
-      }
+      res.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      if (!mounted) return;
+      setState(() {
+        _inventoryLogs
+          ..clear()
+          ..addAll(res);
+        _inventoryOffset = _inventoryLogs.length;
+        _inventoryHasMore = res.length == _initialLoadCount;
+      });
     } catch (e) {
-      debugPrint('Failed to load audit logs: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Failed to load history')));
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      debugPrint('Failed to load inventory logs: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to load inventory history')),
+      );
     }
   }
 
-  Future<void> _fetchGeneralAuditHistory() async {
+  Future<void> _loadMoreInventory() async {
+    if (_inventoryLoadingMore || !_inventoryHasMore) return;
+    if (!mounted) return;
+    setState(() => _inventoryLoadingMore = true);
+
+    try {
+      final res = await client.adminInventoryEndpoints.getInventoryAuditLogs(
+        _loadMoreCount,
+        _inventoryOffset,
+      );
+      res.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      if (!mounted) return;
+      setState(() {
+        _inventoryLogs.addAll(res);
+        _inventoryOffset = _inventoryLogs.length;
+        _inventoryHasMore = res.length == _loadMoreCount;
+      });
+    } catch (e) {
+      debugPrint('Failed to load more inventory logs: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to load more inventory history')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() => _inventoryLoadingMore = false);
+    }
+  }
+
+  Future<void> _loadAllGeneralLogs() async {
     try {
       final res = await client.adminEndpoints.getAuditLogs();
+      res.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      if (!mounted) return;
       setState(() {
-        _generalLogs = res;
+        _allGeneralLogs
+          ..clear()
+          ..addAll(res);
+        _generalVisibleCount = _allGeneralLogs.length < _initialLoadCount
+            ? _allGeneralLogs.length
+            : _initialLoadCount;
       });
     } catch (e) {
       debugPrint('General Audit load failed: $e');
     }
+  }
+
+  void _loadMoreGeneralLogs() {
+    if (!mounted) return;
+    setState(() {
+      final next = _generalVisibleCount + _loadMoreCount;
+      _generalVisibleCount = next > _allGeneralLogs.length
+          ? _allGeneralLogs.length
+          : next;
+    });
   }
 
   // অ্যাকশন অনুযায়ী সহজ নাম দেওয়া
@@ -117,90 +175,195 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  String _toTitleCaseWords(String input) {
+    final parts = input
+        .trim()
+        .replaceAll(RegExp(r'[_\-]+'), ' ')
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    return parts
+        .map(
+          (w) => w.isEmpty
+              ? w
+              : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}',
+        )
+        .join(' ');
+  }
+
+  String _prettyAction(String action) {
+    // Keep existing readable actions as-is, otherwise prettify codes like EXPORT_PDF.
+    if (action.contains(' ')) return action;
+    return _toTitleCaseWords(action);
+  }
+
+  String _relativeTime(DateTime when) {
+    final now = DateTime.now();
+    final diff = now.difference(when);
+
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
+    if (diff.inHours < 24) return '${diff.inHours} hrs ago';
+    if (diff.inDays < 7) return '${diff.inDays} days ago';
+    return DateFormat('dd MMM yyyy').format(when);
+  }
+
+  Widget _ssTile({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required String subtitle,
+    required DateTime time,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+              child: Icon(icon, color: iconColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 13,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              _relativeTime(time),
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        appBar: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
-          child: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            bottom: TabBar(
-              labelColor: primaryColor,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: primaryColor,
-              tabs: const [
-                Tab(text: "Inventory Logs"),
-                Tab(text: "General Logs"),
-              ],
+        appBar: AppBar(
+          title: const Text('History'),
+          backgroundColor: const Color(0xFF00695C), // AppBar color
+          foregroundColor: Colors.white,
+          centerTitle: true,
+
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(48),
+            child: Container(
+              color: Colors.white, // ✅ TabBar background
+              child: const TabBar(
+                labelColor: Color(0xFF00695C), // selected tab text
+                unselectedLabelColor: Color(0xFF00695C),
+                indicatorColor: Color(0xFF00695C), // indicator color
+                labelStyle: TextStyle(fontWeight: FontWeight.bold),
+                unselectedLabelStyle: TextStyle(fontWeight: FontWeight.bold),
+                tabs: [
+                  Tab(text: 'Inventory Logs'),
+                  Tab(text: 'General Logs'),
+                ],
+              ),
             ),
           ),
         ),
+
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : TabBarView(
-                children: [
-                  _buildInventoryTab(), // আপনার আগের ডিজাইন
-                  _buildGeneralAuditTab(), // নতুন ডিজাইন
-                ],
+                children: [_buildInventoryTab(), _buildGeneralAuditTab()],
               ),
       ),
     );
   }
 
   Widget _buildGeneralAuditTab() {
-    if (_generalLogs.isEmpty) {
+    if (_allGeneralLogs.isEmpty) {
       return const Center(child: Text("No general logs found"));
     }
 
+    final hasMore = _generalVisibleCount < _allGeneralLogs.length;
+
     return RefreshIndicator(
-      onRefresh: _fetchAllData,
+      onRefresh: _refreshAll,
       child: ListView.builder(
         padding: const EdgeInsets.all(12),
-        itemCount: _generalLogs.length,
+        itemCount: _generalVisibleCount + (hasMore ? 1 : 0),
         itemBuilder: (context, index) {
-          final log = _generalLogs[index];
-
-          return Card(
-            elevation: 1,
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.blue.withOpacity(0.1),
-                child: const Icon(
-                  Icons.admin_panel_settings,
-                  color: Colors.blue,
+          if (hasMore && index == _generalVisibleCount) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: OutlinedButton(
+                  onPressed: _loadMoreGeneralLogs,
+                  child: const Text('Load more'),
                 ),
               ),
-              title: Text(
-                log.adminName ?? 'Unknown Admin',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  Text(
-                    "Action: ${log.action}",
-                    style: const TextStyle(color: Colors.black87),
-                  ),
-                  Text(
-                    "Target Name: ${log.targetName}",
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    DateFormat('dd MMM yyyy | hh:mm a').format(log.createdAt),
-                    style: const TextStyle(color: Colors.grey, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
+            );
+          }
+
+          final log = _allGeneralLogs[index];
+
+          final title = _prettyAction(log.action);
+          final admin = (log.adminName?.trim().isNotEmpty ?? false)
+              ? log.adminName!.trim()
+              : 'Unknown';
+          final target = (log.targetName?.trim().isNotEmpty ?? false)
+              ? log.targetName!.trim()
+              : '';
+
+          final subtitle = target.isEmpty
+              ? 'By $admin'
+              : 'By $admin • Target: $target';
+
+          return _ssTile(
+            icon: Icons.history,
+            iconColor: const Color(0xFF00796B),
+            iconBg: const Color(0xFF00796B).withOpacity(0.12),
+            title: title,
+            subtitle: subtitle,
+            time: log.createdAt,
           );
         },
       ),
@@ -208,66 +371,51 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildInventoryTab() {
-    if (historyItems.isEmpty) {
+    if (_inventoryLogs.isEmpty) {
       return const Center(child: Text('No inventory history found'));
     }
     return RefreshIndicator(
-      onRefresh: _fetchAllData,
+      onRefresh: _refreshAll,
       child: ListView.builder(
         padding: const EdgeInsets.all(12),
-        itemCount: historyItems.length,
+        itemCount: _inventoryLogs.length + (_inventoryHasMore ? 1 : 0),
         itemBuilder: (context, index) {
-          final item = historyItems[index];
+          if (_inventoryHasMore && index == _inventoryLogs.length) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: _inventoryLoadingMore
+                    ? const CircularProgressIndicator()
+                    : OutlinedButton(
+                        onPressed: _loadMoreInventory,
+                        child: const Text('Load more'),
+                      ),
+              ),
+            );
+          }
+
+          final item = _inventoryLogs[index];
           final action = item.action;
           final type = _mapActionType(action);
 
-          return Card(
-            elevation: 1,
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: Colors.grey.shade200),
-            ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 8,
-                horizontal: 16,
-              ),
-              leading: CircleAvatar(
-                backgroundColor: _getIconColor(type).withOpacity(0.12),
-                child: Icon(_getActionIcon(type), color: _getIconColor(type)),
-              ),
-              title: Text(
-                item.userName ?? 'System Admin', // আপনার YAML অনুযায়ী userName
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  Text(
-                    "Action: $action",
-                    style: const TextStyle(color: Colors.black87),
-                  ),
-                  // স্টক পরিবর্তন দেখালে ভালো হয়
-                  if (item.oldQuantity != null && item.newQuantity != null)
-                    Text(
-                      "Change: ${item.oldQuantity} → ${item.newQuantity}",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.blueGrey.shade700,
-                      ),
-                    ),
-                  const SizedBox(height: 6),
-                  Text(
-                    // সরাসরি item.timestamp ব্যবহার করা (কারণ এটি অলরেডি DateTime অবজেক্ট)
-                    DateFormat('dd MMM yyyy | hh:mm a').format(item.timestamp),
-                    style: const TextStyle(color: Colors.grey, fontSize: 11),
-                  ),
-                ],
-              ),
-              isThreeLine: true,
-            ),
+          final who = (item.userName?.trim().isNotEmpty ?? false)
+              ? item.userName!.trim()
+              : 'System Admin';
+
+          final title = _toTitleCaseWords(type);
+          final changeText =
+              (item.oldQuantity != null && item.newQuantity != null)
+              ? ' • Change: ${item.oldQuantity} → ${item.newQuantity}'
+              : '';
+          final subtitle = 'By $who$changeText';
+
+          return _ssTile(
+            icon: _getActionIcon(type),
+            iconColor: _getIconColor(type),
+            iconBg: _getIconColor(type).withOpacity(0.12),
+            title: title,
+            subtitle: subtitle,
+            time: item.timestamp,
           );
         },
       ),

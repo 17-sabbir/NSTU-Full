@@ -1255,6 +1255,12 @@ class _InventoryManagementState extends State<InventoryManagement> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Inventory'),
+        backgroundColor: const Color(0xFF00695C),
+        foregroundColor: Colors.white,
+        centerTitle: true,
+      ),
       body: CustomScrollView(
         slivers: [
           // Header controls: category filter and add buttons

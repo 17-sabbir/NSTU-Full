@@ -87,8 +87,39 @@ class _ProfilePageState extends State<ProfilePage> {
     // _ageController.addListener(_checkChanges); // listen for age changes
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadProfile();
+      _verifyAndLoad();
     });
+  }
+
+  Future<void> _verifyAndLoad() async {
+    try {
+      // ignore: deprecated_member_use
+      final authKey = await client.authenticationKeyManager?.get();
+      if (authKey == null || authKey.isEmpty) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
+      String role = '';
+      try {
+        role = (await client.patient.getUserRole(0)).toUpperCase();
+      } catch (e) {
+        debugPrint('Failed to fetch user role: $e');
+      }
+
+      if (role != 'DOCTOR') {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
+      await _loadProfile();
+    } catch (e) {
+      debugPrint('Doctor profile auth check failed: $e');
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/');
+    }
   }
 
   @override
@@ -671,9 +702,22 @@ class _ProfilePageState extends State<ProfilePage> {
 
                 try {
                   final prefs = await SharedPreferences.getInstance();
-                  await prefs.remove('user_id');
-                  await prefs.remove('user_email');
-                  await prefs.remove('user_role');
+                  // Preserve device id so login doesn't require OTP again
+                  // just because user logged out.
+                  final preservedDeviceId = prefs.getString('device_id');
+                  await prefs.clear();
+                  if (preservedDeviceId != null &&
+                      preservedDeviceId.trim().isNotEmpty) {
+                    await prefs.setString(
+                      'device_id',
+                      preservedDeviceId.trim(),
+                    );
+                  }
+                } catch (_) {}
+
+                // Defensive: ensure any in-memory auth state is cleared too.
+                try {
+                  initServerpodClient();
                 } catch (_) {}
 
                 if (!mounted) return;

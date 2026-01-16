@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:intl/intl.dart';
 
@@ -11,8 +10,13 @@ class DispenseLogsScreen extends StatefulWidget {
 }
 
 class _DispenseLogsScreenState extends State<DispenseLogsScreen> {
-  List<InventoryAuditLog> _logs = [];
+  List<DispenseHistoryEntry> _dispenses = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = false;
+
+  static const int _pageSize = 10;
+  int _limit = _pageSize;
 
   @override
   void initState() {
@@ -20,28 +24,48 @@ class _DispenseLogsScreenState extends State<DispenseLogsScreen> {
     _loadHistory();
   }
 
-  Future<void> _loadHistory() async {
+  Future<void> _loadHistory({bool reset = false}) async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (reset) {
+      _limit = _pageSize;
+      setState(() {
+        _isLoading = true;
+        _isLoadingMore = false;
+      });
+    } else {
+      setState(() => _isLoading = true);
+    }
 
-    final prefs = await SharedPreferences.getInstance();
-    final userIdStr = prefs.getString('user_id');
-    final userId = int.tryParse(userIdStr ?? '');
+    try {
+      // Request one extra item to detect if there are more.
+      final result = await client.dispenser.getDispenserDispenseHistory(
+        limit: _limit + 1,
+      );
+      if (!mounted) return;
 
-    if (userId != null) {
-      try {
-        // ব্যাকএন্ড থেকে ডেটা ফেচ (আপনার এন্ডপয়েন্ট অনুযায়ী নাম চেক করে নিন)
-        final result = await client.dispenser.getDispenserHistory();
-        if (mounted) {
-          setState(() {
-            _logs = result;
-            _isLoading = false;
-          });
-        }
-      } catch (e) {
-        if (mounted) setState(() => _isLoading = false);
-        debugPrint("Error loading history: $e");
-      }
+      final hasMore = result.length > _limit;
+      final shown = hasMore ? result.take(_limit).toList() : result;
+
+      setState(() {
+        _dispenses = shown;
+        _hasMore = hasMore;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      debugPrint("Error loading history: $e");
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    setState(() => _isLoadingMore = true);
+    try {
+      _limit += _pageSize;
+      await _loadHistory();
+    } finally {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -51,76 +75,187 @@ class _DispenseLogsScreenState extends State<DispenseLogsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: _loadHistory,
-              child: _logs.isEmpty
+              onRefresh: () => _loadHistory(reset: true),
+              child: _dispenses.isEmpty
                   ? _buildEmptyState()
-                  : ListView.builder(
-                      itemCount: _logs.length,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      itemBuilder: (context, index) {
-                        final log = _logs[index];
-                        return _buildLogCard(log);
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final maxWidth = constraints.maxWidth;
+                        final isWide = maxWidth >= 900;
+                        final contentWidth = maxWidth > 980 ? 980.0 : maxWidth;
+
+                        final itemCount =
+                            _dispenses.length + (_hasMore ? 1 : 0);
+
+                        return Center(
+                          child: SizedBox(
+                            width: contentWidth,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: isWide
+                                  ? GridView.builder(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      gridDelegate:
+                                          const SliverGridDelegateWithFixedCrossAxisCount(
+                                            crossAxisCount: 2,
+                                            mainAxisSpacing: 12,
+                                            crossAxisSpacing: 12,
+                                            childAspectRatio: 2.1,
+                                          ),
+                                      itemCount: itemCount,
+                                      itemBuilder: (context, index) {
+                                        if (index >= _dispenses.length) {
+                                          return _buildLoadMoreCard();
+                                        }
+                                        return _buildDispenseCard(
+                                          _dispenses[index],
+                                        );
+                                      },
+                                    )
+                                  : ListView.builder(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      itemCount: itemCount,
+                                      itemBuilder: (context, index) {
+                                        if (index >= _dispenses.length) {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 6,
+                                              bottom: 14,
+                                            ),
+                                            child: _buildLoadMoreCard(),
+                                          );
+                                        }
+                                        return _buildDispenseCard(
+                                          _dispenses[index],
+                                        );
+                                      },
+                                    ),
+                            ),
+                          ),
+                        );
                       },
                     ),
             ),
     );
   }
 
-  Widget _buildLogCard(InventoryAuditLog log) {
-    bool isDispensed = log.action == 'DISPENSE';
-    Color actionColor = isDispensed ? Colors.orange : Colors.green;
-    IconData actionIcon = isDispensed ? Icons.outbox : Icons.add_business;
+  Widget _buildLoadMoreCard() {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _isLoadingMore ? 'Loading...' : 'Load more',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (_isLoadingMore)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              ElevatedButton(
+                onPressed: _loadMore,
+                child: const Text('Load more'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  Widget _buildDispenseCard(DispenseHistoryEntry d) {
     return Card(
       elevation: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: actionColor.withOpacity(0.1),
-          child: Icon(actionIcon, color: actionColor),
-        ),
-        title: Text(
-          log.userName ?? 'Unknown Item', // এখানে আইটেম নাম দেখাবে
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        subtitle: Column(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 4),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    log.action,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: actionColor,
-                    ),
+                CircleAvatar(
+                  backgroundColor: Colors.orange.withOpacity(0.1),
+                  child: const Icon(Icons.outbox, color: Colors.orange),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        d.patientName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Rx #${d.prescriptionId} • ${d.mobileNumber}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 10),
+
                 Text(
-                  "Stock: ${log.oldQuantity} → ${log.newQuantity}",
-                  style: const TextStyle(fontSize: 13, color: Colors.black87),
+                  DateFormat('dd MMM yyyy').format(d.dispensedAt),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              DateFormat('dd MMM yyyy • hh:mm a').format(log.timestamp),
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-            ),
+            const SizedBox(height: 10),
+            if (d.items.isEmpty)
+              Text('No items', style: TextStyle(color: Colors.grey.shade700))
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: d.items.map((it) {
+                  final label = '${it.medicineName} × ${it.quantity}';
+                  final color = it.isAlternative ? Colors.purple : Colors.blue;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: color.withOpacity(0.25)),
+                    ),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
           ],
         ),
       ),

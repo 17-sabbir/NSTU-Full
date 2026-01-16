@@ -19,6 +19,15 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
   bool _loading = true;
   pw.Font? _englishFont;
 
+  DateTime? _medicineFromDate;
+  DateTime? _medicineToDate;
+  Set<DateTime>? _medicineAvailableDates;
+  bool _medicineDatesLoading = false;
+
+  final ScrollController _labMonthsScrollController = ScrollController();
+  final ScrollController _labChartScrollController = ScrollController();
+  final ScrollController _stockReportScrollController = ScrollController();
+
   static const List<String> _months = [
     'Jan',
     'Feb',
@@ -52,6 +61,115 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
     _loadFont();
   }
 
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  String _fmtDate(DateTime d) => d.toString().split(' ').first;
+
+  Future<void> _ensureMedicineAvailableDatesLoaded() async {
+    if (_medicineAvailableDates != null) return;
+    if (_medicineDatesLoading) return;
+
+    setState(() => _medicineDatesLoading = true);
+    try {
+      final dates = await client.adminReportEndpoints
+          .getDispensedAvailableDates();
+      final normalized = dates.map(_dateOnly).toSet();
+      if (!mounted) return;
+      setState(() {
+        _medicineAvailableDates = normalized;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load available dates: $e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() => _medicineDatesLoading = false);
+    }
+  }
+
+  Future<void> _pickMedicineFromDate() async {
+    await _ensureMedicineAvailableDatesLoaded();
+    final set = _medicineAvailableDates;
+    if (set == null || set.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No medicine usage data found.')),
+      );
+      return;
+    }
+
+    final sorted = set.toList()..sort();
+    final first = sorted.first;
+    final last = sorted.last;
+    final initial = _medicineFromDate ?? last;
+
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: first,
+      lastDate: last,
+      initialDate: initial.isBefore(first)
+          ? first
+          : (initial.isAfter(last) ? last : initial),
+      selectableDayPredicate: (day) => set.contains(_dateOnly(day)),
+    );
+    if (picked == null) return;
+
+    final from = _dateOnly(picked);
+    setState(() {
+      _medicineFromDate = from;
+      if (_medicineToDate != null && _medicineToDate!.isBefore(from)) {
+        _medicineToDate = from;
+      }
+    });
+  }
+
+  Future<void> _pickMedicineToDate() async {
+    await _ensureMedicineAvailableDatesLoaded();
+    final set = _medicineAvailableDates;
+    if (set == null || set.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No medicine usage data found.')),
+      );
+      return;
+    }
+
+    final from = _medicineFromDate;
+    if (from == null) return;
+
+    final sorted = set.toList()..sort();
+    final last = sorted.last;
+
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: from,
+      lastDate: last,
+      initialDate: (_medicineToDate ?? from).isAfter(last)
+          ? last
+          : (_medicineToDate ?? from),
+      selectableDayPredicate: (day) {
+        final d = _dateOnly(day);
+        if (d.isBefore(from)) return false;
+        return set.contains(d);
+      },
+    );
+    if (picked == null) return;
+
+    setState(() {
+      _medicineToDate = _dateOnly(picked);
+    });
+  }
+
+  @override
+  void dispose() {
+    _labMonthsScrollController.dispose();
+    _labChartScrollController.dispose();
+    _stockReportScrollController.dispose();
+    super.dispose();
+  }
+
   Future<void> _exportDashboardAsPDF() async {
     if (_analytics == null) return;
 
@@ -79,6 +197,7 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
         }
         print("Current Admin ID: $currentUser");
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('No current user ID found in SharedPreferences!'),
@@ -94,6 +213,61 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
     }
   }
 
+  Future<void> _exportMedicinesByDateRangeAsPDF() async {
+    if (_englishFont == null) {
+      await _loadFont();
+    }
+
+    final from = _medicineFromDate;
+    final to = _medicineToDate;
+    if (from == null || to == null) return;
+    if (to.isBefore(from)) return;
+
+    final toExclusive = _dateOnly(to).add(const Duration(days: 1));
+
+    try {
+      final items = await client.adminReportEndpoints
+          .getMedicineStockUsageByDateRange(from, toExclusive);
+
+      final labTests = await client.adminReportEndpoints
+          .getLabTestTotalsByDateRange(from, toExclusive);
+
+      await ExportService.exportMedicineStockUsageRangeAsPDF(
+        items: items,
+        labTests: labTests,
+        from: from,
+        to: to,
+        font: _englishFont!,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _medicineFromDate = null;
+        _medicineToDate = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Date range report exported.')),
+      );
+
+      final currentUser = await getCurrentUserId();
+      final currentUserId = int.tryParse(currentUser ?? '');
+      if (currentUserId != null) {
+        await client.adminEndpoints.createAuditLog(
+          adminId: currentUserId,
+          action: 'EXPORT_MEDICINE_RANGE_PDF',
+          targetId:
+              '${from.toIso8601String()}..${toExclusive.toIso8601String()}',
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to export medicine report: $e')),
+      );
+    }
+  }
+
   // Future<void> _exportDashboardAsWord() async {
   //   if (_analytics == null) return;
   //
@@ -105,6 +279,7 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
   // }
   Future<void> _fetchAnalytics() async {
     try {
+      if (!mounted) return;
       setState(() => _loading = true);
       final data = await client.adminReportEndpoints.getDashboardAnalytics();
       // debugPrint('Raw dashboard analytics: $data');
@@ -128,12 +303,15 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
 
       // Replace original monthlyBreakdown with full list
       data.monthlyBreakdown = fullMonthlyBreakdown;
+
+      if (!mounted) return;
       setState(() {
         _analytics = data;
         _loading = false;
       });
     } catch (e) {
       debugPrint('Error fetching analytics: $e');
+      if (!mounted) return;
       setState(() => _loading = false);
     }
   }
@@ -527,11 +705,11 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
     Widget barChartInteractive() {
       if (_analytics == null) return const SizedBox.shrink();
 
-      // Find max revenue for scaling
+      // Find max total amount for scaling
       final maxRevenue = _analytics!.monthlyBreakdown
           .map((m) => m.revenue.toDouble())
           .fold<double>(0, (prev, val) => val > prev ? val : prev);
-      debugPrint('Max revenue: $maxRevenue');
+      final yInterval = maxRevenue <= 0 ? 2.0 : (maxRevenue / 5);
 
       return BarChart(
         BarChartData(
@@ -542,10 +720,10 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 40,
-                interval: maxRevenue / 5,
+                interval: yInterval,
                 getTitlesWidget: (value, meta) {
                   return Text(
-                    value.toInt().toString(), // Y-axis shows revenue
+                    '${value.toInt()} taka',
                     style: const TextStyle(color: Colors.black54, fontSize: 12),
                   );
                 },
@@ -607,6 +785,12 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
 
     return Scaffold(
       backgroundColor: bg,
+      appBar: AppBar(
+        title: const Text('Reports & Analytics'),
+        backgroundColor: const Color(0xFF00695C),
+        foregroundColor: Colors.white,
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -757,7 +941,27 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
                     'Lab Tests',
                     subtitle: 'Click a month to see breakdown',
                   ),
-                  SizedBox(height: 300, child: barChartInteractive()),
+                  SizedBox(
+                    height: 320,
+                    child: Scrollbar(
+                      controller: _labChartScrollController,
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        controller: _labChartScrollController,
+                        scrollDirection: Axis.horizontal,
+                        child: SizedBox(
+                          width: isWide
+                              ? MediaQuery.of(context).size.width - 64
+                              : 720,
+                          height: 300,
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: barChartInteractive(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   Row(
                     children: [
                       Expanded(
@@ -768,7 +972,21 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Row(children: List.generate(12, (i) => _monthDot(i))),
+                      SizedBox(
+                        height: 32,
+                        width: isWide ? 320 : 220,
+                        child: Scrollbar(
+                          controller: _labMonthsScrollController,
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            controller: _labMonthsScrollController,
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: List.generate(12, (i) => _monthDot(i)),
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   monthBreakdownPanel(),
@@ -792,10 +1010,7 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  sectionTitle(
-                    'Stock Report',
-                    subtitle: 'Previous vs current vs usage',
-                  ),
+                  sectionTitle('Stock Report', subtitle: 'Current vs usage'),
                   const SizedBox(height: 6),
                   if (_analytics?.stockReport == null ||
                       _analytics!.stockReport.isEmpty)
@@ -806,100 +1021,144 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
                       ),
                     )
                   else
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minWidth: isWide
-                              ? MediaQuery.of(context).size.width - 64
-                              : 800,
-                        ),
-                        child: DataTable(
-                          headingRowColor: WidgetStateProperty.all(
-                            Colors.grey[50],
-                          ),
-                          columns: const [
-                            DataColumn(
-                              label: Text(
-                                'Medicine',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Previous',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Current',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Used',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                'Status',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                          rows: _analytics!.stockReport.map((item) {
-                            // Logic for Status/Place
-                            // Calculate percentage: (Current / Previous) * 100
-                            final double percentage = item.previous > 0
-                                ? (item.current / item.previous) * 100
-                                : 0;
+                    Builder(
+                      builder: (context) {
+                        final stockRows = List<StockReport>.from(
+                          _analytics!.stockReport,
+                        );
+                        int severity(StockReport s) {
+                          if (s.current <= 0) return 0; // out of stock
+                          final denom = (s.used + s.current).toDouble();
+                          final usedRate = denom <= 0
+                              ? 0.0
+                              : (s.used / denom) * 100;
+                          if (usedRate >= 70)
+                            return 1; // low (high usage vs remaining)
+                          return 2; // good
+                        }
 
-                            final bool isLow = percentage < 30;
+                        stockRows.sort((a, b) {
+                          final sa = severity(a);
+                          final sb = severity(b);
+                          if (sa != sb) return sa.compareTo(sb);
+                          final c = a.current.compareTo(b.current);
+                          if (c != 0) return c;
+                          return a.itemName.toLowerCase().compareTo(
+                            b.itemName.toLowerCase(),
+                          );
+                        });
 
-                            return DataRow(
-                              cells: [
-                                DataCell(
-                                  Text(
-                                    item.itemName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                        return Scrollbar(
+                          controller: _stockReportScrollController,
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            controller: _stockReportScrollController,
+                            scrollDirection: Axis.horizontal,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minWidth: isWide
+                                    ? MediaQuery.of(context).size.width - 64
+                                    : 650,
+                              ),
+                              child: DataTable(
+                                headingRowColor: WidgetStateProperty.all(
+                                  Colors.grey[50],
                                 ),
-                                DataCell(Text('${item.previous}')),
-                                DataCell(Text('${item.current}')),
-                                DataCell(Text('${item.previous-item.current}')),
-                                DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: (isLow ? Colors.red : Colors.green)
-                                          .withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      '${isLow ? "Low" : "Good"} (${percentage.toStringAsFixed(0)}%)',
+                                columns: const [
+                                  DataColumn(
+                                    label: Text(
+                                      'Inventory Item',
                                       style: TextStyle(
-                                        color: isLow
-                                            ? Colors.red
-                                            : Colors.green,
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 12,
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
-                        ),
-                      ),
+                                  DataColumn(
+                                    label: Text(
+                                      'Current',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataColumn(
+                                    label: Text(
+                                      'Used',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataColumn(
+                                    label: Text(
+                                      'Status',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                rows: stockRows.map((item) {
+                                  final denom = (item.used + item.current)
+                                      .toDouble();
+                                  final double usedRate = denom <= 0
+                                      ? 0.0
+                                      : (item.used / denom) * 100;
+
+                                  final bool isOut = item.current <= 0;
+                                  final bool isLow = !isOut && usedRate >= 70;
+
+                                  final Color statusColor = isOut
+                                      ? Colors.grey
+                                      : (isLow ? Colors.red : Colors.green);
+                                  final String statusText = isOut
+                                      ? 'Out'
+                                      : (isLow ? 'Low' : 'Good');
+
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(
+                                        Text(
+                                          item.itemName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      DataCell(Text('${item.current}')),
+                                      DataCell(Text('${item.used}')),
+                                      DataCell(
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: statusColor.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '$statusText (${usedRate.toStringAsFixed(0)}%)',
+                                            style: TextStyle(
+                                              color: statusColor,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                 ],
               ),
@@ -907,30 +1166,101 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
 
             // NEW: Move Export buttons to bottom under Stock Report
             const SizedBox(height: 18),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _exportDashboardAsPDF,
-                  icon: const Icon(Icons.picture_as_pdf),
-                  label: const Text(
-                    'Export as PDF',
-                    style: TextStyle(color: Colors.white),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // 1st row: Export as PDF
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton.icon(
+                      onPressed: _exportDashboardAsPDF,
+                      icon: const Icon(Icons.picture_as_pdf),
+                      label: const Text(
+                        'Export as PDF',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                      ),
+                    ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
+                  const SizedBox(height: 10),
+
+                  // 2nd row: From date → To date
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: _medicineDatesLoading
+                              ? null
+                              : _pickMedicineFromDate,
+                          icon: _medicineDatesLoading
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.event),
+                          label: Text(
+                            _medicineFromDate == null
+                                ? 'From date'
+                                : 'From: ${_fmtDate(_medicineFromDate!)}',
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E7DFF),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                        FilledButton.icon(
+                          onPressed:
+                              (_medicineFromDate == null ||
+                                  _medicineDatesLoading)
+                              ? null
+                              : _pickMedicineToDate,
+                          icon: const Icon(Icons.event_available),
+                          label: Text(
+                            _medicineToDate == null
+                                ? 'To date'
+                                : 'To: ${_fmtDate(_medicineToDate!)}',
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF00BFA6),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                // const SizedBox(width: 12),
-                // ElevatedButton.icon(
-                //   onPressed: (){},
-                //   icon: const Icon(Icons.file_copy),
-                //   label: const Text('Export as Word'),
-                //   style: ElevatedButton.styleFrom(
-                //     backgroundColor: Colors.blueAccent,
-                //   ),
-                // ),
-              ],
+                  const SizedBox(height: 10),
+
+                  // 3rd row: Date range export
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton.icon(
+                      onPressed:
+                          (_medicineFromDate == null || _medicineToDate == null)
+                          ? null
+                          : _exportMedicinesByDateRangeAsPDF,
+                      icon: const Icon(Icons.date_range),
+                      label: const Text(
+                        'Date Range (Medicines + Lab Tests)',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -963,20 +1293,31 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
 
   Widget _monthDot(int index) {
     final selected = _selectedMonthIndex == index;
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: () => setState(() => _selectedMonthIndex = index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        width: selected ? 18 : 10,
-        height: selected ? 18 : 10,
-        decoration: BoxDecoration(
-          color: selected
-              ? const Color(0xFF00BFA6)
-              : Colors.black.withValues(alpha: 0.18),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Tooltip(
+        message: _months[index],
+        child: InkWell(
           borderRadius: BorderRadius.circular(999),
+          onTap: () => setState(() => _selectedMonthIndex = index),
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                width: selected ? 20 : 14,
+                height: selected ? 20 : 14,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? const Color(0xFF00BFA6)
+                      : Colors.black.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

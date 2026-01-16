@@ -213,7 +213,7 @@ class _PatientLabTestAvailabilityState
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Fee: ${feeVal.toStringAsFixed(2)}৳',
+                              'Fee: ${feeVal.toStringAsFixed(2)} taka',
                               style: const TextStyle(color: Colors.black87),
                             ),
                             Text(
@@ -246,7 +246,7 @@ class _PatientLabTestAvailabilityState
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                'Fee: ${feeVal.toStringAsFixed(2)}৳',
+                                                'Fee: ${feeVal.toStringAsFixed(2)} taka',
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.w600,
                                                 ),
