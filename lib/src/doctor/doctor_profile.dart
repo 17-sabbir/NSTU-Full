@@ -676,72 +676,64 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // Navigate to rostering system
 
-  // Added: show logout confirmation dialog and perform logout
-  void _confirmLogout() {
-    showDialog(
+  Future<void> _performLogout() async {
+    try {
+      try {
+        await client.auth.logout();
+      } catch (_) {}
+
+      try {
+        // ignore: deprecated_member_use
+        await client.authenticationKeyManager?.remove();
+      } catch (_) {}
+
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        // Preserve device id so login doesn't require OTP again
+        // just because user logged out.
+        final preservedDeviceId = prefs.getString('device_id');
+        await prefs.clear();
+        if (preservedDeviceId != null && preservedDeviceId.trim().isNotEmpty) {
+          await prefs.setString('device_id', preservedDeviceId.trim());
+        }
+      } catch (_) {}
+
+      // Defensive: ensure any in-memory auth state is cleared too.
+      try {
+        initServerpodClient();
+      } catch (_) {}
+
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Logout failed')));
+    }
+  }
+
+  Future<void> _confirmLogout() async {
+    final shouldLogout = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Logout"),
-        content: const Text("Are you sure you want to log out?"),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to log out?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context); // close dialog
-              () async {
-                try {
-                  try {
-                    await client.auth.logout();
-                  } catch (_) {}
-                  // ignore: deprecated_member_use
-                  await client.authenticationKeyManager?.remove();
-                } catch (_) {}
-
-                try {
-                  final prefs = await SharedPreferences.getInstance();
-                  // Preserve device id so login doesn't require OTP again
-                  // just because user logged out.
-                  final preservedDeviceId = prefs.getString('device_id');
-                  await prefs.clear();
-                  if (preservedDeviceId != null &&
-                      preservedDeviceId.trim().isNotEmpty) {
-                    await prefs.setString(
-                      'device_id',
-                      preservedDeviceId.trim(),
-                    );
-                  }
-                } catch (_) {}
-
-                // Defensive: ensure any in-memory auth state is cleared too.
-                try {
-                  initServerpodClient();
-                } catch (_) {}
-
-                if (!mounted) return;
-                // ignore: use_build_context_synchronously
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Logged out successfully"),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-
-                Navigator.pushNamedAndRemoveUntil(
-                  // ignore: use_build_context_synchronously
-                  context,
-                  '/',
-                  (route) => false,
-                );
-              }();
-            },
-            child: const Text("Logout", style: TextStyle(color: Colors.red)),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Logout', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
+
+    if (shouldLogout != true) return;
+    await _performLogout();
   }
 
   Widget safeNetworkImage({
