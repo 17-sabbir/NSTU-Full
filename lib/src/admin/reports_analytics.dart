@@ -229,8 +229,10 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
       final items = await client.adminReportEndpoints
           .getMedicineStockUsageByDateRange(from, toExclusive);
 
-      final labTests = await client.adminReportEndpoints
-          .getLabTestTotalsByDateRange(from, toExclusive);
+      final labTests = await _computeLabTestTotalsByDateRange(
+        from: from,
+        toExclusive: toExclusive,
+      );
 
       await ExportService.exportMedicineStockUsageRangeAsPDF(
         items: items,
@@ -266,6 +268,59 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
         SnackBar(content: Text('Failed to export medicine report: $e')),
       );
     }
+  }
+
+  Future<List<LabTestRangeRow>> _computeLabTestTotalsByDateRange({
+    required DateTime from,
+    required DateTime toExclusive,
+  }) async {
+    final tests = await client.lab.getAllLabTests();
+    final results = await client.lab.getAllTestResults();
+
+    final Map<int, LabTests> byId = {
+      for (final t in tests)
+        if (t.id != null) t.id!: t,
+    };
+
+    double feeFor(LabTests test, String patientType) {
+      final type = patientType.trim().toUpperCase();
+      if (type == 'TEACHER') return test.teacherFee;
+      if (type == 'OUTSIDE') return test.outsideFee;
+      return test.studentFee;
+    }
+
+    final Map<int, int> counts = {};
+    final Map<int, double> totals = {};
+
+    for (final r in results) {
+      final createdAt = r.createdAt;
+      if (createdAt == null) continue;
+      if (createdAt.isBefore(from) || !createdAt.isBefore(toExclusive)) {
+        continue;
+      }
+
+      final test = byId[r.testId];
+      if (test == null) continue;
+
+      counts[r.testId] = (counts[r.testId] ?? 0) + 1;
+      totals[r.testId] = (totals[r.testId] ?? 0) + feeFor(test, r.patientType);
+    }
+
+    final rows = <LabTestRangeRow>[];
+    for (final entry in counts.entries) {
+      final testId = entry.key;
+      final test = byId[testId];
+      final testName = test?.testName ?? 'Test #$testId';
+      rows.add(
+        LabTestRangeRow(
+          testName: testName,
+          count: entry.value,
+          totalAmount: totals[testId] ?? 0,
+        ),
+      );
+    }
+
+    return rows;
   }
 
   // Future<void> _exportDashboardAsWord() async {
@@ -1032,8 +1087,9 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
                           final usedRate = denom <= 0
                               ? 0.0
                               : (s.used / denom) * 100;
-                          if (usedRate >= 70)
+                          if (usedRate >= 70) {
                             return 1; // low (high usage vs remaining)
+                          }
                           return 2; // good
                         }
 

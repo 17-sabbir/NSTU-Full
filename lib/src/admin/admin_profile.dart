@@ -631,7 +631,8 @@ class _AdminProfileState extends State<AdminProfile> {
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      constraints: const BoxConstraints(minHeight: 150),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         children: [
           Stack(
@@ -649,7 +650,7 @@ class _AdminProfileState extends State<AdminProfile> {
                   ],
                 ),
                 child: CircleAvatar(
-                  radius: 50,
+                  radius: 36,
                   backgroundColor: Colors.white.withAlpha(30),
                   backgroundImage: _imageBytes != null
                       ? MemoryImage(_imageBytes!) as ImageProvider
@@ -661,7 +662,7 @@ class _AdminProfileState extends State<AdminProfile> {
                       (_imageBytes == null &&
                           (_profilePictureUrl == null ||
                               _profilePictureUrl!.isEmpty))
-                      ? const Icon(Icons.person, size: 50, color: Colors.white)
+                      ? const Icon(Icons.person, size: 36, color: Colors.white)
                       : null,
                 ),
               ),
@@ -696,13 +697,13 @@ class _AdminProfileState extends State<AdminProfile> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Text(
             _nameCtrl.text.isNotEmpty
                 ? _nameCtrl.text
                 : (name.isNotEmpty ? name : 'Unnamed'),
             style: const TextStyle(
-              fontSize: 22,
+              fontSize: 19,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
@@ -710,7 +711,7 @@ class _AdminProfileState extends State<AdminProfile> {
           const SizedBox(height: 4),
           Text(
             email.isNotEmpty ? email : '',
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
         ],
       ),

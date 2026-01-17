@@ -6,6 +6,229 @@ import 'package:printing/printing.dart';
 import 'package:backend_client/backend_client.dart';
 
 class ExportService {
+  static const String _dash = '—';
+
+  static String _two(int n) => n.toString().padLeft(2, '0');
+
+  static String _fmtDate(DateTime d) =>
+      '${d.year}-${_two(d.month)}-${_two(d.day)}';
+
+  static String _fmtDateTime(DateTime d) {
+    return '${d.year}-${_two(d.month)}-${_two(d.day)} '
+        '${_two(d.hour)}:${_two(d.minute)}';
+  }
+
+  /// UI-only helper model for Inventory Transactions PDF export.
+  ///
+  /// Note: This is intentionally not a Serverpod protocol type.
+  /// It is built client-side from existing endpoints.
+  static InventoryTransactionReportRow inventoryTxRow({
+    required DateTime time,
+    required String itemName,
+    required String unit,
+    required String type,
+    required int quantity,
+  }) {
+    return InventoryTransactionReportRow(
+      time: time,
+      itemName: itemName,
+      unit: unit,
+      type: type,
+      quantity: quantity,
+    );
+  }
+
+  static Future<void> exportInventoryTransactionsRangeAsPDF({
+    required List<InventoryTransactionReportRow> rows,
+    required DateTime from,
+    required DateTime to,
+    required pw.Font font,
+  }) async {
+    final pdf = pw.Document();
+
+    final baseStyle = pw.TextStyle(font: font);
+    final h1 = baseStyle.copyWith(fontSize: 20, fontWeight: pw.FontWeight.bold);
+    final h2 = baseStyle.copyWith(fontSize: 14, fontWeight: pw.FontWeight.bold);
+    final smallMuted = baseStyle.copyWith(
+      fontSize: 9,
+      color: PdfColors.grey600,
+    );
+
+    pw.Widget tableCell(String text, {bool isHeader = false}) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.all(8),
+        child: pw.Text(
+          text,
+          style: isHeader
+              ? baseStyle.copyWith(fontWeight: pw.FontWeight.bold)
+              : baseStyle.copyWith(fontSize: 10),
+        ),
+      );
+    }
+
+    final safeRows = List<InventoryTransactionReportRow>.from(rows)
+      ..sort((a, b) => b.time.compareTo(a.time));
+
+    final Map<String, _InventoryAgg> byItem = {};
+    for (final r in safeRows) {
+      final name = r.itemName.trim().isEmpty ? _dash : r.itemName.trim();
+      final unit = r.unit.trim().isEmpty ? _dash : r.unit.trim();
+      final key = '$name|$unit';
+      final agg = byItem.putIfAbsent(
+        key,
+        () => _InventoryAgg(name: name, unit: unit),
+      );
+      final t = r.type.toUpperCase().trim();
+      if (t == 'IN') {
+        agg.totalIn += r.quantity;
+      } else if (t == 'OUT') {
+        agg.totalOut += r.quantity;
+      }
+      agg.entries += 1;
+    }
+
+    final perItem = byItem.values.toList()
+      ..sort((a, b) {
+        final outCmp = b.totalOut.compareTo(a.totalOut);
+        if (outCmp != 0) return outCmp;
+        final inCmp = b.totalIn.compareTo(a.totalIn);
+        if (inCmp != 0) return inCmp;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+
+    int totalIn = 0;
+    int totalOut = 0;
+    for (final r in safeRows) {
+      if (r.type.toUpperCase() == 'IN') {
+        totalIn += r.quantity;
+      } else if (r.type.toUpperCase() == 'OUT') {
+        totalOut += r.quantity;
+      }
+    }
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(54),
+          theme: pw.ThemeData.withFont(base: font, bold: font),
+        ),
+        header: (_) => pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'Dishari - Inventory Transactions',
+              style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Text(
+              'Generated: ${_fmtDate(DateTime.now())}',
+              style: smallMuted,
+            ),
+          ],
+        ),
+        build: (_) {
+          return [
+            pw.SizedBox(height: 12),
+            pw.Text('Inventory Transactions (Date Range)', style: h1),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              'From: ${_fmtDate(from)}    To: ${_fmtDate(to)}',
+              style: smallMuted,
+            ),
+            pw.SizedBox(height: 16),
+            pw.Text('Summary', style: h2),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              'Total entries: ${safeRows.length}',
+              style: baseStyle.copyWith(fontSize: 11),
+            ),
+            pw.Text(
+              'Total IN: $totalIn    Total OUT: $totalOut    Net: ${totalIn - totalOut}',
+              style: baseStyle.copyWith(fontSize: 11),
+            ),
+            pw.SizedBox(height: 14),
+            pw.Text('Per-item Summary', style: h2),
+            pw.SizedBox(height: 6),
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(2.8),
+                1: const pw.FlexColumnWidth(1.0),
+                2: const pw.FlexColumnWidth(0.9),
+                3: const pw.FlexColumnWidth(0.9),
+                4: const pw.FlexColumnWidth(0.9),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                  children: [
+                    tableCell('Item', isHeader: true),
+                    tableCell('Unit', isHeader: true),
+                    tableCell('IN', isHeader: true),
+                    tableCell('OUT', isHeader: true),
+                    tableCell('NET', isHeader: true),
+                  ],
+                ),
+                ...perItem.map((a) {
+                  final net = a.totalIn - a.totalOut;
+                  return pw.TableRow(
+                    children: [
+                      tableCell(a.name),
+                      tableCell(a.unit),
+                      tableCell(a.totalIn.toString()),
+                      tableCell(a.totalOut.toString()),
+                      tableCell(net.toString()),
+                    ],
+                  );
+                }),
+              ],
+            ),
+            pw.SizedBox(height: 14),
+            pw.Text('Transactions', style: h2),
+            pw.SizedBox(height: 6),
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(1.35),
+                1: const pw.FlexColumnWidth(2.6),
+                2: const pw.FlexColumnWidth(0.85),
+                3: const pw.FlexColumnWidth(0.9),
+                4: const pw.FlexColumnWidth(1.0),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                  children: [
+                    tableCell('Date/Time', isHeader: true),
+                    tableCell('Item', isHeader: true),
+                    tableCell('Type', isHeader: true),
+                    tableCell('Qty', isHeader: true),
+                    tableCell('Unit', isHeader: true),
+                  ],
+                ),
+                ...safeRows.map((r) {
+                  final type = r.type.toUpperCase();
+                  final qty = r.quantity;
+                  return pw.TableRow(
+                    children: [
+                      tableCell(_fmtDateTime(r.time)),
+                      tableCell(r.itemName.isEmpty ? _dash : r.itemName),
+                      tableCell(type.isEmpty ? _dash : type),
+                      tableCell(qty.toString()),
+                      tableCell(r.unit.isEmpty ? _dash : r.unit),
+                    ],
+                  );
+                }),
+              ],
+            ),
+          ];
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+  }
+
   static Future<void> exportMedicineStockUsageRangeAsPDF({
     required List<MedicineStockRangeRow> items,
     List<LabTestRangeRow>? labTests,
@@ -84,23 +307,26 @@ class ExportService {
             pw.SizedBox(height: 6),
             pw.Table(
               border: pw.TableBorder.all(color: PdfColors.grey300),
+              columnWidths: const {
+                0: pw.FlexColumnWidth(3.2),
+                1: pw.FlexColumnWidth(1.3),
+                2: pw.FlexColumnWidth(1.8),
+              },
               children: [
                 pw.TableRow(
                   decoration: const pw.BoxDecoration(color: PdfColors.grey100),
                   children: [
                     tableCell('Medicine', isHeader: true),
-                    tableCell('From Qty', isHeader: true),
-                    tableCell('Used', isHeader: true),
-                    tableCell('To Qty', isHeader: true),
+                    tableCell('Current', isHeader: true),
+                    tableCell('Date Range Used', isHeader: true),
                   ],
                 ),
                 ...safeItems.map(
                   (m) => pw.TableRow(
                     children: [
                       tableCell(m.medicineName),
-                      tableCell(m.fromQuantity.toString()),
-                      tableCell(m.used.toString()),
                       tableCell(m.toQuantity.toString()),
+                      tableCell(m.used.toString()),
                     ],
                   ),
                 ),
@@ -693,4 +919,30 @@ class ExportService {
 
     await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
+}
+
+class InventoryTransactionReportRow {
+  InventoryTransactionReportRow({
+    required this.time,
+    required this.itemName,
+    required this.unit,
+    required this.type,
+    required this.quantity,
+  });
+
+  final DateTime time;
+  final String itemName;
+  final String unit;
+  final String type;
+  final int quantity;
+}
+
+class _InventoryAgg {
+  _InventoryAgg({required this.name, required this.unit});
+
+  final String name;
+  final String unit;
+  int totalIn = 0;
+  int totalOut = 0;
+  int entries = 0;
 }

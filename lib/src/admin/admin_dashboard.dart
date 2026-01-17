@@ -264,7 +264,8 @@ class AdminDashboardState extends State<AdminDashboard> {
         _loadAdminProfile();
       },
       child: Container(
-        padding: const EdgeInsets.all(16),
+        constraints: const BoxConstraints(minHeight: 110),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF00695C), Color(0xFF4DB6AC)],
@@ -280,73 +281,88 @@ class AdminDashboardState extends State<AdminDashboard> {
             ),
           ],
         ),
-        child: Row(
-          children: [
-            _isLoadingProfile
-                ? const CircleAvatar(
-                    backgroundColor: Colors.white,
-                    radius: 30,
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF00695C),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Row(
+            children: [
+              _isLoadingProfile
+                  ? const CircleAvatar(
+                      backgroundColor: Colors.white,
+                      radius: 24,
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF00695C),
+                        ),
+                      ),
+                    )
+                  : (_profilePictureUrl != null &&
+                        _profilePictureUrl!.isNotEmpty)
+                  ? CircleAvatar(
+                      backgroundColor: Colors.white,
+                      radius: 24,
+                      backgroundImage: NetworkImage(_profilePictureUrl!),
+                      onBackgroundImageError: (_, __) {},
+                      child: null,
+                    )
+                  : CircleAvatar(
+                      backgroundColor: Colors.white,
+                      radius: 24,
+                      child: Text(
+                        initials,
+                        style: const TextStyle(
+                          color: Color(0xFF00695C),
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  )
-                : (_profilePictureUrl != null && _profilePictureUrl!.isNotEmpty)
-                ? CircleAvatar(
-                    backgroundColor: Colors.white,
-                    radius: 30,
-                    backgroundImage: NetworkImage(_profilePictureUrl!),
-                    onBackgroundImageError: (_, __) {},
-                    child: null,
-                  )
-                : CircleAvatar(
-                    backgroundColor: Colors.white,
-                    radius: 30,
-                    child: Text(
-                      initials,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isLoadingProfile ? 'Loading...' : _adminName,
                       style: const TextStyle(
-                        color: Color(0xFF00695C),
-                        fontSize: 20,
+                        color: Colors.white,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _isLoadingProfile ? 'Loading...' : _adminName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 4),
+                    Text(
+                      _isLoadingProfile ? '' : _adminEmail,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _isLoadingProfile ? '' : _adminEmail,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    designationText,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      designationText,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Spacer(),
-            const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 20),
-          ],
+              const SizedBox(width: 12),
+              const Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.white,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );

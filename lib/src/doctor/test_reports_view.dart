@@ -616,20 +616,62 @@ class _TestReportsViewState extends State<TestReportsView> {
                               ? Uri.parse(raw).pathSegments.last
                               : 'report_${DateTime.now().millisecondsSinceEpoch}';
 
-                          await downloadPdfImageFromLink(
-                            url: raw,
-                            fileName: suggestedName,
-                            context: context,
-                          );
+                          try {
+                            await downloadPdfImageFromLink(
+                              url: raw,
+                              fileName: suggestedName,
+                              context: context,
+                            );
 
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Saved to Downloads (or browser downloads).',
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Saved to Downloads (or browser downloads).',
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          } catch (e) {
+                            if (!mounted) return;
+                            if (e is CloudinaryPdfDeliveryBlockedException) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Cloudinary blocked this PDF. If you are on a Free plan, enable “Allow delivery of PDF and ZIP files” in Cloudinary Console → Settings → Security, or upgrade your plan.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+
+                            if (e is DownloadHttpException &&
+                                e.statusCode == 401) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Unauthorized (401). If this is a Cloudinary PDF, check Cloudinary Security settings (PDF delivery can be blocked on Free plan).',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+
+                            final msg = e.toString();
+                            if (msg.contains('401') ||
+                                msg.toLowerCase().contains('unauthorized')) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Unauthorized (401). Please login again.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Download failed: $e')),
+                            );
+                          }
                         },
                         icon: const Icon(Icons.download),
                         label: const Text('Download'),

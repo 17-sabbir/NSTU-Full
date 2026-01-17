@@ -92,7 +92,41 @@ class _PatientReportsState extends State<PatientReports> {
           content: Text('Saved to Downloads (or browser downloads).'),
         ),
       );
+    } on CloudinaryPdfDeliveryBlockedException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Cloudinary blocked this PDF. If you are on a Free plan, enable “Allow delivery of PDF and ZIP files” in Cloudinary Console → Settings → Security, or upgrade your plan.',
+          ),
+        ),
+      );
+      return;
+    } on DownloadHttpException catch (e) {
+      if (e.statusCode == 401) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unauthorized (401). If this is a Cloudinary PDF, check Cloudinary Security settings (PDF delivery can be blocked on Free plan).',
+            ),
+          ),
+        );
+        return;
+      }
+      rethrow;
     } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('401') || msg.toLowerCase().contains('unauthorized')) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unauthorized (401). Please login again.'),
+          ),
+        );
+        return;
+      }
+
       // Fallback: open in external app/browser.
       final dl = buildCloudinaryAttachmentUrl(url);
       await launchUrl(Uri.parse(dl), mode: LaunchMode.externalApplication);

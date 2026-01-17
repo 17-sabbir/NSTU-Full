@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:backend_client/backend_client.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
@@ -8,6 +9,39 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:universal_html/html.dart' as html;
 import 'package:universal_io/io.dart' as uio;
+
+class DownloadHttpException implements Exception {
+  final int statusCode;
+  final String url;
+  final String? details;
+
+  DownloadHttpException({
+    required this.statusCode,
+    required this.url,
+    this.details,
+  });
+
+  @override
+  String toString() {
+    final d = (details == null || details!.trim().isEmpty) ? '' : ' ($details)';
+    return 'HTTP $statusCode for $url$d';
+  }
+}
+
+class CloudinaryPdfDeliveryBlockedException implements Exception {
+  final String url;
+  final int statusCode;
+
+  CloudinaryPdfDeliveryBlockedException({
+    required this.url,
+    required this.statusCode,
+  });
+
+  @override
+  String toString() {
+    return 'Cloudinary blocked PDF delivery (HTTP $statusCode) for $url';
+  }
+}
 
 /// Converts a Cloudinary URL into an attachment download URL.
 ///
@@ -58,6 +92,87 @@ String _sanitizeFileName(String name) {
       : replaced;
 }
 
+bool _hasExtension(String fileName) {
+  final base = fileName.trim();
+  final lastDot = base.lastIndexOf('.');
+  return lastDot > 0 && lastDot < base.length - 1;
+}
+
+String _extensionFromContentType(String? contentType) {
+  final ct = (contentType ?? '').toLowerCase();
+  if (ct.contains('application/pdf')) return 'pdf';
+  if (ct.contains('image/png')) return 'png';
+  if (ct.contains('image/webp')) return 'webp';
+  if (ct.contains('image/jpeg') || ct.contains('image/jpg')) return 'jpg';
+  if (ct.contains('image/gif')) return 'gif';
+  return '';
+}
+
+bool _isCloudinaryHost(String url) {
+  try {
+    final u = Uri.parse(url);
+    final host = u.host.toLowerCase();
+    return host == 'res.cloudinary.com' || host.endsWith('.cloudinary.com');
+  } catch (_) {
+    return false;
+  }
+}
+
+bool _looksLikePdfRequest({required String url, required String fileName}) {
+  final u = url.toLowerCase();
+  final f = fileName.toLowerCase();
+  return u.contains('.pdf') || f.endsWith('.pdf');
+}
+
+Future<String?> _tryGetContentType(Dio dio, String url) async {
+  try {
+    final resp = await dio.head(url);
+    return resp.headers.value('content-type');
+  } catch (_) {
+    return null;
+  }
+}
+
+String? _serverpodHostString() {
+  try {
+    final v = (client as dynamic).host;
+    if (v is String && v.trim().isNotEmpty) return v;
+  } catch (_) {
+    // ignore
+  }
+  try {
+    final v = (client as dynamic).serverUrl;
+    if (v is String && v.trim().isNotEmpty) return v;
+  } catch (_) {
+    // ignore
+  }
+  return null;
+}
+
+bool _isBackendHost(String url) {
+  try {
+    final serverHost = _serverpodHostString();
+    if (serverHost == null) return false;
+    final serverUri = Uri.parse(serverHost);
+    final u = Uri.parse(url);
+    return u.scheme == serverUri.scheme &&
+        u.host == serverUri.host &&
+        u.port == serverUri.port;
+  } catch (_) {
+    return false;
+  }
+}
+
+Future<Map<String, String>?> _authHeadersForUrl(String url) async {
+  if (!_isBackendHost(url)) return null;
+  // ignore: deprecated_member_use
+  final key = await client.authenticationKeyManager?.get();
+  // ignore: deprecated_member_use
+  final headerValue = await client.authenticationKeyManager?.toHeaderValue(key);
+  if (headerValue == null || headerValue.isEmpty) return null;
+  return {'Authorization': headerValue};
+}
+
 /// Downloads a Cloudinary-hosted PDF/image from a link.
 ///
 /// Behavior:
@@ -70,28 +185,15 @@ Future<Object?> downloadPdfImageFromLink({
   BuildContext? context,
 }) async {
   final dl = buildCloudinaryAttachmentUrl(url);
-  final safeName = _sanitizeFileName(
+  final candidates = <String>{
+    url,
+    dl,
+  }.where((e) => e.trim().isNotEmpty).toList();
+  var safeName = _sanitizeFileName(
     (fileName == null || fileName.trim().isEmpty)
-        ? _inferFileNameFromUrl(dl)
+        ? _inferFileNameFromUrl(url)
         : fileName,
   );
-
-  // Web: always use browser download, even on Android browsers.
-  if (kIsWeb) {
-    final a = html.AnchorElement(href: dl)
-      ..style.display = 'none'
-      ..target = '_blank'
-      ..setAttribute('download', safeName);
-
-    html.document.body?.append(a);
-    a.click();
-    a.remove();
-    return dl;
-  }
-
-  // Non-web: download to temp file first.
-  final tmpDir = await getTemporaryDirectory();
-  final tmpPath = p.join(tmpDir.path, safeName);
 
   final dio = Dio(
     BaseOptions(
@@ -102,7 +204,96 @@ Future<Object?> downloadPdfImageFromLink({
     ),
   );
 
-  await dio.download(dl, tmpPath);
+  Future<({Uint8List bytes, String contentType, String usedUrl})>
+  downloadFirstOk() async {
+    Object? lastError;
+    DownloadHttpException? lastHttp;
+    CloudinaryPdfDeliveryBlockedException? cloudinaryPdfBlocked;
+    for (final u in candidates) {
+      try {
+        final headers = await _authHeadersForUrl(u);
+        final resp = await dio.get<List<int>>(
+          u,
+          options: Options(responseType: ResponseType.bytes, headers: headers),
+        );
+        final bytes = Uint8List.fromList(resp.data ?? const <int>[]);
+        if (bytes.isEmpty) throw Exception('Empty download');
+        final contentType =
+            resp.headers.value('content-type') ?? 'application/octet-stream';
+        return (bytes: bytes, contentType: contentType, usedUrl: u);
+      } catch (e) {
+        lastError = e;
+
+        if (e is DioException) {
+          final status = e.response?.statusCode;
+          if (status != null) {
+            lastHttp = DownloadHttpException(
+              statusCode: status,
+              url: u,
+              details: e.message,
+            );
+
+            // Cloudinary-specific: Free plans can block PDF delivery unless
+            // explicitly enabled in the Cloudinary Console (Security settings).
+            if ((status == 401 || status == 403) &&
+                _isCloudinaryHost(u) &&
+                _looksLikePdfRequest(url: u, fileName: safeName)) {
+              cloudinaryPdfBlocked ??= CloudinaryPdfDeliveryBlockedException(
+                url: u,
+                statusCode: status,
+              );
+            }
+          }
+        }
+        continue;
+      }
+    }
+
+    if (cloudinaryPdfBlocked != null) throw cloudinaryPdfBlocked;
+    if (lastHttp != null) throw lastHttp;
+    throw Exception('Download failed for all URLs: $lastError');
+  }
+
+  // Some Cloudinary/raw URLs don't include an extension; try to infer it.
+  if (!_hasExtension(safeName)) {
+    String? ct;
+    for (final u in candidates) {
+      try {
+        final headers = await _authHeadersForUrl(u);
+        final resp = await dio.head(u, options: Options(headers: headers));
+        ct = resp.headers.value('content-type');
+      } catch (_) {
+        ct = await _tryGetContentType(dio, u);
+      }
+      if (ct != null && ct.isNotEmpty) break;
+    }
+    final ext = _extensionFromContentType(ct);
+    if (ext.isNotEmpty) safeName = '$safeName.$ext';
+  }
+
+  // Web: always use browser download, even on Android browsers.
+  if (kIsWeb) {
+    final result = await downloadFirstOk();
+    final bytes = result.bytes;
+    final contentType = result.contentType;
+    final blob = html.Blob([bytes], contentType);
+    final objectUrl = html.Url.createObjectUrlFromBlob(blob);
+    final a = html.AnchorElement(href: objectUrl)
+      ..style.display = 'none'
+      ..setAttribute('download', safeName);
+    html.document.body?.append(a);
+    a.click();
+    a.remove();
+    html.Url.revokeObjectUrl(objectUrl);
+    return result.usedUrl;
+  }
+
+  // Non-web: download bytes then save to temp file first.
+  final result = await downloadFirstOk();
+  final tmpDir = await getTemporaryDirectory();
+  final tmpPath = p.join(tmpDir.path, safeName);
+  final bytes = result.bytes;
+  await uio.File(tmpPath).writeAsBytes(bytes, flush: true);
 
   // Android: write to public Downloads using MediaStore.
   if (uio.Platform.isAndroid) {

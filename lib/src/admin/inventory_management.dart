@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
+import 'package:pdf/widgets.dart' as pw;
+
+import 'export_service.dart';
 
 class InventoryManagement extends StatefulWidget {
   const InventoryManagement({super.key});
@@ -13,6 +17,137 @@ class _InventoryManagementState extends State<InventoryManagement> {
   final Color primaryColor = const Color(0xFF00796B); // Deep Teal
   final Color lowStockColor = Colors.orange.shade700;
   final Color criticalStockColor = Colors.red.shade700;
+
+  pw.Font? _englishFont;
+  bool _exportingPdf = false;
+
+  Future<void> _ensurePdfFontLoaded() async {
+    if (_englishFont != null) return;
+    final data = await rootBundle.load(
+      'assets/fonts/OpenSans-VariableFont.ttf',
+    );
+    _englishFont = pw.Font.ttf(data);
+  }
+
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  Future<void> _exportInventoryTransactionsPdf() async {
+    if (_exportingPdf) return;
+
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 5, 1, 1),
+      lastDate: DateTime(now.year + 1, 12, 31),
+      initialDateRange: DateTimeRange(
+        start: _dateOnly(now.subtract(const Duration(days: 7))),
+        end: _dateOnly(now),
+      ),
+      helpText: 'Select date range for inventory transactions',
+      confirmText: 'EXPORT',
+    );
+
+    if (picked == null) return;
+
+    final from = DateTime(
+      picked.start.year,
+      picked.start.month,
+      picked.start.day,
+    );
+    final to = DateTime(picked.end.year, picked.end.month, picked.end.day);
+    final toExclusive = to.add(const Duration(days: 1));
+
+    if (!mounted) return;
+    setState(() => _exportingPdf = true);
+
+    try {
+      await _ensurePdfFontLoaded();
+      final font = _englishFont;
+      if (font == null) {
+        throw Exception('PDF font not available');
+      }
+
+      if (products.isEmpty) {
+        await _loadInventory();
+      }
+
+      final Map<int, Map<String, String>> itemLookup = {
+        for (final p in products)
+          (p['id'] as int): {
+            'name': (p['name'] ?? '').toString(),
+            'unit': (p['unit'] ?? '').toString(),
+          },
+      };
+
+      final itemIds = itemLookup.keys.toList()..sort();
+      final rows = <InventoryTransactionReportRow>[];
+
+      // Fetch transactions in small batches to avoid hammering the server.
+      const int batchSize = 10;
+      for (int i = 0; i < itemIds.length; i += batchSize) {
+        final batch = itemIds.sublist(
+          i,
+          (i + batchSize) > itemIds.length ? itemIds.length : (i + batchSize),
+        );
+
+        final results = await Future.wait(
+          batch.map((id) async {
+            try {
+              return await client.adminInventoryEndpoints.getItemTransactions(
+                id,
+              );
+            } catch (_) {
+              return <InventoryTransactionInfo>[];
+            }
+          }),
+        );
+
+        for (final txs in results) {
+          for (final tx in txs) {
+            final createdAt = tx.createdAt;
+            if (createdAt.isBefore(from) || !createdAt.isBefore(toExclusive)) {
+              continue;
+            }
+            final meta = itemLookup[tx.itemId];
+            rows.add(
+              ExportService.inventoryTxRow(
+                time: createdAt,
+                itemName: meta?['name'] ?? 'Item #${tx.itemId}',
+                unit: meta?['unit'] ?? '',
+                type: tx.transactionType,
+                quantity: tx.quantity,
+              ),
+            );
+          }
+        }
+      }
+
+      if (!mounted) return;
+      if (rows.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No transactions found in this date range'),
+          ),
+        );
+        return;
+      }
+
+      await ExportService.exportInventoryTransactionsRangeAsPDF(
+        rows: rows,
+        from: from,
+        to: to,
+        font: font,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to export PDF: $e')));
+    } finally {
+      if (!mounted) return;
+      setState(() => _exportingPdf = false);
+    }
+  }
 
   List<InventoryCategory> categories = [];
   int? selectedCategoryId;
@@ -657,6 +792,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
     super.initState();
     _loadCategories();
     _loadInventory();
+    _ensurePdfFontLoaded();
   }
 
   @override
@@ -1260,6 +1396,22 @@ class _InventoryManagementState extends State<InventoryManagement> {
         backgroundColor: const Color(0xFF00695C),
         foregroundColor: Colors.white,
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Export transactions as PDF',
+            onPressed: _exportingPdf ? null : _exportInventoryTransactionsPdf,
+            icon: _exportingPdf
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.picture_as_pdf),
+          ),
+        ],
       ),
       body: CustomScrollView(
         slivers: [
