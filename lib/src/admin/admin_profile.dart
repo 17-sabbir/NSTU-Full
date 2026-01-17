@@ -512,61 +512,54 @@ class _AdminProfileState extends State<AdminProfile> {
     }
   }
 
+  Future<void> _performLogout() async {
+    try {
+      try {
+        await client.auth.logout();
+      } catch (_) {}
+
+      try {
+        await client.authenticationKeyManager?.remove();
+      } catch (_) {}
+
+      final prefs = await SharedPreferences.getInstance();
+      final preservedDeviceId = prefs.getString('device_id');
+      await prefs.clear();
+
+      if (preservedDeviceId != null && preservedDeviceId.isNotEmpty) {
+        await prefs.setString('device_id', preservedDeviceId);
+      }
+
+      // Reset Serverpod client state
+      initServerpodClient();
+
+      if (!mounted) return;
+
+      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Logout failed")));
+    }
+  }
+
   void _logout() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text("Logout"),
         content: const Text("Are you sure you want to log out?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text("Cancel"),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              () async {
-                try {
-                  try {
-                    await client.auth.logout();
-                  } catch (_) {}
-                  await client.authenticationKeyManager?.remove();
-                } catch (_) {}
+            onPressed: () async {
+              Navigator.pop(dialogContext); // close dialog first
 
-                try {
-                  final prefs = await SharedPreferences.getInstance();
-                  // Preserve device id so login doesn't require OTP again
-                  // just because user logged out.
-                  final preservedDeviceId = prefs.getString('device_id');
-                  await prefs.clear();
-                  if (preservedDeviceId != null &&
-                      preservedDeviceId.trim().isNotEmpty) {
-                    await prefs.setString(
-                      'device_id',
-                      preservedDeviceId.trim(),
-                    );
-                  }
-                } catch (_) {}
-
-                // Defensive: ensure any in-memory auth state is cleared too.
-                try {
-                  initServerpodClient();
-                } catch (_) {}
-
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Logged out successfully"),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/',
-                  (route) => false,
-                );
-              }();
+              await _performLogout(); // then logout safely
             },
             child: const Text("Logout", style: TextStyle(color: Colors.red)),
           ),
