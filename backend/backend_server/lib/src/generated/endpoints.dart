@@ -11,72 +11,994 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
-import '../endpoints/auth_endpoint.dart' as _i2;
-import '../endpoints/dispenser_endpoints.dart' as _i3;
-import '../endpoints/doctor_endpoints.dart' as _i4;
-import '../endpoints/lab_endpoints.dart' as _i5;
-import '../endpoints/notifications_endpoint.dart' as _i6;
-import '../endpoints/password_endpoint.dart' as _i7;
-import '../endpoints/patient_endpoints.dart' as _i8;
-import '../greeting_endpoint.dart' as _i9;
-import 'package:backend_server/src/generated/dispense_request.dart' as _i10;
-import 'package:backend_server/src/generated/prescription.dart' as _i11;
-import 'package:backend_server/src/generated/PrescribedItem.dart' as _i12;
-import 'package:backend_server/src/generated/patient_return_tests.dart' as _i13;
+import '../endpoints/admin_endpoints.dart' as _i2;
+import '../endpoints/admin_inventory_endpoints.dart' as _i3;
+import '../endpoints/admin_report_endpoints.dart' as _i4;
+import '../endpoints/auth_endpoint.dart' as _i5;
+import '../endpoints/dispenser_endpoints.dart' as _i6;
+import '../endpoints/doctor_endpoints.dart' as _i7;
+import '../endpoints/lab_endpoints.dart' as _i8;
+import '../endpoints/notifications_endpoint.dart' as _i9;
+import '../endpoints/password_endpoint.dart' as _i10;
+import '../endpoints/patient_endpoints.dart' as _i11;
+import '../greeting_endpoint.dart' as _i12;
+import 'package:backend_server/src/generated/dispense_request.dart' as _i13;
+import 'package:backend_server/src/generated/prescription.dart' as _i14;
+import 'package:backend_server/src/generated/PrescribedItem.dart' as _i15;
+import 'package:backend_server/src/generated/patient_return_tests.dart' as _i16;
 
 class Endpoints extends _i1.EndpointDispatch {
   @override
   void initializeEndpoints(_i1.Server server) {
     var endpoints = <String, _i1.Endpoint>{
-      'auth': _i2.AuthEndpoint()
+      'adminEndpoints': _i2.AdminEndpoints()
+        ..initialize(
+          server,
+          'adminEndpoints',
+          null,
+        ),
+      'adminInventoryEndpoints': _i3.AdminInventoryEndpoints()
+        ..initialize(
+          server,
+          'adminInventoryEndpoints',
+          null,
+        ),
+      'adminReportEndpoints': _i4.AdminReportEndpoints()
+        ..initialize(
+          server,
+          'adminReportEndpoints',
+          null,
+        ),
+      'auth': _i5.AuthEndpoint()
         ..initialize(
           server,
           'auth',
           null,
         ),
-      'dispenser': _i3.DispenserEndpoint()
+      'dispenser': _i6.DispenserEndpoint()
         ..initialize(
           server,
           'dispenser',
           null,
         ),
-      'doctor': _i4.DoctorEndpoint()
+      'doctor': _i7.DoctorEndpoint()
         ..initialize(
           server,
           'doctor',
           null,
         ),
-      'lab': _i5.LabEndpoint()
+      'lab': _i8.LabEndpoint()
         ..initialize(
           server,
           'lab',
           null,
         ),
-      'notification': _i6.NotificationEndpoint()
+      'notification': _i9.NotificationEndpoint()
         ..initialize(
           server,
           'notification',
           null,
         ),
-      'password': _i7.PasswordEndpoint()
+      'password': _i10.PasswordEndpoint()
         ..initialize(
           server,
           'password',
           null,
         ),
-      'patient': _i8.PatientEndpoint()
+      'patient': _i11.PatientEndpoint()
         ..initialize(
           server,
           'patient',
           null,
         ),
-      'greeting': _i9.GreetingEndpoint()
+      'greeting': _i12.GreetingEndpoint()
         ..initialize(
           server,
           'greeting',
           null,
         ),
     };
+    connectors['adminEndpoints'] = _i1.EndpointConnector(
+      name: 'adminEndpoints',
+      endpoint: endpoints['adminEndpoints']!,
+      methodConnectors: {
+        'listUsersByRole': _i1.MethodConnector(
+          name: 'listUsersByRole',
+          params: {
+            'role': _i1.ParameterDescription(
+              name: 'role',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'limit': _i1.ParameterDescription(
+              name: 'limit',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .listUsersByRole(
+                    session,
+                    params['role'],
+                    params['limit'],
+                  ),
+        ),
+        'toggleUserActive': _i1.MethodConnector(
+          name: 'toggleUserActive',
+          params: {
+            'userId': _i1.ParameterDescription(
+              name: 'userId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .toggleUserActive(
+                    session,
+                    params['userId'],
+                  ),
+        ),
+        'createUser': _i1.MethodConnector(
+          name: 'createUser',
+          params: {
+            'name': _i1.ParameterDescription(
+              name: 'name',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'email': _i1.ParameterDescription(
+              name: 'email',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'passwordHash': _i1.ParameterDescription(
+              name: 'passwordHash',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'role': _i1.ParameterDescription(
+              name: 'role',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'phone': _i1.ParameterDescription(
+              name: 'phone',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .createUser(
+                    session,
+                    params['name'],
+                    params['email'],
+                    params['passwordHash'],
+                    params['role'],
+                    params['phone'],
+                  ),
+        ),
+        'createUserWithPassword': _i1.MethodConnector(
+          name: 'createUserWithPassword',
+          params: {
+            'name': _i1.ParameterDescription(
+              name: 'name',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'email': _i1.ParameterDescription(
+              name: 'email',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'password': _i1.ParameterDescription(
+              name: 'password',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'role': _i1.ParameterDescription(
+              name: 'role',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'phone': _i1.ParameterDescription(
+              name: 'phone',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .createUserWithPassword(
+                    session,
+                    params['name'],
+                    params['email'],
+                    params['password'],
+                    params['role'],
+                    params['phone'],
+                  ),
+        ),
+        'getRosters': _i1.MethodConnector(
+          name: 'getRosters',
+          params: {
+            'staffId': _i1.ParameterDescription(
+              name: 'staffId',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'fromDate': _i1.ParameterDescription(
+              name: 'fromDate',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+            'toDate': _i1.ParameterDescription(
+              name: 'toDate',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+            'includeDeleted': _i1.ParameterDescription(
+              name: 'includeDeleted',
+              type: _i1.getType<bool>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .getRosters(
+                    session,
+                    params['staffId'],
+                    params['fromDate'],
+                    params['toDate'],
+                    includeDeleted: params['includeDeleted'],
+                  ),
+        ),
+        'deleteRoster': _i1.MethodConnector(
+          name: 'deleteRoster',
+          params: {
+            'rosterId': _i1.ParameterDescription(
+              name: 'rosterId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .deleteRoster(
+                    session,
+                    params['rosterId'],
+                  ),
+        ),
+        'saveRoster': _i1.MethodConnector(
+          name: 'saveRoster',
+          params: {
+            'rosterId': _i1.ParameterDescription(
+              name: 'rosterId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'staffId': _i1.ParameterDescription(
+              name: 'staffId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'shiftType': _i1.ParameterDescription(
+              name: 'shiftType',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'shiftDate': _i1.ParameterDescription(
+              name: 'shiftDate',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+            'timeRange': _i1.ParameterDescription(
+              name: 'timeRange',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'status': _i1.ParameterDescription(
+              name: 'status',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'approvedBy': _i1.ParameterDescription(
+              name: 'approvedBy',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .saveRoster(
+                    session,
+                    params['rosterId'],
+                    params['staffId'],
+                    params['shiftType'],
+                    params['shiftDate'],
+                    params['timeRange'],
+                    params['status'],
+                    params['approvedBy'],
+                  ),
+        ),
+        'listStaff': _i1.MethodConnector(
+          name: 'listStaff',
+          params: {
+            'limit': _i1.ParameterDescription(
+              name: 'limit',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminEndpoints'] as _i2.AdminEndpoints).listStaff(
+                    session,
+                    params['limit'],
+                  ),
+        ),
+        'getAdminProfile': _i1.MethodConnector(
+          name: 'getAdminProfile',
+          params: {
+            'userId': _i1.ParameterDescription(
+              name: 'userId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .getAdminProfile(
+                    session,
+                    params['userId'],
+                  ),
+        ),
+        'updateAdminProfile': _i1.MethodConnector(
+          name: 'updateAdminProfile',
+          params: {
+            'userId': _i1.ParameterDescription(
+              name: 'userId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'name': _i1.ParameterDescription(
+              name: 'name',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'phone': _i1.ParameterDescription(
+              name: 'phone',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'profilePictureData': _i1.ParameterDescription(
+              name: 'profilePictureData',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'designation': _i1.ParameterDescription(
+              name: 'designation',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'qualification': _i1.ParameterDescription(
+              name: 'qualification',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .updateAdminProfile(
+                    session,
+                    params['userId'],
+                    params['name'],
+                    params['phone'],
+                    params['profilePictureData'],
+                    params['designation'],
+                    params['qualification'],
+                  ),
+        ),
+        'changePassword': _i1.MethodConnector(
+          name: 'changePassword',
+          params: {
+            'userId': _i1.ParameterDescription(
+              name: 'userId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'currentPassword': _i1.ParameterDescription(
+              name: 'currentPassword',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'newPassword': _i1.ParameterDescription(
+              name: 'newPassword',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .changePassword(
+                    session,
+                    params['userId'],
+                    params['currentPassword'],
+                    params['newPassword'],
+                  ),
+        ),
+        'createAuditLog': _i1.MethodConnector(
+          name: 'createAuditLog',
+          params: {
+            'adminId': _i1.ParameterDescription(
+              name: 'adminId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'action': _i1.ParameterDescription(
+              name: 'action',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'targetId': _i1.ParameterDescription(
+              name: 'targetId',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .createAuditLog(
+                    session,
+                    adminId: params['adminId'],
+                    action: params['action'],
+                    targetId: params['targetId'],
+                  ),
+        ),
+        'getAuditLogs': _i1.MethodConnector(
+          name: 'getAuditLogs',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .getAuditLogs(session),
+        ),
+        'getRecentAuditLogs': _i1.MethodConnector(
+          name: 'getRecentAuditLogs',
+          params: {
+            'hours': _i1.ParameterDescription(
+              name: 'hours',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'limit': _i1.ParameterDescription(
+              name: 'limit',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .getRecentAuditLogs(
+                    session,
+                    params['hours'],
+                    params['limit'],
+                  ),
+        ),
+        'addAmbulanceContact': _i1.MethodConnector(
+          name: 'addAmbulanceContact',
+          params: {
+            'title': _i1.ParameterDescription(
+              name: 'title',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'phoneBn': _i1.ParameterDescription(
+              name: 'phoneBn',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'phoneEn': _i1.ParameterDescription(
+              name: 'phoneEn',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'isPrimary': _i1.ParameterDescription(
+              name: 'isPrimary',
+              type: _i1.getType<bool>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .addAmbulanceContact(
+                    session,
+                    params['title'],
+                    params['phoneBn'],
+                    params['phoneEn'],
+                    params['isPrimary'],
+                  ),
+        ),
+        'updateAmbulanceContact': _i1.MethodConnector(
+          name: 'updateAmbulanceContact',
+          params: {
+            'id': _i1.ParameterDescription(
+              name: 'id',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'title': _i1.ParameterDescription(
+              name: 'title',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'phoneBn': _i1.ParameterDescription(
+              name: 'phoneBn',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'phoneEn': _i1.ParameterDescription(
+              name: 'phoneEn',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'isPrimary': _i1.ParameterDescription(
+              name: 'isPrimary',
+              type: _i1.getType<bool>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['adminEndpoints'] as _i2.AdminEndpoints)
+                  .updateAmbulanceContact(
+                    session,
+                    params['id'],
+                    params['title'],
+                    params['phoneBn'],
+                    params['phoneEn'],
+                    params['isPrimary'],
+                  ),
+        ),
+      },
+    );
+    connectors['adminInventoryEndpoints'] = _i1.EndpointConnector(
+      name: 'adminInventoryEndpoints',
+      endpoint: endpoints['adminInventoryEndpoints']!,
+      methodConnectors: {
+        'addInventoryCategory': _i1.MethodConnector(
+          name: 'addInventoryCategory',
+          params: {
+            'name': _i1.ParameterDescription(
+              name: 'name',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'description': _i1.ParameterDescription(
+              name: 'description',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminInventoryEndpoints']
+                          as _i3.AdminInventoryEndpoints)
+                      .addInventoryCategory(
+                        session,
+                        params['name'],
+                        params['description'],
+                      ),
+        ),
+        'listInventoryCategories': _i1.MethodConnector(
+          name: 'listInventoryCategories',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminInventoryEndpoints']
+                          as _i3.AdminInventoryEndpoints)
+                      .listInventoryCategories(session),
+        ),
+        'addInventoryItem': _i1.MethodConnector(
+          name: 'addInventoryItem',
+          params: {
+            'categoryId': _i1.ParameterDescription(
+              name: 'categoryId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'itemName': _i1.ParameterDescription(
+              name: 'itemName',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'unit': _i1.ParameterDescription(
+              name: 'unit',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'minimumStock': _i1.ParameterDescription(
+              name: 'minimumStock',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'initialStock': _i1.ParameterDescription(
+              name: 'initialStock',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'canRestockDispenser': _i1.ParameterDescription(
+              name: 'canRestockDispenser',
+              type: _i1.getType<bool>(),
+              nullable: false,
+            ),
+            'adminUserId': _i1.ParameterDescription(
+              name: 'adminUserId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminInventoryEndpoints']
+                          as _i3.AdminInventoryEndpoints)
+                      .addInventoryItem(
+                        session,
+                        categoryId: params['categoryId'],
+                        itemName: params['itemName'],
+                        unit: params['unit'],
+                        minimumStock: params['minimumStock'],
+                        initialStock: params['initialStock'],
+                        canRestockDispenser: params['canRestockDispenser'],
+                        adminUserId: params['adminUserId'],
+                      ),
+        ),
+        'updateInventoryStock': _i1.MethodConnector(
+          name: 'updateInventoryStock',
+          params: {
+            'itemId': _i1.ParameterDescription(
+              name: 'itemId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'quantity': _i1.ParameterDescription(
+              name: 'quantity',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'type': _i1.ParameterDescription(
+              name: 'type',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'userId': _i1.ParameterDescription(
+              name: 'userId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminInventoryEndpoints']
+                          as _i3.AdminInventoryEndpoints)
+                      .updateInventoryStock(
+                        session,
+                        itemId: params['itemId'],
+                        quantity: params['quantity'],
+                        type: params['type'],
+                        userId: params['userId'],
+                      ),
+        ),
+        'updateDispenserRestockFlag': _i1.MethodConnector(
+          name: 'updateDispenserRestockFlag',
+          params: {
+            'itemId': _i1.ParameterDescription(
+              name: 'itemId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'canRestock': _i1.ParameterDescription(
+              name: 'canRestock',
+              type: _i1.getType<bool>(),
+              nullable: false,
+            ),
+            'adminUserId': _i1.ParameterDescription(
+              name: 'adminUserId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminInventoryEndpoints']
+                          as _i3.AdminInventoryEndpoints)
+                      .updateDispenserRestockFlag(
+                        session,
+                        itemId: params['itemId'],
+                        canRestock: params['canRestock'],
+                        adminUserId: params['adminUserId'],
+                      ),
+        ),
+        'listInventoryItems': _i1.MethodConnector(
+          name: 'listInventoryItems',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminInventoryEndpoints']
+                          as _i3.AdminInventoryEndpoints)
+                      .listInventoryItems(session),
+        ),
+        'updateMinimumThreshold': _i1.MethodConnector(
+          name: 'updateMinimumThreshold',
+          params: {
+            'itemId': _i1.ParameterDescription(
+              name: 'itemId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'newThreshold': _i1.ParameterDescription(
+              name: 'newThreshold',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'adminUserId': _i1.ParameterDescription(
+              name: 'adminUserId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminInventoryEndpoints']
+                          as _i3.AdminInventoryEndpoints)
+                      .updateMinimumThreshold(
+                        session,
+                        itemId: params['itemId'],
+                        newThreshold: params['newThreshold'],
+                        adminUserId: params['adminUserId'],
+                      ),
+        ),
+        'getItemTransactions': _i1.MethodConnector(
+          name: 'getItemTransactions',
+          params: {
+            'itemId': _i1.ParameterDescription(
+              name: 'itemId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminInventoryEndpoints']
+                          as _i3.AdminInventoryEndpoints)
+                      .getItemTransactions(
+                        session,
+                        params['itemId'],
+                      ),
+        ),
+        'getInventoryAuditLogs': _i1.MethodConnector(
+          name: 'getInventoryAuditLogs',
+          params: {
+            'limit': _i1.ParameterDescription(
+              name: 'limit',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'offset': _i1.ParameterDescription(
+              name: 'offset',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminInventoryEndpoints']
+                          as _i3.AdminInventoryEndpoints)
+                      .getInventoryAuditLogs(
+                        session,
+                        params['limit'],
+                        params['offset'],
+                      ),
+        ),
+      },
+    );
+    connectors['adminReportEndpoints'] = _i1.EndpointConnector(
+      name: 'adminReportEndpoints',
+      endpoint: endpoints['adminReportEndpoints']!,
+      methodConnectors: {
+        'getAdminDashboardOverview': _i1.MethodConnector(
+          name: 'getAdminDashboardOverview',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminReportEndpoints']
+                          as _i4.AdminReportEndpoints)
+                      .getAdminDashboardOverview(session),
+        ),
+        'getDashboardAnalytics': _i1.MethodConnector(
+          name: 'getDashboardAnalytics',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminReportEndpoints']
+                          as _i4.AdminReportEndpoints)
+                      .getDashboardAnalytics(session),
+        ),
+        'getMedicineUsageByDateRange': _i1.MethodConnector(
+          name: 'getMedicineUsageByDateRange',
+          params: {
+            'from': _i1.ParameterDescription(
+              name: 'from',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+            'to': _i1.ParameterDescription(
+              name: 'to',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminReportEndpoints']
+                          as _i4.AdminReportEndpoints)
+                      .getMedicineUsageByDateRange(
+                        session,
+                        params['from'],
+                        params['to'],
+                      ),
+        ),
+        'getMedicineStockUsageByDateRange': _i1.MethodConnector(
+          name: 'getMedicineStockUsageByDateRange',
+          params: {
+            'from': _i1.ParameterDescription(
+              name: 'from',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+            'toExclusive': _i1.ParameterDescription(
+              name: 'toExclusive',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminReportEndpoints']
+                          as _i4.AdminReportEndpoints)
+                      .getMedicineStockUsageByDateRange(
+                        session,
+                        params['from'],
+                        params['toExclusive'],
+                      ),
+        ),
+        'getDispensedAvailableDates': _i1.MethodConnector(
+          name: 'getDispensedAvailableDates',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminReportEndpoints']
+                          as _i4.AdminReportEndpoints)
+                      .getDispensedAvailableDates(session),
+        ),
+        'getLabTestTotalsByDateRange': _i1.MethodConnector(
+          name: 'getLabTestTotalsByDateRange',
+          params: {
+            'from': _i1.ParameterDescription(
+              name: 'from',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+            'toExclusive': _i1.ParameterDescription(
+              name: 'toExclusive',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['adminReportEndpoints']
+                          as _i4.AdminReportEndpoints)
+                      .getLabTestTotalsByDateRange(
+                        session,
+                        params['from'],
+                        params['toExclusive'],
+                      ),
+        ),
+      },
+    );
     connectors['auth'] = _i1.EndpointConnector(
       name: 'auth',
       endpoint: endpoints['auth']!,
@@ -94,7 +1016,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['auth'] as _i2.AuthEndpoint)
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint)
                   .requestProfileEmailChangeOtp(
                     session,
                     params['newEmail'],
@@ -123,7 +1045,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['auth'] as _i2.AuthEndpoint)
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint)
                   .verifyProfileEmailChangeOtp(
                     session,
                     params['newEmail'],
@@ -155,7 +1077,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['auth'] as _i2.AuthEndpoint).updateMyEmailWithOtp(
+                  (endpoints['auth'] as _i5.AuthEndpoint).updateMyEmailWithOtp(
                     session,
                     params['newEmail'],
                     params['otp'],
@@ -185,7 +1107,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['auth'] as _i2.AuthEndpoint).login(
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint).login(
                 session,
                 params['email'],
                 params['password'],
@@ -211,7 +1133,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['auth'] as _i2.AuthEndpoint).startSignupPhoneOtp(
+                  (endpoints['auth'] as _i5.AuthEndpoint).startSignupPhoneOtp(
                     session,
                     params['email'],
                     params['phone'],
@@ -245,7 +1167,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['auth'] as _i2.AuthEndpoint).verifyLoginOtp(
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint).verifyLoginOtp(
                 session,
                 params['email'],
                 params['otp'],
@@ -261,7 +1183,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['auth'] as _i2.AuthEndpoint).logout(session),
+                  (endpoints['auth'] as _i5.AuthEndpoint).logout(session),
         ),
         'register': _i1.MethodConnector(
           name: 'register',
@@ -291,7 +1213,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['auth'] as _i2.AuthEndpoint).register(
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint).register(
                 session,
                 params['email'],
                 params['password'],
@@ -327,7 +1249,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['auth'] as _i2.AuthEndpoint).resendOtp(
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint).resendOtp(
                 session,
                 params['email'],
                 params['password'],
@@ -363,7 +1285,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['auth'] as _i2.AuthEndpoint)
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint)
                   .verifySignupEmailAndStartPhoneOtp(
                     session,
                     params['email'],
@@ -430,7 +1352,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['auth'] as _i2.AuthEndpoint)
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint)
                   .completeSignupWithPhoneOtp(
                     session,
                     params['email'],
@@ -463,7 +1385,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['auth'] as _i2.AuthEndpoint)
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint)
                   .sendWelcomeEmailViaResend(
                     session,
                     params['email'],
@@ -523,7 +1445,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['auth'] as _i2.AuthEndpoint).verifyOtp(
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint).verifyOtp(
                 session,
                 params['email'],
                 params['otp'],
@@ -550,7 +1472,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['auth'] as _i2.AuthEndpoint).requestPasswordReset(
+                  (endpoints['auth'] as _i5.AuthEndpoint).requestPasswordReset(
                     session,
                     params['email'],
                   ),
@@ -579,7 +1501,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['auth'] as _i2.AuthEndpoint).verifyPasswordReset(
+                  (endpoints['auth'] as _i5.AuthEndpoint).verifyPasswordReset(
                     session,
                     params['email'],
                     params['otp'],
@@ -609,7 +1531,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['auth'] as _i2.AuthEndpoint).resetPassword(
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint).resetPassword(
                 session,
                 params['email'],
                 params['token'],
@@ -639,7 +1561,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['auth'] as _i2.AuthEndpoint)
+              ) async => (endpoints['auth'] as _i5.AuthEndpoint)
                   .changePasswordUniversal(
                     session,
                     params['email'],
@@ -660,7 +1582,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['dispenser'] as _i3.DispenserEndpoint)
+              ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
                   .getDispenserProfile(session),
         ),
         'updateDispenserProfile': _i1.MethodConnector(
@@ -696,7 +1618,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['dispenser'] as _i3.DispenserEndpoint)
+              ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
                   .updateDispenserProfile(
                     session,
                     name: params['name'],
@@ -713,7 +1635,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['dispenser'] as _i3.DispenserEndpoint)
+              ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
                   .listInventoryItems(session),
         ),
         'restockItem': _i1.MethodConnector(
@@ -735,7 +1657,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['dispenser'] as _i3.DispenserEndpoint).restockItem(
+                  (endpoints['dispenser'] as _i6.DispenserEndpoint).restockItem(
                     session,
                     itemId: params['itemId'],
                     quantity: params['quantity'],
@@ -748,7 +1670,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['dispenser'] as _i3.DispenserEndpoint)
+              ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
                   .getDispenserHistory(session),
         ),
         'getPendingPrescriptions': _i1.MethodConnector(
@@ -758,7 +1680,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['dispenser'] as _i3.DispenserEndpoint)
+              ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
                   .getPendingPrescriptions(session),
         ),
         'getPrescriptionDetail': _i1.MethodConnector(
@@ -774,7 +1696,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['dispenser'] as _i3.DispenserEndpoint)
+              ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
                   .getPrescriptionDetail(
                     session,
                     params['prescriptionId'],
@@ -793,7 +1715,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['dispenser'] as _i3.DispenserEndpoint)
+              ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
                   .getStockByFirstWord(
                     session,
                     params['medicineName'],
@@ -812,7 +1734,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['dispenser'] as _i3.DispenserEndpoint)
+              ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
                   .searchInventoryItems(
                     session,
                     params['query'],
@@ -833,7 +1755,7 @@ class Endpoints extends _i1.EndpointDispatch {
             ),
             'items': _i1.ParameterDescription(
               name: 'items',
-              type: _i1.getType<List<_i10.DispenseItemRequest>>(),
+              type: _i1.getType<List<_i13.DispenseItemRequest>>(),
               nullable: false,
             ),
           },
@@ -841,7 +1763,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['dispenser'] as _i3.DispenserEndpoint)
+              ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
                   .dispensePrescription(
                     session,
                     prescriptionId: params['prescriptionId'],
@@ -862,7 +1784,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['dispenser'] as _i3.DispenserEndpoint)
+              ) async => (endpoints['dispenser'] as _i6.DispenserEndpoint)
                   .getDispenserDispenseHistory(
                     session,
                     limit: params['limit'],
@@ -881,7 +1803,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['doctor'] as _i4.DoctorEndpoint)
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
                   .getDoctorHomeData(session),
         ),
         'getDoctorInfo': _i1.MethodConnector(
@@ -891,7 +1813,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['doctor'] as _i4.DoctorEndpoint)
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
                   .getDoctorInfo(session),
         ),
         'getDoctorProfile': _i1.MethodConnector(
@@ -908,7 +1830,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['doctor'] as _i4.DoctorEndpoint).getDoctorProfile(
+                  (endpoints['doctor'] as _i7.DoctorEndpoint).getDoctorProfile(
                     session,
                     params['doctorId'],
                   ),
@@ -961,7 +1883,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['doctor'] as _i4.DoctorEndpoint)
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
                   .updateDoctorProfile(
                     session,
                     params['doctorId'],
@@ -988,7 +1910,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['doctor'] as _i4.DoctorEndpoint).getPatientByPhone(
+                  (endpoints['doctor'] as _i7.DoctorEndpoint).getPatientByPhone(
                     session,
                     params['phone'],
                   ),
@@ -998,12 +1920,12 @@ class Endpoints extends _i1.EndpointDispatch {
           params: {
             'prescription': _i1.ParameterDescription(
               name: 'prescription',
-              type: _i1.getType<_i11.Prescription>(),
+              type: _i1.getType<_i14.Prescription>(),
               nullable: false,
             ),
             'items': _i1.ParameterDescription(
               name: 'items',
-              type: _i1.getType<List<_i12.PrescribedItem>>(),
+              type: _i1.getType<List<_i15.PrescribedItem>>(),
               nullable: false,
             ),
             'patientPhone': _i1.ParameterDescription(
@@ -1016,7 +1938,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['doctor'] as _i4.DoctorEndpoint)
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
                   .createPrescription(
                     session,
                     params['prescription'],
@@ -1037,7 +1959,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['doctor'] as _i4.DoctorEndpoint)
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
                   .getReportsForDoctor(
                     session,
                     params['doctorId'],
@@ -1056,7 +1978,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['doctor'] as _i4.DoctorEndpoint)
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
                   .markReportReviewed(
                     session,
                     params['reportId'],
@@ -1077,7 +1999,7 @@ class Endpoints extends _i1.EndpointDispatch {
             ),
             'newItems': _i1.ParameterDescription(
               name: 'newItems',
-              type: _i1.getType<List<_i12.PrescribedItem>>(),
+              type: _i1.getType<List<_i15.PrescribedItem>>(),
               nullable: false,
             ),
           },
@@ -1085,7 +2007,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['doctor'] as _i4.DoctorEndpoint)
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
                   .revisePrescription(
                     session,
                     originalPrescriptionId: params['originalPrescriptionId'],
@@ -1116,7 +2038,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['doctor'] as _i4.DoctorEndpoint)
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
                   .getPatientPrescriptionList(
                     session,
                     query: params['query'],
@@ -1137,7 +2059,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['doctor'] as _i4.DoctorEndpoint)
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
                   .getPrescriptionDetails(
                     session,
                     prescriptionId: params['prescriptionId'],
@@ -1157,7 +2079,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['lab'] as _i5.LabEndpoint).getAllLabTests(session),
+                  (endpoints['lab'] as _i8.LabEndpoint).getAllLabTests(session),
         ),
         'createTestResult': _i1.MethodConnector(
           name: 'createTestResult',
@@ -1187,7 +2109,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['lab'] as _i5.LabEndpoint).createTestResult(
+              ) async => (endpoints['lab'] as _i8.LabEndpoint).createTestResult(
                 session,
                 testId: params['testId'],
                 patientName: params['patientName'],
@@ -1200,7 +2122,7 @@ class Endpoints extends _i1.EndpointDispatch {
           params: {
             'test': _i1.ParameterDescription(
               name: 'test',
-              type: _i1.getType<_i13.LabTests>(),
+              type: _i1.getType<_i16.LabTests>(),
               nullable: false,
             ),
           },
@@ -1208,7 +2130,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['lab'] as _i5.LabEndpoint).createLabTest(
+              ) async => (endpoints['lab'] as _i8.LabEndpoint).createLabTest(
                 session,
                 params['test'],
               ),
@@ -1218,7 +2140,7 @@ class Endpoints extends _i1.EndpointDispatch {
           params: {
             'test': _i1.ParameterDescription(
               name: 'test',
-              type: _i1.getType<_i13.LabTests>(),
+              type: _i1.getType<_i16.LabTests>(),
               nullable: false,
             ),
           },
@@ -1226,7 +2148,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['lab'] as _i5.LabEndpoint).updateLabTest(
+              ) async => (endpoints['lab'] as _i8.LabEndpoint).updateLabTest(
                 session,
                 params['test'],
               ),
@@ -1249,7 +2171,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['lab'] as _i5.LabEndpoint).sendDummySms(
+              ) async => (endpoints['lab'] as _i8.LabEndpoint).sendDummySms(
                 session,
                 mobileNumber: params['mobileNumber'],
                 message: params['message'],
@@ -1268,7 +2190,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['lab'] as _i5.LabEndpoint).submitResult(
+              ) async => (endpoints['lab'] as _i8.LabEndpoint).submitResult(
                 session,
                 resultId: params['resultId'],
               ),
@@ -1292,7 +2214,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['lab'] as _i5.LabEndpoint).submitResultWithUrl(
+                  (endpoints['lab'] as _i8.LabEndpoint).submitResultWithUrl(
                     session,
                     resultId: params['resultId'],
                     attachmentUrl: params['attachmentUrl'],
@@ -1305,7 +2227,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['lab'] as _i5.LabEndpoint)
+              ) async => (endpoints['lab'] as _i8.LabEndpoint)
                   .getAllTestResults(session),
         ),
         'getStaffProfile': _i1.MethodConnector(
@@ -1321,7 +2243,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['lab'] as _i5.LabEndpoint).getStaffProfile(
+              ) async => (endpoints['lab'] as _i8.LabEndpoint).getStaffProfile(
                 session,
                 params['userId'],
               ),
@@ -1370,7 +2292,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['lab'] as _i5.LabEndpoint).updateStaffProfile(
+                  (endpoints['lab'] as _i8.LabEndpoint).updateStaffProfile(
                     session,
                     userId: params['userId'],
                     name: params['name'],
@@ -1388,7 +2310,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['lab'] as _i5.LabEndpoint)
+              ) async => (endpoints['lab'] as _i8.LabEndpoint)
                   .getLabHomeTwoDaySummary(session),
         ),
         'getLast10TestHistory': _i1.MethodConnector(
@@ -1398,7 +2320,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['lab'] as _i5.LabEndpoint)
+              ) async => (endpoints['lab'] as _i8.LabEndpoint)
                   .getLast10TestHistory(session),
         ),
       },
@@ -1430,7 +2352,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['notification'] as _i6.NotificationEndpoint)
+              ) async => (endpoints['notification'] as _i9.NotificationEndpoint)
                   .createNotification(
                     session,
                     userId: params['userId'],
@@ -1456,7 +2378,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['notification'] as _i6.NotificationEndpoint)
+              ) async => (endpoints['notification'] as _i9.NotificationEndpoint)
                   .getMyNotifications(
                     session,
                     limit: params['limit'],
@@ -1476,7 +2398,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['notification'] as _i6.NotificationEndpoint)
+              ) async => (endpoints['notification'] as _i9.NotificationEndpoint)
                   .getMyNotificationCounts(
                     session,
                     userId: params['userId'],
@@ -1500,7 +2422,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['notification'] as _i6.NotificationEndpoint)
+              ) async => (endpoints['notification'] as _i9.NotificationEndpoint)
                   .getNotificationById(
                     session,
                     notificationId: params['notificationId'],
@@ -1525,7 +2447,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['notification'] as _i6.NotificationEndpoint)
+              ) async => (endpoints['notification'] as _i9.NotificationEndpoint)
                   .markAsRead(
                     session,
                     notificationId: params['notificationId'],
@@ -1545,7 +2467,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['notification'] as _i6.NotificationEndpoint)
+              ) async => (endpoints['notification'] as _i9.NotificationEndpoint)
                   .markAllAsRead(
                     session,
                     userId: params['userId'],
@@ -1575,7 +2497,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['password'] as _i7.PasswordEndpoint)
+              ) async => (endpoints['password'] as _i10.PasswordEndpoint)
                   .changePassword(
                     session,
                     currentPassword: params['currentPassword'],
@@ -1595,7 +2517,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['patient'] as _i8.PatientEndpoint)
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .getPatientProfile(session),
         ),
         'listTests': _i1.MethodConnector(
@@ -1605,7 +2527,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['patient'] as _i8.PatientEndpoint)
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .listTests(session),
         ),
         'getUserRole': _i1.MethodConnector(
@@ -1622,7 +2544,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['patient'] as _i8.PatientEndpoint).getUserRole(
+                  (endpoints['patient'] as _i11.PatientEndpoint).getUserRole(
                     session,
                     params['userId'],
                   ),
@@ -1670,7 +2592,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['patient'] as _i8.PatientEndpoint)
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .updatePatientProfile(
                     session,
                     params['userId'],
@@ -1695,8 +2617,8 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async =>
-                  (endpoints['patient'] as _i8.PatientEndpoint).getMyLabReports(
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
+                  .getMyLabReports(
                     session,
                     params['userId'],
                   ),
@@ -1714,7 +2636,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['patient'] as _i8.PatientEndpoint)
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .getMyPrescriptionList(
                     session,
                     params['userId'],
@@ -1748,7 +2670,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['patient'] as _i8.PatientEndpoint)
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .finalizeReportUpload(
                     session,
                     patientId: params['patientId'],
@@ -1770,7 +2692,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['patient'] as _i8.PatientEndpoint)
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .getMyExternalReports(
                     session,
                     params['userId'],
@@ -1789,7 +2711,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['patient'] as _i8.PatientEndpoint)
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .getPrescriptionList(
                     session,
                     params['patientId'],
@@ -1808,7 +2730,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['patient'] as _i8.PatientEndpoint)
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .getPrescriptionsByPatientId(
                     session,
                     params['patientId'],
@@ -1827,7 +2749,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['patient'] as _i8.PatientEndpoint)
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .getPrescriptionDetail(
                     session,
                     params['prescriptionId'],
@@ -1840,7 +2762,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['patient'] as _i8.PatientEndpoint)
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .getMedicalStaff(session),
         ),
         'getAmbulanceContacts': _i1.MethodConnector(
@@ -1850,7 +2772,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['patient'] as _i8.PatientEndpoint)
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .getAmbulanceContacts(session),
         ),
         'getOndutyStaff': _i1.MethodConnector(
@@ -1860,7 +2782,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['patient'] as _i8.PatientEndpoint)
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .getOndutyStaff(session),
         ),
       },
@@ -1882,7 +2804,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['greeting'] as _i9.GreetingEndpoint).hello(
+              ) async => (endpoints['greeting'] as _i12.GreetingEndpoint).hello(
                 session,
                 params['name'],
               ),
