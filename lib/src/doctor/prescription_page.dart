@@ -80,9 +80,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
   final TextEditingController _genderController = TextEditingController();
   String? _selectedGender;
 
-  Timer? _autoFillDebounce;
-  String? _lastAutoFilledLast11;
-  bool _autoFillLoading = false;
+  bool _isNormalizingPhone = false;
 
   // whether the current prescription has been successfully saved
   bool _isSaved = false;
@@ -166,7 +164,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     // mark unsaved when any main field changes
     _nameController.addListener(_markUnsaved);
     _rollController.addListener(_markUnsaved);
-    _rollController.addListener(_maybeAutoFillPatientByPhone);
+    _rollController.addListener(_normalizePhoneNumber);
     _ageController.addListener(_markUnsaved);
     _genderController.addListener(_markUnsaved);
     _complainController.addListener(_markUnsaved);
@@ -180,85 +178,25 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     });
   }
 
-  String _digitsOnly(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
-
-  String _last11Digits(String raw) {
-    final d = _digitsOnly(raw);
-    if (d.length <= 11) return d;
-    return d.substring(d.length - 11);
-  }
-
-  void _applyGenderFromRaw(String raw) {
-    final g = raw.trim().toLowerCase();
-    if (g.isEmpty) return;
-
-    if (g == 'male' || g == 'm' || g.startsWith('male')) {
-      _selectedGender = 'Male';
-      _genderController.text = 'Male';
-    } else if (g == 'female' || g == 'f' || g.startsWith('female')) {
-      _selectedGender = 'Female';
-      _genderController.text = 'Female';
-    }
-  }
-
-  void _maybeAutoFillPatientByPhone() {
-    final last11 = _last11Digits(_rollController.text);
-    if (last11.length != 11) return;
-    if (_lastAutoFilledLast11 == last11) return;
-
-    _autoFillDebounce?.cancel();
-    _autoFillDebounce = Timer(const Duration(milliseconds: 450), () {
-      _autoFillPatientByPhone();
-    });
-  }
-
-  Future<void> _autoFillPatientByPhone() async {
-    if (_autoFillLoading) return;
-    final last11 = _last11Digits(_rollController.text);
-    if (last11.length != 11) return;
-
-    setState(() {
-      _autoFillLoading = true;
-    });
+  void _normalizePhoneNumber() {
+    if (_isNormalizingPhone) return;
+    _isNormalizingPhone = true;
 
     try {
-      final res = await client.doctor.getPatientByPhone(last11);
+      final raw = _rollController.text;
+      final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+      final normalized = digits.length <= 11
+          ? digits
+          : digits.substring(digits.length - 11);
 
-      if (kDebugMode) {
-        debugPrint('doctor.getPatientByPhone($last11) -> $res');
-      }
+      if (normalized == raw) return;
 
-      final id = (res['id'] ?? '').trim();
-      if (id.isEmpty) {
-        return; // only auto-fill from an existing account
-      }
-
-      final name = (res['name'] ?? '').trim();
-      final ageStr = (res['age'] ?? '').trim();
-      final genderRaw = (res['gender'] ?? '').trim();
-
-      setState(() {
-        // only fill if doctor hasn't typed yet
-        if (_nameController.text.trim().isEmpty && name.isNotEmpty) {
-          _nameController.text = name;
-        }
-        if (_ageController.text.trim().isEmpty && ageStr.isNotEmpty) {
-          _ageController.text = ageStr;
-        }
-        if ((_selectedGender == null || _selectedGender!.isEmpty) &&
-            genderRaw.isNotEmpty) {
-          _applyGenderFromRaw(genderRaw);
-        }
-        _lastAutoFilledLast11 = last11;
-      });
-    } catch (e) {
-      // ignore - we don't want to block the doctor form
+      _rollController.value = TextEditingValue(
+        text: normalized,
+        selection: TextSelection.collapsed(offset: normalized.length),
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _autoFillLoading = false;
-        });
-      }
+      _isNormalizingPhone = false;
     }
   }
 
@@ -354,7 +292,6 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
 
   @override
   void dispose() {
-    _autoFillDebounce?.cancel();
     _nameController.dispose();
     _rollController.dispose();
     _ageController.dispose();
@@ -1433,7 +1370,6 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                             keyboardType: TextInputType.number,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(11),
                             ],
                             decoration: InputDecoration(
                               prefixText: "+88 ",
@@ -1441,22 +1377,6 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                                 color: Colors.black,
                                 fontWeight: FontWeight.bold,
                               ),
-                              suffixIcon: _autoFillLoading
-                                  ? const Padding(
-                                      padding: EdgeInsets.all(10),
-                                      child: SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
-                                    )
-                                  : IconButton(
-                                      tooltip: 'Auto-fill from account',
-                                      icon: const Icon(Icons.search),
-                                      onPressed: _autoFillPatientByPhone,
-                                    ),
                               border: const UnderlineInputBorder(),
                               isDense: true,
                               contentPadding: const EdgeInsets.only(bottom: 4),
@@ -1575,7 +1495,6 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                             keyboardType: TextInputType.number,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(11),
                             ],
                             decoration: InputDecoration(
                               prefixText: "+88 ",
@@ -1583,22 +1502,6 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                                 color: Colors.black,
                                 fontWeight: FontWeight.bold,
                               ),
-                              suffixIcon: _autoFillLoading
-                                  ? const Padding(
-                                      padding: EdgeInsets.all(10),
-                                      child: SizedBox(
-                                        width: 16,
-
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
-                                    )
-                                  : IconButton(
-                                      tooltip: 'Auto-fill from account',
-                                      icon: const Icon(Icons.search),
-                                      onPressed: _autoFillPatientByPhone,
-                                    ),
                               border: const UnderlineInputBorder(),
                               isDense: true,
                               contentPadding: const EdgeInsets.only(bottom: 4),

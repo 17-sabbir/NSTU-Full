@@ -6,7 +6,6 @@ import 'package:backend_client/backend_client.dart';
 import 'package:dishari/src/doctor/prescription_page.dart';
 import 'dosage_times.dart';
 
-
 class PatientRecordsPage extends StatefulWidget {
   const PatientRecordsPage({super.key});
 
@@ -57,6 +56,12 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
   }
 
   String _digitsOnly(String input) => input.replaceAll(RegExp(r'[^0-9]'), '');
+
+  String _last11Digits(String raw) {
+    final d = _digitsOnly(raw);
+    if (d.length <= 11) return d;
+    return d.substring(d.length - 11);
+  }
 
   bool _phonesMatchByLast11(String? a, String? b) {
     final da = _digitsOnly(a ?? '');
@@ -180,7 +185,8 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
 
   Future<void> _continueFromSearchNumber() async {
     final raw = _searchController.text.trim();
-    if (raw.isEmpty) {
+    final last11 = _last11Digits(raw);
+    if (last11.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter a phone number first')),
       );
@@ -188,7 +194,7 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
     }
 
     try {
-      final res = await client.doctor.getPatientByPhone(raw);
+      final res = await client.doctor.getPatientByPhone(last11);
       final nameFromAccount = (res['name'] ?? '').trim();
 
       // Backend returns these keys when patient exists:
@@ -214,7 +220,7 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
       // Try to auto-fill gender/age from the most recent record (if any)
       PatientPrescriptionListItem? bestRecord;
       for (final r in _patients) {
-        if (_phonesMatchByLast11(r.mobileNumber, raw)) {
+        if (_phonesMatchByLast11(r.mobileNumber, last11)) {
           bestRecord = r;
           break;
         }
@@ -287,32 +293,12 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
               decoration: InputDecoration(
                 hintText: 'Search by phone number...',
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_searching)
-                      const Padding(
-                        padding: EdgeInsets.only(right: 4),
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    IconButton(
-                      tooltip: 'Next',
-                      icon: const Icon(Icons.keyboard_return),
-                      onPressed: _continueFromSearchNumber,
-                    ),
-                  ],
-                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
                 fillColor: Colors.grey[50],
               ),
-              onSubmitted: (_) => _continueFromSearchNumber(),
             ),
           ),
 
@@ -390,7 +376,11 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
             ),
         ],
       ),
-      floatingActionButton: null,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _continueFromSearchNumber,
+        tooltip: 'New Prescription',
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }
