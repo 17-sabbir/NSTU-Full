@@ -307,7 +307,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(48),
             child: Container(
-              color: Colors.white, // ✅ TabBar background
+              color: Colors.white, //TabBar background
               child: const TabBar(
                 labelColor: Color(0xFF00695C), // selected tab text
                 unselectedLabelColor: Color(0xFF00695C),

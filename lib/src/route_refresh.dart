@@ -26,6 +26,10 @@ mixin RouteRefreshMixin<T extends StatefulWidget> on State<T>
 
   Future<void> refreshOnFocus();
 
+  /// Trigger a refresh from a user gesture (e.g., pull-to-refresh).
+  /// Uses the same cooldown + in-flight coalescing as focus-based refresh.
+  Future<void> refreshFromPull() => _maybeRefresh();
+
   Future<void> _maybeRefresh() {
     if (!mounted) return Future.value();
 
@@ -100,17 +104,21 @@ mixin RouteRefreshMixin<T extends StatefulWidget> on State<T>
 
   @override
   void handleCancelBackGesture() {}
-
+  @override
   void didChangeAccessibilityFeatures() {}
-
+  @override
   void didChangeLocales(List<Locale>? locales) {}
 
+  @override
   void didChangeMetrics() {}
 
+  @override
   void didChangePlatformBrightness() {}
 
+  @override
   void didChangeTextScaleFactor() {}
 
+  @override
   void didHaveMemoryPressure() {}
 
   @override
@@ -118,11 +126,11 @@ mixin RouteRefreshMixin<T extends StatefulWidget> on State<T>
 
   @override
   Future<AppExitResponse> didRequestAppExit() async => AppExitResponse.exit;
-
+  @override
   Future<bool> didPopRoute() async => false;
-
+  @override
   Future<bool> didPushRoute(String route) async => false;
-
+  @override
   Future<bool> didPushRouteInformation(
     RouteInformation routeInformation,
   ) async => false;

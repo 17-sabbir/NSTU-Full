@@ -125,188 +125,219 @@ class _PatientLabTestAvailabilityState extends State<PatientLabTestAvailability>
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(child: Text(_error!))
-          : labTestsDB.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'No tests found',
-                    style: TextStyle(
-                      color: kPrimaryColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Role: ${_role.isEmpty ? 'UNKNOWN/OUTSIDE' : _role}',
-                    style: const TextStyle(color: Colors.black54),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Fetched: ${labTestsDB.length} tests',
-                    style: const TextStyle(color: Colors.black54),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: () async {
-                      // quick retry
-                      await _loadData();
-                    },
-                    child: const Text('Retry'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () {
-                      // print debug info to console
-                      debugPrint(
-                        'DEBUG: labTestsDB content => ${labTestsDB.toString()}',
-                      );
-                    },
-                    child: const Text('Show debug in console'),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: labTestsDB.length,
-              itemBuilder: (context, index) {
-                final LabTests test = labTestsDB[index];
-                final String name = test.testName;
-                final String description = test.description;
-                final bool available = test.available;
-
-                double feeVal;
-                if (_role.contains('STUDENT')) {
-                  feeVal = test.studentFee;
-                } else if (_role.contains('TEACHER') ||
-                    _role.contains('STAFF')) {
-                  feeVal = test.teacherFee;
-                } else {
-                  feeVal = test.outsideFee;
-                }
-
-                return Card(
-                  elevation: 3,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          : RefreshIndicator(
+              onRefresh: refreshFromPull,
+              child: _error != null
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(24),
                       children: [
-                        // Test name
-                        Text(
-                          "${index + 1}. $name",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: kPrimaryColor,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        if (description.isNotEmpty)
-                          Text(
-                            description,
-                            style: const TextStyle(color: Colors.black54),
-                          ),
-                        const SizedBox(height: 8),
-                        // Fee row
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Fee: ${feeVal.toStringAsFixed(2)} taka',
-                              style: const TextStyle(color: Colors.black87),
-                            ),
-                            Text(
-                              available ? 'Available' : 'Unavailable',
-                              style: TextStyle(
-                                color: available ? Colors.green : Colors.red,
-                                fontWeight: FontWeight.w600,
+                        const SizedBox(height: 80),
+                        Center(child: Text(_error!)),
+                      ],
+                    )
+                  : labTestsDB.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(24),
+                      children: [
+                        const SizedBox(height: 40),
+                        Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'No tests found',
+                                style: TextStyle(
+                                  color: kPrimaryColor,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: ElevatedButton.icon(
-                            onPressed: available
-                                ? () {
-                                    final instructions =
-                                        'This feature is not implemented in the app yet.\n\n'
-                                        'Please visit the NSTU bank, pay the required fee, and obtain a payment token. '
-                                        'Then go to the Lab Test Center (2nd floor of the NSTU Medical Center) and present the token to receive the service.';
-
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: Text('Test Name - $name'),
-                                        content: SingleChildScrollView(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                'Fee: ${feeVal.toStringAsFixed(2)} taka',
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                available
-                                                    ? 'Status: Available'
-                                                    : 'Status: Unavailable',
-                                                style: TextStyle(
-                                                  color: available
-                                                      ? Colors.green
-                                                      : Colors.red,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 12),
-                                              SelectableText(
-                                                instructions,
-                                                showCursor: true,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.of(context).pop(),
-                                            child: const Text('Close'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }
-                                : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: kPrimaryColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Role: ${_role.isEmpty ? 'UNKNOWN/OUTSIDE' : _role}',
+                                style: const TextStyle(color: Colors.black54),
                               ),
-                            ),
-                            label: const Text(
-                              "Details",
-                              style: TextStyle(color: Colors.white),
-                            ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Fetched: ${labTestsDB.length} tests',
+                                style: const TextStyle(color: Colors.black54),
+                              ),
+                              const SizedBox(height: 12),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  await _loadData();
+                                },
+                                child: const Text('Retry'),
+                              ),
+                              const SizedBox(height: 12),
+                              TextButton(
+                                onPressed: () {
+                                  debugPrint(
+                                    'DEBUG: labTestsDB content => ${labTestsDB.toString()}',
+                                  );
+                                },
+                                child: const Text('Show debug in console'),
+                              ),
+                            ],
                           ),
                         ),
                       ],
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      itemCount: labTestsDB.length,
+                      itemBuilder: (context, index) {
+                        final LabTests test = labTestsDB[index];
+                        final String name = test.testName;
+                        final String description = test.description;
+                        final bool available = test.available;
+
+                        double feeVal;
+                        if (_role.contains('STUDENT')) {
+                          feeVal = test.studentFee;
+                        } else if (_role.contains('TEACHER') ||
+                            _role.contains('STAFF')) {
+                          feeVal = test.teacherFee;
+                        } else {
+                          feeVal = test.outsideFee;
+                        }
+
+                        return Card(
+                          elevation: 3,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Test name
+                                Text(
+                                  "${index + 1}. $name",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: kPrimaryColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                if (description.isNotEmpty)
+                                  Text(
+                                    description,
+                                    style: const TextStyle(
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                const SizedBox(height: 8),
+                                // Fee row
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Fee: ${feeVal.toStringAsFixed(2)} taka',
+                                      style: const TextStyle(
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    Text(
+                                      available ? 'Available' : 'Unavailable',
+                                      style: TextStyle(
+                                        color: available
+                                            ? Colors.green
+                                            : Colors.red,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: ElevatedButton.icon(
+                                    onPressed: available
+                                        ? () {
+                                            final instructions =
+                                                'This feature is not implemented in the app yet.\n\n'
+                                                'Please visit the NSTU bank, pay the required fee, and obtain a payment token. '
+                                                'Then go to the Lab Test Center (2nd floor of the NSTU Medical Center) and present the token to receive the service.';
+
+                                            showDialog(
+                                              context: context,
+                                              builder: (context) => AlertDialog(
+                                                title: Text(
+                                                  'Test Name - $name',
+                                                ),
+                                                content: SingleChildScrollView(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        'Fee: ${feeVal.toStringAsFixed(2)} taka',
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 8),
+                                                      Text(
+                                                        available
+                                                            ? 'Status: Available'
+                                                            : 'Status: Unavailable',
+                                                        style: TextStyle(
+                                                          color: available
+                                                              ? Colors.green
+                                                              : Colors.red,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 12,
+                                                      ),
+                                                      SelectableText(
+                                                        instructions,
+                                                        showCursor: true,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.of(
+                                                          context,
+                                                        ).pop(),
+                                                    child: const Text('Close'),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          }
+                                        : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: kPrimaryColor,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    label: const Text(
+                                      "Details",
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  ),
-                );
-              },
             ),
     );
   }

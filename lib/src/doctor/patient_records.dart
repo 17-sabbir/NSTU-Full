@@ -73,6 +73,10 @@ class _PatientRecordsPageState extends State<PatientRecordsPage>
     return d.substring(d.length - 11);
   }
 
+  bool _isValidBdMobile11(String digits11) {
+    return digits11.length == 11 && digits11.startsWith('01');
+  }
+
   bool _phonesMatchByLast11(String? a, String? b) {
     final da = _digitsOnly(a ?? '');
     final db = _digitsOnly(b ?? '');
@@ -203,6 +207,19 @@ class _PatientRecordsPageState extends State<PatientRecordsPage>
       return;
     }
 
+    // Search supports partial numbers, but creating a prescription requires
+    // a full BD mobile (11 digits, starting with 01).
+    if (!_isValidBdMobile11(last11)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'To create prescription, enter 11-digit mobile starting with 01',
+          ),
+        ),
+      );
+      return;
+    }
+
     try {
       final res = await client.doctor.getPatientByPhone(last11);
       final nameFromAccount = (res['name'] ?? '').trim();
@@ -246,11 +263,12 @@ class _PatientRecordsPageState extends State<PatientRecordsPage>
                 : (bestRecord?.name.isNotEmpty == true
                       ? bestRecord!.name
                       : null),
-            initialPatientNumber: raw,
+            // Pass normalized digits so PrescriptionPage doesn't receive '+88', spaces, etc.
+            initialPatientNumber: last11,
             initialPatientGender: genderFromBackend.isNotEmpty
                 ? genderFromBackend
                 : bestRecord?.gender,
-            initialPatientAge: ageFromBackend ?? ageFromDob,
+            initialPatientAge: ageFromBackend ?? ageFromDob ?? bestRecord?.age,
           ),
         ),
       );
@@ -298,7 +316,9 @@ class _PatientRecordsPageState extends State<PatientRecordsPage>
               controller: _searchController,
               keyboardType: TextInputType.phone,
               inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9+ -]')),
+                // Allow partial phone input, including +88 / spaces / dashes.
+                // Also allow '*' since some users type it by habit.
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9+* -]')),
               ],
               decoration: InputDecoration(
                 hintText: 'Search by phone number...',

@@ -506,116 +506,120 @@ class _PatientDashboardState extends State<PatientDashboard>
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(responsiveWidth(16)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: responsiveHeight(20)),
+        child: RefreshIndicator(
+          onRefresh: refreshFromPull,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.all(responsiveWidth(16)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: responsiveHeight(20)),
 
-              // Header
-              buildHeader(),
+                // Header
+                buildHeader(),
 
-              SizedBox(height: responsiveHeight(20)),
+                SizedBox(height: responsiveHeight(20)),
 
-              const Text(
-                "On Duty Medical Staff",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                const Text(
+                  "On Duty Medical Staff",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
-              ),
-              SizedBox(height: responsiveHeight(12)),
-              buildOnduty(),
+                SizedBox(height: responsiveHeight(12)),
+                buildOnduty(),
 
-              SizedBox(height: responsiveHeight(24)),
+                SizedBox(height: responsiveHeight(24)),
 
-              // Quick Actions
-              const Text(
-                "Quick Actions",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                // Quick Actions
+                const Text(
+                  "Quick Actions",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
-              ),
-              SizedBox(height: responsiveHeight(12)),
+                SizedBox(height: responsiveHeight(12)),
 
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  double itemWidth =
-                      (constraints.maxWidth - responsiveWidth(16)) / 2;
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    double itemWidth =
+                        (constraints.maxWidth - responsiveWidth(16)) / 2;
 
-                  return Wrap(
-                    spacing: responsiveWidth(16),
-                    runSpacing: responsiveHeight(16),
-                    children: [
-                      buildActionCard(
-                        icon: Icons.person,
-                        label: "Profile",
-                        onTap: () {
-                          // Open profile page; profile page will fetch the data itself.
-                          Navigator.pushNamed(context, '/patient/profile');
-                        },
-                        width: itemWidth,
-                      ),
-                      buildActionCard(
-                        icon: Icons.medication,
-                        label: "Prescriptions",
-                        onTap: () {
-                          Navigator.pushNamed(
-                            context,
-                            '/patient/prescriptions',
-                          );
-                        },
-                        width: itemWidth,
-                      ),
-                      buildActionCard(
-                        icon: Icons.description,
-                        label: "My Reports",
-                        onTap: () {
-                          Navigator.pushNamed(context, '/patient/reports');
-                        },
-                        width: itemWidth,
-                      ),
-                      buildActionCard(
-                        icon: Icons.upload_file,
-                        label: "Upload Results",
-                        onTap: () {
-                          Navigator.pushNamed(context, '/patient/upload');
-                        },
-                        width: itemWidth,
-                        startColor: Colors.blueAccent,
-                        endColor: Colors.blue,
-                      ),
-                      buildActionCard(
-                        icon: Icons.science_outlined,
-                        label: "Lab Test Availability",
-                        onTap: () {
-                          Navigator.pushNamed(context, '/patient/lab');
-                        },
-                        width: itemWidth,
-                        startColor: Colors.tealAccent,
-                        endColor: Colors.teal,
-                      ),
-                      buildActionCard(
-                        icon: Icons.local_hospital,
-                        label: "Ambulance & Staff",
-                        onTap: () {
-                          Navigator.pushNamed(context, '/patient/ambulance');
-                        },
-                        width: itemWidth,
-                        startColor: Colors.orangeAccent,
-                        endColor: Colors.deepOrange,
-                      ),
-                    ],
-                  );
-                },
-              ),
+                    return Wrap(
+                      spacing: responsiveWidth(16),
+                      runSpacing: responsiveHeight(16),
+                      children: [
+                        buildActionCard(
+                          icon: Icons.person,
+                          label: "Profile",
+                          onTap: () {
+                            // Open profile page; profile page will fetch the data itself.
+                            Navigator.pushNamed(context, '/patient/profile');
+                          },
+                          width: itemWidth,
+                        ),
+                        buildActionCard(
+                          icon: Icons.medication,
+                          label: "Prescriptions",
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              '/patient/prescriptions',
+                            );
+                          },
+                          width: itemWidth,
+                        ),
+                        buildActionCard(
+                          icon: Icons.description,
+                          label: "My Reports",
+                          onTap: () {
+                            Navigator.pushNamed(context, '/patient/reports');
+                          },
+                          width: itemWidth,
+                        ),
+                        buildActionCard(
+                          icon: Icons.upload_file,
+                          label: "Upload Results",
+                          onTap: () {
+                            Navigator.pushNamed(context, '/patient/upload');
+                          },
+                          width: itemWidth,
+                          startColor: Colors.blueAccent,
+                          endColor: Colors.blue,
+                        ),
+                        buildActionCard(
+                          icon: Icons.science_outlined,
+                          label: "Lab Test Availability",
+                          onTap: () {
+                            Navigator.pushNamed(context, '/patient/lab');
+                          },
+                          width: itemWidth,
+                          startColor: Colors.tealAccent,
+                          endColor: Colors.teal,
+                        ),
+                        buildActionCard(
+                          icon: Icons.local_hospital,
+                          label: "Ambulance & Staff",
+                          onTap: () {
+                            Navigator.pushNamed(context, '/patient/ambulance');
+                          },
+                          width: itemWidth,
+                          startColor: Colors.orangeAccent,
+                          endColor: Colors.deepOrange,
+                        ),
+                      ],
+                    );
+                  },
+                ),
 
-              SizedBox(height: responsiveHeight(20)),
-            ],
+                SizedBox(height: responsiveHeight(20)),
+              ],
+            ),
           ),
         ),
       ),

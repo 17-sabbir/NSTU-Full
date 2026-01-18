@@ -142,6 +142,8 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     final number = widget.initialPatientNumber?.trim();
     if (number != null && number.isNotEmpty) {
       _rollController.text = number;
+      // Prefill can come from search (may include +88/spaces/etc). Normalize once.
+      _normalizePhoneNumber();
     }
 
     final age = widget.initialPatientAge;
@@ -807,13 +809,15 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     }
 
     // Inside _validateForm()
-    final number = _rollController.text
-        .trim(); // Controller only holds the 11 digits
+    final number = _rollController.text.trim(); // should be 11 digits
     if (number.isEmpty) {
       _numberError = 'Number is required';
       ok = false;
     } else if (number.length != 11) {
       _numberError = 'Number must be 11 digits';
+      ok = false;
+    } else if (!number.startsWith('01')) {
+      _numberError = 'Number must start with 01';
       ok = false;
     }
 

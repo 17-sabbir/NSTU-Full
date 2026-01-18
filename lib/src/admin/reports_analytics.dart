@@ -24,6 +24,8 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics>
   bool _loading = true;
   pw.Font? _englishFont;
 
+  static const int _patientCountFetchLimit = 200000;
+
   DateTime? _medicineFromDate;
   DateTime? _medicineToDate;
   Set<DateTime>? _medicineAvailableDates;
@@ -351,13 +353,43 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics>
   //     months: _months,
   //   );
   // }
+
+  Future<int?> _tryCountUsersByRole(String role) async {
+    try {
+      final users = await client.adminEndpoints.listUsersByRole(
+        role,
+        _patientCountFetchLimit,
+      );
+      return users.length;
+    } catch (e, st) {
+      debugPrint('Failed to count users for role=$role: $e\n$st');
+      return null;
+    }
+  }
+
+  Future<int?> _computeTeacherStudentStaffTotalPatients() async {
+    final counts = await Future.wait<int?>([
+      _tryCountUsersByRole('STUDENT'),
+      _tryCountUsersByRole('TEACHER'),
+      _tryCountUsersByRole('STAFF'),
+    ]);
+
+    if (counts.any((c) => c == null)) return null;
+    return (counts[0] ?? 0) + (counts[1] ?? 0) + (counts[2] ?? 0);
+  }
+
   Future<void> _fetchAnalytics({bool silent = false}) async {
     try {
       if (!mounted) return;
       if (!silent) {
         setState(() => _loading = true);
       }
-      final data = await client.adminReportEndpoints.getDashboardAnalytics();
+
+      final analyticsFuture = client.adminReportEndpoints
+          .getDashboardAnalytics();
+      final correctedTotalFuture = _computeTeacherStudentStaffTotalPatients();
+
+      final data = await analyticsFuture;
       // debugPrint('Raw dashboard analytics: $data');
       // Fill missing months with zero
       // -------------------------
@@ -379,6 +411,19 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics>
 
       // Replace original monthlyBreakdown with full list
       data.monthlyBreakdown = fullMonthlyBreakdown;
+
+      // UI-only correction:
+      // Backend currently counts (Student + Teacher + Outside) as totalPatients.
+      // For this page we want (Student + Teacher + Staff).
+      final correctedTotal = await correctedTotalFuture;
+
+      // Fallback: at minimum, exclude Outside when corrected total isn't available.
+      var fallbackTeacherStudent = data.totalPatients - data.outPatients;
+      if (fallbackTeacherStudent < 0) fallbackTeacherStudent = 0;
+
+      final finalTotalPatients = correctedTotal ?? fallbackTeacherStudent;
+      data.totalPatients = finalTotalPatients;
+      data.patientCount = finalTotalPatients;
 
       if (!mounted) return;
       setState(() {

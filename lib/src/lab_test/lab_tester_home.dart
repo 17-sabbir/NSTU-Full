@@ -190,299 +190,314 @@ class _LabTesterHomeState extends State<LabTesterHome>
     final yesterdayPending = (_twoDay?.yesterdayPendingUploads ?? 0).toString();
     final yesterdaySubmitted = (_twoDay?.yesterdaySubmitted ?? 0).toString();
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF4FACFE), Color(0xFF00F2FE)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+    return RefreshIndicator(
+      onRefresh: refreshFromPull,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4FACFE), Color(0xFF00F2FE)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha((0.06 * 255).round()),
+                    blurRadius: 12,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha((0.06 * 255).round()),
-                  blurRadius: 12,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.white.withAlpha((0.2 * 255).round()),
-                  backgroundImage:
-                      (profilePictureUrl != null &&
-                          profilePictureUrl!.isNotEmpty)
-                      ? NetworkImage(profilePictureUrl!)
-                      : null,
-                  child:
-                      (profilePictureUrl == null || profilePictureUrl!.isEmpty)
-                      ? const Icon(Icons.person, color: Colors.white, size: 40)
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name.isNotEmpty ? name : 'Name',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.white.withAlpha(
+                      (0.2 * 255).round(),
+                    ),
+                    backgroundImage:
+                        (profilePictureUrl != null &&
+                            profilePictureUrl!.isNotEmpty)
+                        ? NetworkImage(profilePictureUrl!)
+                        : null,
+                    child:
+                        (profilePictureUrl == null ||
+                            profilePictureUrl!.isEmpty)
+                        ? const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 40,
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name.isNotEmpty ? name : 'Name',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        designation.isNotEmpty ? designation : 'Lab Technician',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
+                        const SizedBox(height: 6),
+                        Text(
+                          designation.isNotEmpty
+                              ? designation
+                              : 'Lab Technician',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Chip(
-                            backgroundColor: Colors.brown,
-                            label: Text(
-                              'Today: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Chip(
+                              backgroundColor: Colors.brown,
+                              label: Text(
+                                'Today: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-          const Text(
-            "Two Day Overview",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isMobile = constraints.maxWidth < 600;
-
-              return Wrap(
-                runSpacing: 12,
-                spacing: 12,
-                children: [
-                  SizedBox(
-                    width: isMobile
-                        ? constraints.maxWidth
-                        : constraints.maxWidth * 0.48,
-                    child: _interactiveStat(
-                      todayPending,
-                      'Pending (Today)',
-                      Icons.pending_actions,
-                      Colors.orange,
-                    ),
-                  ),
-                  SizedBox(
-                    width: isMobile
-                        ? constraints.maxWidth
-                        : constraints.maxWidth * 0.48,
-                    child: _interactiveStat(
-                      todaySubmitted,
-                      'Submitted (Today)',
-                      Icons.task_alt,
-                      Colors.green,
-                    ),
-                  ),
-                  SizedBox(
-                    width: isMobile
-                        ? constraints.maxWidth
-                        : constraints.maxWidth * 0.48,
-                    child: _interactiveStat(
-                      yesterdayPending,
-                      'Pending (Yesterday)',
-                      Icons.pending_actions,
-                      Colors.deepOrange,
-                    ),
-                  ),
-                  SizedBox(
-                    width: isMobile
-                        ? constraints.maxWidth
-                        : constraints.maxWidth * 0.48,
-                    child: _interactiveStat(
-                      yesterdaySubmitted,
-                      'Submitted (Yesterday)',
-                      Icons.task_alt,
-                      Colors.teal,
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              );
-            },
-          ),
-
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              const Text(
-                "Last 10 Test History",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const Spacer(),
-            ],
-          ),
-          const SizedBox(height: 8),
+            ),
 
-          if (_homeLoading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(12),
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (_homeError != null)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(
-                'Failed: $_homeError',
-                style: const TextStyle(color: Colors.red),
-              ),
-            )
-          else
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: _last10.isEmpty
-                    ? [const ListTile(title: Text('No history found'))]
-                    : _last10.map((item) {
-                        final isPending = item.isUploaded == false;
-                        final isSubmitted = item.submittedAt != null;
+            const SizedBox(height: 20),
+            const Text(
+              "Two Day Overview",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
 
-                        String fmt(DateTime? dt) {
-                          if (dt == null) return '';
-                          return '${dt.day}/${dt.month}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-                        }
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < 600;
 
-                        final dateText = fmt(item.createdAt);
-                        final statusText = isPending
-                            ? 'Pending'
-                            : (isSubmitted ? 'Submitted' : 'Uploaded');
+                return Wrap(
+                  runSpacing: 12,
+                  spacing: 12,
+                  children: [
+                    SizedBox(
+                      width: isMobile
+                          ? constraints.maxWidth
+                          : constraints.maxWidth * 0.48,
+                      child: _interactiveStat(
+                        todayPending,
+                        'Pending (Today)',
+                        Icons.pending_actions,
+                        Colors.orange,
+                      ),
+                    ),
+                    SizedBox(
+                      width: isMobile
+                          ? constraints.maxWidth
+                          : constraints.maxWidth * 0.48,
+                      child: _interactiveStat(
+                        todaySubmitted,
+                        'Submitted (Today)',
+                        Icons.task_alt,
+                        Colors.green,
+                      ),
+                    ),
+                    SizedBox(
+                      width: isMobile
+                          ? constraints.maxWidth
+                          : constraints.maxWidth * 0.48,
+                      child: _interactiveStat(
+                        yesterdayPending,
+                        'Pending (Yesterday)',
+                        Icons.pending_actions,
+                        Colors.deepOrange,
+                      ),
+                    ),
+                    SizedBox(
+                      width: isMobile
+                          ? constraints.maxWidth
+                          : constraints.maxWidth * 0.48,
+                      child: _interactiveStat(
+                        yesterdaySubmitted,
+                        'Submitted (Yesterday)',
+                        Icons.task_alt,
+                        Colors.teal,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
 
-                        final statusColor = isPending
-                            ? Colors.orange
-                            : Colors.green;
-                        // Keep a consistent badge width so the last character aligns.
-                        const double statusBadgeWidth = 90;
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                const Text(
+                  "Last 10 Test History",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+              ],
+            ),
+            const SizedBox(height: 8),
 
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                backgroundColor: Colors.grey.shade200,
-                                child: Icon(
-                                  isPending
-                                      ? Icons.pending_actions
-                                      : Icons.task_alt,
-                                  color: statusColor,
+            if (_homeLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (_homeError != null)
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  'Failed: $_homeError',
+                  style: const TextStyle(color: Colors.red),
+                ),
+              )
+            else
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: _last10.isEmpty
+                      ? [const ListTile(title: Text('No history found'))]
+                      : _last10.map((item) {
+                          final isPending = item.isUploaded == false;
+                          final isSubmitted = item.submittedAt != null;
+
+                          String fmt(DateTime? dt) {
+                            if (dt == null) return '';
+                            return '${dt.day}/${dt.month}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                          }
+
+                          final dateText = fmt(item.createdAt);
+                          final statusText = isPending
+                              ? 'Pending'
+                              : (isSubmitted ? 'Submitted' : 'Uploaded');
+
+                          final statusColor = isPending
+                              ? Colors.orange
+                              : Colors.green;
+                          // Keep a consistent badge width so the last character aligns.
+                          const double statusBadgeWidth = 90;
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: Colors.grey.shade200,
+                                  child: Icon(
+                                    isPending
+                                        ? Icons.pending_actions
+                                        : Icons.task_alt,
+                                    color: statusColor,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
+                                const SizedBox(width: 12),
 
-                              // ✅ This takes all remaining space
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                // ✅ This takes all remaining space
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.patientName.isNotEmpty
+                                            ? item.patientName
+                                            : 'Unknown',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${item.mobileNumber}  •  $dateText',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.grey.shade700,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(width: 12),
+
+                                // right badges (no big gap)
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    Text(
-                                      item.patientName.isNotEmpty
-                                          ? item.patientName
-                                          : 'Unknown',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: statusColor.withAlpha(
+                                          (0.12 * 255).round(),
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        statusText,
+                                        style: TextStyle(
+                                          color: statusColor,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                        ),
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
+                                    const SizedBox(height: 6),
                                     Text(
-                                      '${item.mobileNumber}  •  $dateText',
+                                      item.testName ?? '',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        color: Colors.grey.shade700,
                                         fontSize: 12,
+                                        color: Colors.grey.shade700,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-
-                              const SizedBox(width: 12),
-
-                              // right badges (no big gap)
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withAlpha(
-                                        (0.12 * 255).round(),
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      statusText,
-                                      style: TextStyle(
-                                        color: statusColor,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    item.testName ?? '',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade700,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

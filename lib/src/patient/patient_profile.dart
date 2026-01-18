@@ -473,61 +473,65 @@ class _PatientProfilePageState extends State<PatientProfilePage>
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  _buildHeaderSection(),
-                  const SizedBox(height: 24),
-                  _buildSectionCard(
-                    title: 'Personal Information',
-                    children: [
-                      _buildModernField(
-                        controller: _nameController,
-                        label: 'Full Name',
-                        icon: Icons.person_outline,
-                      ),
-                      _buildModernField(
-                        controller: _emailController,
-                        label: 'Email Address',
-                        icon: Icons.mail_outline,
-                        keyboardType: TextInputType.emailAddress,
-                        inputFormatters: [
-                          MailPhnUpdateVerify.denyWhitespaceFormatter,
-                        ],
-                        suffix:
-                            (_emailChanged && !_emailVerifiedForCurrentValue)
-                            ? _verifySuffixButton(_verifyEmailChange)
-                            : null,
-                      ),
-                      _buildModernField(
-                        controller: _phoneController,
-                        label: 'Phone Number',
-                        icon: Icons.phone_android_outlined,
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          MailPhnUpdateVerify
-                              .phoneDigitsAndOptionalLeadingPlusFormatter,
-                          LengthLimitingTextInputFormatter(14),
-                        ],
-                        suffix:
-                            (_phoneChanged && !_phoneVerifiedForCurrentValue)
-                            ? _verifySuffixButton(_verifyPhoneChangeDummy)
-                            : null,
-                      ),
-                      _buildModernField(
-                        controller: _bloodGroupController,
-                        label: 'Blood Group',
-                        icon: Icons.water_drop_outlined,
-                      ),
-                      _buildGenderDropdown(),
-                      _buildDobDisplay(),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _buildActionButtons(),
-                  const SizedBox(height: 30),
-                ],
+          : RefreshIndicator(
+              onRefresh: refreshFromPull,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    _buildHeaderSection(),
+                    const SizedBox(height: 24),
+                    _buildSectionCard(
+                      title: 'Personal Information',
+                      children: [
+                        _buildModernField(
+                          controller: _nameController,
+                          label: 'Full Name',
+                          icon: Icons.person_outline,
+                        ),
+                        _buildModernField(
+                          controller: _emailController,
+                          label: 'Email Address',
+                          icon: Icons.mail_outline,
+                          keyboardType: TextInputType.emailAddress,
+                          inputFormatters: [
+                            MailPhnUpdateVerify.denyWhitespaceFormatter,
+                          ],
+                          suffix:
+                              (_emailChanged && !_emailVerifiedForCurrentValue)
+                              ? _verifySuffixButton(_verifyEmailChange)
+                              : null,
+                        ),
+                        _buildModernField(
+                          controller: _phoneController,
+                          label: 'Phone Number',
+                          icon: Icons.phone_android_outlined,
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            MailPhnUpdateVerify
+                                .phoneDigitsAndOptionalLeadingPlusFormatter,
+                            LengthLimitingTextInputFormatter(14),
+                          ],
+                          suffix:
+                              (_phoneChanged && !_phoneVerifiedForCurrentValue)
+                              ? _verifySuffixButton(_verifyPhoneChangeDummy)
+                              : null,
+                        ),
+                        _buildModernField(
+                          controller: _bloodGroupController,
+                          label: 'Blood Group',
+                          icon: Icons.water_drop_outlined,
+                        ),
+                        _buildGenderDropdown(),
+                        _buildDobDisplay(),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _buildActionButtons(),
+                    const SizedBox(height: 30),
+                  ],
+                ),
               ),
             ),
     );

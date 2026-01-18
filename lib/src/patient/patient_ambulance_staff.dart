@@ -216,95 +216,99 @@ class _PatientAmbulanceStaffState extends State<PatientAmbulanceStaff>
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(15),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Ambulance Section
-            Container(
-              width: double.infinity,
-              alignment: Alignment.center,
-              child: Text(
-                "🚨 Emergency Ambulance Contact",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red.shade700,
+      body: RefreshIndicator(
+        onRefresh: refreshFromPull,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Ambulance Section
+              Container(
+                width: double.infinity,
+                alignment: Alignment.center,
+                child: Text(
+                  "🚨 Emergency Ambulance Contact",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade700,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            FutureBuilder<List<AmbulanceContact>>(
-              future: _ambulances,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return const Center(
-                    child: Text(
-                      "Failed to load ambulance contacts",
-                      style: TextStyle(color: Colors.red),
-                    ),
+              const SizedBox(height: 10),
+              FutureBuilder<List<AmbulanceContact>>(
+                future: _ambulances,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return const Center(
+                      child: Text(
+                        "Failed to load ambulance contacts",
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    );
+                  }
+                  final contacts = snapshot.data ?? [];
+                  if (contacts.isEmpty) {
+                    return const Center(
+                      child: Text("No ambulance contacts available"),
+                    );
+                  }
+                  return Column(
+                    children: contacts.map(_buildAmbulanceTile).toList(),
                   );
-                }
-                final contacts = snapshot.data ?? [];
-                if (contacts.isEmpty) {
-                  return const Center(
-                    child: Text("No ambulance contacts available"),
-                  );
-                }
-                return Column(
-                  children: contacts.map(_buildAmbulanceTile).toList(),
-                );
-              },
-            ),
+                },
+              ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Staff Section
-            Container(
-              width: double.infinity,
-              alignment: Alignment.center,
-              child: Text(
-                "👨‍⚕️ Medical Staff",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: kPrimaryColor,
+              // Staff Section
+              Container(
+                width: double.infinity,
+                alignment: Alignment.center,
+                child: Text(
+                  "👨‍⚕️ Medical Staff",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: kPrimaryColor,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            FutureBuilder<List<StaffInfo>>(
-              future: _staff,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Center(child: CircularProgressIndicator()),
+              const SizedBox(height: 10),
+              FutureBuilder<List<StaffInfo>>(
+                future: _staff,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return const Center(
+                      child: Text(
+                        "Failed to load medical staff",
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    );
+                  }
+                  final staffList = snapshot.data ?? [];
+                  if (staffList.isEmpty) {
+                    return const Center(child: Text("No staff available"));
+                  }
+                  return Column(
+                    children: staffList.map(_buildStaffTileFromModel).toList(),
                   );
-                }
-                if (snapshot.hasError) {
-                  return const Center(
-                    child: Text(
-                      "Failed to load medical staff",
-                      style: TextStyle(color: Colors.red),
-                    ),
-                  );
-                }
-                final staffList = snapshot.data ?? [];
-                if (staffList.isEmpty) {
-                  return const Center(child: Text("No staff available"));
-                }
-                return Column(
-                  children: staffList.map(_buildStaffTileFromModel).toList(),
-                );
-              },
-            ),
-          ],
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

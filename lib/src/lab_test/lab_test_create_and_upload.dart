@@ -440,33 +440,43 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
     return Scaffold(
       body: loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(12),
-              children: [
-                const Center(
-                  child: Text(
-                    "Pending Upload",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          : RefreshIndicator(
+              onRefresh: refreshFromPull,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(12),
+                children: [
+                  const Center(
+                    child: Text(
+                      "Pending Upload",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                if (pending.isEmpty)
-                  const Center(child: Text("No pending results")),
-                ...pending.map(buildTile),
+                  const SizedBox(height: 8),
+                  if (pending.isEmpty)
+                    const Center(child: Text("No pending results")),
+                  ...pending.map(buildTile),
 
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                const Center(
-                  child: Text(
-                    "Completed",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  const Center(
+                    child: Text(
+                      "Completed",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                if (completed.isEmpty)
-                  const Center(child: Text("No completed results")),
-                ...completed.map(buildTile),
-              ],
+                  const SizedBox(height: 8),
+                  if (completed.isEmpty)
+                    const Center(child: Text("No completed results")),
+                  ...completed.map(buildTile),
+                ],
+              ),
             ),
 
       floatingActionButton: FloatingActionButton(

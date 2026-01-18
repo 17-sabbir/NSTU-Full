@@ -454,105 +454,111 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptions>
       ),
       body: _isLoading && _prescriptions.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _prescriptions.length,
-              itemBuilder: (context, index) {
-                final item = _prescriptions[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  clipBehavior: Clip.hardEdge,
-                  child: InkWell(
-                    onTap: () => _handleDownload(item),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          // Serial number avatar
-                          CircleAvatar(
-                            radius: 22,
-                            backgroundColor: Colors.blue.shade50,
-                            child: Text(
-                              "${index + 1}",
-                              style: TextStyle(
-                                color: Colors.blue.shade700,
-                                fontWeight: FontWeight.bold,
+          : RefreshIndicator(
+              onRefresh: refreshFromPull,
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                itemCount: _prescriptions.length,
+                itemBuilder: (context, index) {
+                  final item = _prescriptions[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    clipBehavior: Clip.hardEdge,
+                    child: InkWell(
+                      onTap: () => _handleDownload(item),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            // Serial number avatar
+                            CircleAvatar(
+                              radius: 22,
+                              backgroundColor: Colors.blue.shade50,
+                              child: Text(
+                                "${index + 1}",
+                                style: TextStyle(
+                                  color: Colors.blue.shade700,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
+                            const SizedBox(width: 12),
 
-                          // Main info
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "Dr. ${item.doctorName}",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                if (item.revisedFromPrescriptionId != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 6),
-                                    child: Text(
-                                      () {
-                                        final type =
-                                            (item.sourceReportType ?? '')
-                                                .trim();
-                                        if (type.isNotEmpty) {
-                                          return 'Updated for: $type';
-                                        }
-                                        final rid = item.sourceReportId;
-                                        if (rid != null) {
-                                          return 'Updated for Report #$rid';
-                                        }
-                                        return 'Updated prescription';
-                                      }(),
-                                      style: TextStyle(
-                                        color: Colors.deepPurple.shade600,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 12,
-                                      ),
+                            // Main info
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Dr. ${item.doctorName}",
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
                                     ),
                                   ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  "Date: ${item.date.day}/${item.date.month}/${item.date.year}",
-                                  style: TextStyle(color: Colors.grey.shade700),
-                                ),
-                              ],
+                                  if (item.revisedFromPrescriptionId != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: Text(
+                                        () {
+                                          final type =
+                                              (item.sourceReportType ?? '')
+                                                  .trim();
+                                          if (type.isNotEmpty) {
+                                            return 'Updated for: $type';
+                                          }
+                                          final rid = item.sourceReportId;
+                                          if (rid != null) {
+                                            return 'Updated for Report #$rid';
+                                          }
+                                          return 'Updated prescription';
+                                        }(),
+                                        style: TextStyle(
+                                          color: Colors.deepPurple.shade600,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    "Date: ${item.date.day}/${item.date.month}/${item.date.year}",
+                                    style: TextStyle(
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
 
-                          // Action button (keeps existing behavior)
-                          ElevatedButton.icon(
-                            onPressed: () => _handleDownload(item),
-                            icon: const Icon(
-                              Icons.download,
-                              size: 18,
-                              color: Colors.white,
+                            // Action button (keeps existing behavior)
+                            ElevatedButton.icon(
+                              onPressed: () => _handleDownload(item),
+                              icon: const Icon(
+                                Icons.download,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                              label: const Text(
+                                "PDF",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                              ),
                             ),
-                            label: const Text(
-                              "PDF",
-                              style: TextStyle(color: Colors.white),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
     );
   }

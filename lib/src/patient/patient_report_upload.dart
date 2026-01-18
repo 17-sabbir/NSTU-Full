@@ -317,27 +317,31 @@ class _PatientReportUploadState extends State<PatientReportUpload>
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildUploadForm(),
-                  const Divider(height: 40),
-                  Center(
-                    child: const Text(
-                      "Previous Uploads (Changeable for 12h)",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+          : RefreshIndicator(
+              onRefresh: refreshFromPull,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildUploadForm(),
+                    const Divider(height: 40),
+                    const Center(
+                      child: Text(
+                        "Previous Uploads (Changeable for 12h)",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
                     ),
-                  ),
 
-                  const SizedBox(height: 10),
-                  _buildPastReportsList(),
-                ],
+                    const SizedBox(height: 10),
+                    _buildPastReportsList(),
+                  ],
+                ),
               ),
             ),
     );

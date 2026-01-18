@@ -160,97 +160,116 @@ class _PatientReportsState extends State<PatientReports>
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : reports.isEmpty
-          ? const Center(child: Text("No reports found"))
-          : ListView.builder(
-              padding: const EdgeInsets.all(15),
-              itemCount: reports.length,
-              itemBuilder: (context, index) {
-                final report = reports[index];
+          : RefreshIndicator(
+              onRefresh: refreshFromPull,
+              child: reports.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(24),
+                      children: const [
+                        SizedBox(height: 80),
+                        Center(child: Text("No reports found")),
+                      ],
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(15),
+                      itemCount: reports.length,
+                      itemBuilder: (context, index) {
+                        final report = reports[index];
 
-                return Card(
-                  elevation: 4,
-                  margin: const EdgeInsets.only(bottom: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                report.testName,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            Row(
+                        return Card(
+                          elevation: 4,
+                          margin: const EdgeInsets.only(bottom: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(18),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.calendar_month_outlined, size: 18),
-                                const SizedBox(width: 5),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        report.testName,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_month_outlined,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          AppDateTime.formatDateOnly(
+                                            report.date,
+                                            pattern: 'yyyy-MM-dd',
+                                          ),
+                                          style: TextStyle(
+                                            color: kPrimaryColor,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                                 Text(
-                                  AppDateTime.formatDateOnly(
-                                    report.date,
-                                    pattern: 'yyyy-MM-dd',
-                                  ),
+                                  report.isUploaded
+                                      ? "Report available"
+                                      : "Report not uploaded yet",
                                   style: TextStyle(
-                                    color: kPrimaryColor,
-                                    fontWeight: FontWeight.w600,
+                                    color: report.isUploaded
+                                        ? Colors.green
+                                        : Colors.red,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                                const SizedBox(height: 15),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ElevatedButton.icon(
+                                        onPressed:
+                                            report.isUploaded &&
+                                                report.fileUrl != null
+                                            ? () => downloadReportFromLink(
+                                                url: report.fileUrl!,
+                                                suggestedBaseName:
+                                                    'Report_${report.testName}_${AppDateTime.formatDateOnly(report.date, pattern: 'yyyyMMdd')}',
+                                              )
+                                            : null,
+                                        icon: const Icon(
+                                          Icons.download,
+                                          size: 18,
+                                        ),
+                                        label: const Text("Download"),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: kPrimaryColor,
+                                          foregroundColor: Colors.white,
+                                          disabledBackgroundColor: Colors.grey,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                        Text(
-                          report.isUploaded
-                              ? "Report available"
-                              : "Report not uploaded yet",
-                          style: TextStyle(
-                            color: report.isUploaded
-                                ? Colors.green
-                                : Colors.red,
-                            fontStyle: FontStyle.italic,
                           ),
-                        ),
-                        const SizedBox(height: 15),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ElevatedButton.icon(
-                                onPressed:
-                                    report.isUploaded && report.fileUrl != null
-                                    ? () => downloadReportFromLink(
-                                        url: report.fileUrl!,
-                                        suggestedBaseName:
-                                            'Report_${report.testName}_${AppDateTime.formatDateOnly(report.date, pattern: 'yyyyMMdd')}',
-                                      )
-                                    : null,
-                                icon: const Icon(Icons.download, size: 18),
-                                label: const Text("Download"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: kPrimaryColor,
-                                  foregroundColor: Colors.white,
-                                  disabledBackgroundColor: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  ),
-                );
-              },
             ),
     );
   }

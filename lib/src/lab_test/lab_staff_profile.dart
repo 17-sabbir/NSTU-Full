@@ -566,315 +566,323 @@ class _LabTesterProfileState extends State<LabTesterProfile>
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(responsiveWidth(16)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Top gradient card with avatar and basic info
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF2E7DFF), Color(0xFF6A9CFF)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color.fromRGBO(0, 0, 0, 0.06),
-                            blurRadius: 10,
-                            offset: const Offset(0, 8),
+              child: RefreshIndicator(
+                onRefresh: refreshFromPull,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.all(responsiveWidth(16)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Top gradient card with avatar and basic info
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF2E7DFF), Color(0xFF6A9CFF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ],
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color.fromRGBO(0, 0, 0, 0.06),
+                              blurRadius: 10,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 18,
+                        ),
+                        child: Row(
+                          children: [
+                            // Avatar with overlay edit icon
+                            Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 40,
+                                  backgroundColor: Colors.white.withAlpha(30),
+                                  backgroundImage: _imageBytes != null
+                                      ? MemoryImage(_imageBytes!)
+                                            as ImageProvider // নতুন পিক করা ইমেজ
+                                      : (_profilePictureUrl != null &&
+                                            _profilePictureUrl!.isNotEmpty)
+                                      ? NetworkImage(_profilePictureUrl!)
+                                            as ImageProvider // সার্ভারের ইমেজ
+                                      : null,
+                                  child:
+                                      (_imageBytes == null &&
+                                          (_profilePictureUrl == null ||
+                                              _profilePictureUrl!.isEmpty))
+                                      ? const Icon(
+                                          Icons.person,
+                                          size: 40,
+                                          color: Colors.white,
+                                        )
+                                      : null,
+                                ),
+                                Positioned(
+                                  bottom: -2,
+                                  right: -2,
+                                  child: Tooltip(
+                                    message: 'Edit photo',
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(30),
+                                      onTap: _pickProfileImage,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withAlpha(30),
+                                              blurRadius: 4,
+                                            ),
+                                          ],
+                                        ),
+                                        padding: const EdgeInsets.all(6),
+                                        child: const Icon(
+                                          Icons.edit,
+                                          size: 18,
+                                          color: Colors.blueAccent,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(width: 16),
+
+                            // Name + designation badge + quick info
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _nameCtrl.text.isNotEmpty
+                                        ? _nameCtrl.text
+                                        : (name.isNotEmpty ? name : 'Unnamed'),
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  // removed header designation badge (designation is editable below)
+                                  const SizedBox.shrink(),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    email.isNotEmpty ? email : '',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 18,
-                      ),
-                      child: Row(
-                        children: [
-                          // Avatar with overlay edit icon
-                          Stack(
+
+                      const SizedBox(height: 20),
+
+                      // Details Card
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              CircleAvatar(
-                                radius: 40,
-                                backgroundColor: Colors.white.withAlpha(30),
-                                backgroundImage: _imageBytes != null
-                                    ? MemoryImage(_imageBytes!)
-                                          as ImageProvider // নতুন পিক করা ইমেজ
-                                    : (_profilePictureUrl != null &&
-                                          _profilePictureUrl!.isNotEmpty)
-                                    ? NetworkImage(_profilePictureUrl!)
-                                          as ImageProvider // সার্ভারের ইমেজ
+                              const Text(
+                                'Contact & Professional',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Editable fields
+                              _buildEditableField(
+                                _nameCtrl,
+                                Icons.person,
+                                'Full Name',
+                              ),
+                              const SizedBox(height: 12),
+                              _buildEditableField(
+                                _emailCtrl,
+                                Icons.email,
+                                'Email',
+                                suffix:
+                                    (_emailChanged &&
+                                        !_emailVerifiedForCurrentValue)
+                                    ? _verifySuffixButton(_verifyEmailChange)
                                     : null,
-                                child:
-                                    (_imageBytes == null &&
-                                        (_profilePictureUrl == null ||
-                                            _profilePictureUrl!.isEmpty))
-                                    ? const Icon(
-                                        Icons.person,
-                                        size: 40,
-                                        color: Colors.white,
+                              ), // Email field
+                              const SizedBox(height: 12),
+                              _buildEditableField(
+                                _phoneCtrl,
+                                Icons.phone,
+                                'Phone',
+                                suffix:
+                                    (_phoneChanged &&
+                                        !_phoneVerifiedForCurrentValue)
+                                    ? _verifySuffixButton(
+                                        _verifyPhoneChangeDummy,
                                       )
                                     : null,
                               ),
-                              Positioned(
-                                bottom: -2,
-                                right: -2,
-                                child: Tooltip(
-                                  message: 'Edit photo',
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(30),
-                                    onTap: _pickProfileImage,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withAlpha(30),
-                                            blurRadius: 4,
-                                          ),
-                                        ],
-                                      ),
-                                      padding: const EdgeInsets.all(6),
-                                      child: const Icon(
-                                        Icons.edit,
-                                        size: 18,
-                                        color: Colors.blueAccent,
+                              const SizedBox(height: 12),
+                              _buildEditableField(
+                                _qualCtrl,
+                                Icons.school,
+                                'Qualification',
+                              ),
+                              const SizedBox(height: 12),
+                              _buildEditableField(
+                                _specCtrl,
+                                Icons.work,
+                                'Designation',
+                              ),
+                              const SizedBox(height: 12),
+
+                              // joined date field and code removed as requested
+                              const SizedBox(height: 18),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Buttons: Change Password, Save Changes, Logout
+                      Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 52,
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => Navigator.pushNamed(
+                                      context,
+                                      '/change-password',
+                                    ),
+                                    icon: const Icon(
+                                      Icons.lock_reset,
+                                      size: 20,
+                                      color: Colors.deepPurple,
+                                    ),
+                                    label: const Text(
+                                      'Change Password',
+                                      style: TextStyle(
+                                        color: Colors.deepPurple,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(
+                                        color: Colors.deepPurple.withOpacity(
+                                          0.35,
+                                        ),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 52,
+                                  child: ElevatedButton(
+                                    onPressed: (_canSave && !_isSaving)
+                                        ? _saveProfile
+                                        : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _canSave
+                                          ? Colors.deepPurple
+                                          : Colors.grey.shade300,
+                                      disabledBackgroundColor:
+                                          Colors.grey.shade300,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      elevation: _canSave ? 3 : 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    child: _isSaving
+                                        ? const SizedBox(
+                                            height: 18,
+                                            width: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : Text(
+                                            'Save Changes',
+                                            style: TextStyle(
+                                              color: _canSave
+                                                  ? Colors.white
+                                                  : Colors.grey.shade700,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
-
-                          const SizedBox(width: 16),
-
-                          // Name + designation badge + quick info
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _nameCtrl.text.isNotEmpty
-                                      ? _nameCtrl.text
-                                      : (name.isNotEmpty ? name : 'Unnamed'),
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: OutlinedButton.icon(
+                              onPressed: _logout,
+                              icon: const Icon(Icons.logout, color: Colors.red),
+                              label: const Text(
+                                'Logout',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
                                 ),
-                                const SizedBox(height: 6),
-                                // removed header designation badge (designation is editable below)
-                                const SizedBox.shrink(),
-                                const SizedBox(height: 10),
-                                Text(
-                                  email.isNotEmpty ? email : '',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 13,
-                                  ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: Colors.red.shade200),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 15,
                                 ),
-                              ],
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
 
-                    const SizedBox(height: 20),
-
-                    // Details Card
-                    Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Contact & Professional',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-
-                            // Editable fields
-                            _buildEditableField(
-                              _nameCtrl,
-                              Icons.person,
-                              'Full Name',
-                            ),
-                            const SizedBox(height: 12),
-                            _buildEditableField(
-                              _emailCtrl,
-                              Icons.email,
-                              'Email',
-                              suffix:
-                                  (_emailChanged &&
-                                      !_emailVerifiedForCurrentValue)
-                                  ? _verifySuffixButton(_verifyEmailChange)
-                                  : null,
-                            ), // Email field
-                            const SizedBox(height: 12),
-                            _buildEditableField(
-                              _phoneCtrl,
-                              Icons.phone,
-                              'Phone',
-                              suffix:
-                                  (_phoneChanged &&
-                                      !_phoneVerifiedForCurrentValue)
-                                  ? _verifySuffixButton(_verifyPhoneChangeDummy)
-                                  : null,
-                            ),
-                            const SizedBox(height: 12),
-                            _buildEditableField(
-                              _qualCtrl,
-                              Icons.school,
-                              'Qualification',
-                            ),
-                            const SizedBox(height: 12),
-                            _buildEditableField(
-                              _specCtrl,
-                              Icons.work,
-                              'Designation',
-                            ),
-                            const SizedBox(height: 12),
-
-                            // joined date field and code removed as requested
-                            const SizedBox(height: 18),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Buttons: Change Password, Save Changes, Logout
-                    Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: 52,
-                                child: OutlinedButton.icon(
-                                  onPressed: () => Navigator.pushNamed(
-                                    context,
-                                    '/change-password',
-                                  ),
-                                  icon: const Icon(
-                                    Icons.lock_reset,
-                                    size: 20,
-                                    color: Colors.deepPurple,
-                                  ),
-                                  label: const Text(
-                                    'Change Password',
-                                    style: TextStyle(
-                                      color: Colors.deepPurple,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide(
-                                      color: Colors.deepPurple.withOpacity(
-                                        0.35,
-                                      ),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: SizedBox(
-                                height: 52,
-                                child: ElevatedButton(
-                                  onPressed: (_canSave && !_isSaving)
-                                      ? _saveProfile
-                                      : null,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _canSave
-                                        ? Colors.deepPurple
-                                        : Colors.grey.shade300,
-                                    disabledBackgroundColor:
-                                        Colors.grey.shade300,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                    elevation: _canSave ? 3 : 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                  ),
-                                  child: _isSaving
-                                      ? const SizedBox(
-                                          height: 18,
-                                          width: 18,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : Text(
-                                          'Save Changes',
-                                          style: TextStyle(
-                                            color: _canSave
-                                                ? Colors.white
-                                                : Colors.grey.shade700,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: OutlinedButton.icon(
-                            onPressed: _logout,
-                            icon: const Icon(Icons.logout, color: Colors.red),
-                            label: const Text(
-                              'Logout',
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: Colors.red.shade200),
-                              padding: const EdgeInsets.symmetric(vertical: 15),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 40),
-                  ],
+                      const SizedBox(height: 40),
+                    ],
+                  ),
                 ),
               ),
             ),

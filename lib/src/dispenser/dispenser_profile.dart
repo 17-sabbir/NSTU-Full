@@ -516,12 +516,15 @@ class _DispenserProfileState extends State<DispenserProfile>
       backgroundColor: Colors.grey[100],
 
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              // Header
-              Container(
+        child: RefreshIndicator(
+          onRefresh: refreshFromPull,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // Header
+                Container(
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Colors.blue, Colors.blueAccent],
@@ -782,7 +785,7 @@ class _DispenserProfileState extends State<DispenserProfile>
           ),
         ),
       ),
-    );
+    ),    );
   }
 
   Widget _field(
