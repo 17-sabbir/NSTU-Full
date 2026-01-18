@@ -220,7 +220,7 @@ class _DispenseLogsScreenState extends State<DispenseLogsScreen> {
                 ),
 
                 Text(
-                  DateFormat('dd MMM yyyy').format(d.dispensedAt),
+                  DateFormat('dd MMM yyyy').format(d.dispensedAt.toLocal()),
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],

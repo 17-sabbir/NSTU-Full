@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:backend_client/backend_client.dart';
 
+import '../route_refresh.dart';
+
 class UserManagement extends StatefulWidget {
   const UserManagement({super.key});
 
@@ -12,7 +14,8 @@ class UserManagement extends StatefulWidget {
   State<UserManagement> createState() => _UserManagementState();
 }
 
-class _UserManagementState extends State<UserManagement> {
+class _UserManagementState extends State<UserManagement>
+    with RouteRefreshMixin<UserManagement> {
   String selectedCategory = "Admin";
   final TextEditingController searchController = TextEditingController();
   final Color primaryColor = const Color(0xFF00796B);
@@ -49,8 +52,10 @@ class _UserManagementState extends State<UserManagement> {
     _fetchUsers();
   }
 
-  Future<void> _fetchUsers() async {
-    setState(() => _isLoading = true);
+  Future<void> _fetchUsers({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _isLoading = true);
+    }
     try {
       final role = _mapRoleToDb(selectedCategory);
       // If Patient is selected, fetch ALL from server and filter client-side to include student/teacher/staff.
@@ -147,12 +152,21 @@ class _UserManagementState extends State<UserManagement> {
       });
     } catch (e, st) {
       debugPrint('Failed to fetch users: $e\n$st');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to load users')));
+      if (!silent) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to load users')));
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (!silent) {
+        setState(() => _isLoading = false);
+      }
     }
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    await _fetchUsers(silent: true);
   }
 
   IconData _getIcon(String role) {
@@ -601,7 +615,7 @@ class _UserManagementState extends State<UserManagement> {
                         ),
                         errorText: _isPasswordValid
                             ? null
-                            : "Password must be at least 6 characters",
+                            : "Password at least 6 characters",
                       ),
                     ),
                     const SizedBox(height: 8),

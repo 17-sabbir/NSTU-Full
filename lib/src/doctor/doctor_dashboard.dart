@@ -6,6 +6,8 @@ import 'test_reports_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
 
+import '../route_refresh.dart';
+
 class DoctorDashboard extends StatefulWidget {
   const DoctorDashboard({super.key});
 
@@ -13,7 +15,8 @@ class DoctorDashboard extends StatefulWidget {
   State<DoctorDashboard> createState() => _DoctorDashboardState();
 }
 
-class _DoctorDashboardState extends State<DoctorDashboard> {
+class _DoctorDashboardState extends State<DoctorDashboard>
+    with RouteRefreshMixin<DoctorDashboard> {
   int _currentIndex = 0;
 
   // keep track of visited page history
@@ -21,7 +24,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 
   // Pages are generated dynamically so we always pass the latest doctorId.
   List<Widget> get _pages => [
-    DoctorHomePage(doctorId: _doctorId),
+    DoctorHomePage(doctorId: _doctorId, refreshSeed: _refreshSeed),
     const PatientRecordsPage(),
     TestReportsView(doctorId: _doctorId),
     const ProfilePage(),
@@ -40,6 +43,16 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   }
 
   int _doctorId = 0;
+  int _refreshSeed = 0;
+
+  @override
+  Future<void> refreshOnFocus() async {
+    if (_checkingAuth || !_authorized) return;
+    setState(() {
+      _refreshSeed++;
+    });
+  }
+
   Future<void> _verifyDoctor() async {
     try {
       // ignore: deprecated_member_use

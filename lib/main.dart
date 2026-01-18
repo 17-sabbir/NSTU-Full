@@ -46,6 +46,7 @@ import 'package:dishari/src/universal_login.dart';
 import 'package:dishari/src/forget_password.dart';
 // Import from your existing backend_client package
 import 'package:backend_client/backend_client.dart';
+import 'package:dishari/src/route_refresh.dart';
 
 void main() {
   // Initialize Serverpod client before running app
@@ -68,6 +69,7 @@ class MyApp extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       initialRoute: '/',
+      navigatorObservers: [appRouteObserver],
       routes: {
         // Main routes
         '/': (context) => const HomePage(),

@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
 
+import '../date_time_utils.dart';
+import '../route_refresh.dart';
+
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
   @override
   State<AdminDashboard> createState() => AdminDashboardState();
 }
 
-class AdminDashboardState extends State<AdminDashboard> {
+class AdminDashboardState extends State<AdminDashboard>
+    with RouteRefreshMixin<AdminDashboard> {
   final Color primaryTeal = const Color(0xFF00695C);
   final Color backgroundLight = const Color(0xFFF8F9FA);
 
@@ -38,6 +42,17 @@ class AdminDashboardState extends State<AdminDashboard> {
       if (!mounted) return;
       _verifyAdmin();
     });
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    // Best-effort refresh; do nothing until auth is resolved.
+    if (_checkingAuth || !_authorized) return;
+    await Future.wait([
+      _loadAdminProfile(),
+      _loadDashboardOverview(),
+      _loadRecentActivity(),
+    ]);
   }
 
   Future<void> _goToNamedRoute(String routeName) async {
@@ -587,7 +602,8 @@ class AdminDashboardState extends State<AdminDashboard> {
           subtitleParts.add('By ${entry.adminName}');
         }
         if (entry.targetName != null && entry.targetName!.trim().isNotEmpty) {
-          subtitleParts.add('Target: ${entry.targetName}');
+          final target = AppDateTime.formatMaybeIsoRange(entry.targetName!);
+          subtitleParts.add('Target: $target');
         }
         final subtitle = subtitleParts.isEmpty
             ? 'System activity'

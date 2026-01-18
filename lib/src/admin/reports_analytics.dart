@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'export_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+
+import '../date_time_utils.dart';
 
 class ReportsAnalytics extends StatefulWidget {
   const ReportsAnalytics({super.key});
@@ -61,9 +64,9 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
     _loadFont();
   }
 
-  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+  DateTime _dateOnly(DateTime d) => AppDateTime.startOfLocalDay(d);
 
-  String _fmtDate(DateTime d) => d.toString().split(' ').first;
+  String _fmtDate(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
 
   Future<void> _ensureMedicineAvailableDatesLoaded() async {
     if (_medicineAvailableDates != null) return;
@@ -223,22 +226,28 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
     if (from == null || to == null) return;
     if (to.isBefore(from)) return;
 
-    final toExclusive = _dateOnly(to).add(const Duration(days: 1));
+    final fromLocal = _dateOnly(from);
+    final toLocal = _dateOnly(to);
+    final toExclusiveLocal = AppDateTime.startOfNextLocalDay(toLocal);
+
+    // Backend should always receive UTC instants.
+    final fromUtc = fromLocal.toUtc();
+    final toExclusiveUtc = toExclusiveLocal.toUtc();
 
     try {
       final items = await client.adminReportEndpoints
-          .getMedicineStockUsageByDateRange(from, toExclusive);
+          .getMedicineStockUsageByDateRange(fromUtc, toExclusiveUtc);
 
       final labTests = await _computeLabTestTotalsByDateRange(
-        from: from,
-        toExclusive: toExclusive,
+        from: fromUtc,
+        toExclusive: toExclusiveUtc,
       );
 
       await ExportService.exportMedicineStockUsageRangeAsPDF(
         items: items,
         labTests: labTests,
-        from: from,
-        to: to,
+        from: fromLocal,
+        to: toLocal,
         font: _englishFont!,
       );
 
@@ -259,7 +268,7 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
           adminId: currentUserId,
           action: 'EXPORT_MEDICINE_RANGE_PDF',
           targetId:
-              '${from.toIso8601String()}..${toExclusive.toIso8601String()}',
+              '${AppDateTime.utcIso(fromUtc)}..${AppDateTime.utcIso(toExclusiveUtc)}',
         );
       }
     } catch (e) {
@@ -295,7 +304,10 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
     for (final r in results) {
       final createdAt = r.createdAt;
       if (createdAt == null) continue;
-      if (createdAt.isBefore(from) || !createdAt.isBefore(toExclusive)) {
+
+      // createdAt is an instant; compare in UTC to avoid local timezone drift.
+      final createdUtc = createdAt.toUtc();
+      if (createdUtc.isBefore(from) || !createdUtc.isBefore(toExclusive)) {
         continue;
       }
 

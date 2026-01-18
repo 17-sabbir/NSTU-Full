@@ -10,12 +10,15 @@ class ExportService {
 
   static String _two(int n) => n.toString().padLeft(2, '0');
 
-  static String _fmtDate(DateTime d) =>
-      '${d.year}-${_two(d.month)}-${_two(d.day)}';
+  static String _fmtDate(DateTime d) => () {
+    final local = d.toLocal();
+    return '${local.year}-${_two(local.month)}-${_two(local.day)}';
+  }();
 
   static String _fmtDateTime(DateTime d) {
-    return '${d.year}-${_two(d.month)}-${_two(d.day)} '
-        '${_two(d.hour)}:${_two(d.minute)}';
+    final local = d.toLocal();
+    return '${local.year}-${_two(local.month)}-${_two(local.day)} '
+        '${_two(local.hour)}:${_two(local.minute)}';
   }
 
   /// UI-only helper model for Inventory Transactions PDF export.
@@ -246,7 +249,7 @@ class ExportService {
       color: PdfColors.grey600,
     );
 
-    String fmt(DateTime d) => d.toString().split(' ').first;
+    String fmt(DateTime d) => _fmtDate(d);
 
     pw.Widget tableCell(String text, {bool isHeader = false}) {
       return pw.Padding(
@@ -400,7 +403,7 @@ class ExportService {
       color: PdfColors.grey600,
     );
 
-    String fmt(DateTime d) => d.toString().split(' ').first;
+    String fmt(DateTime d) => _fmtDate(d);
 
     pw.Widget tableCell(String text, {bool isHeader = false}) {
       return pw.Padding(
@@ -569,7 +572,7 @@ class ExportService {
                 style: baseStyle.copyWith(fontWeight: pw.FontWeight.bold),
               ),
               pw.Text(
-                'Report Generated: ${DateTime.now().toString().split(' ')[0]}',
+                'Report Generated: ${_fmtDate(DateTime.now())}',
                 style: smallMuted,
               ),
             ],

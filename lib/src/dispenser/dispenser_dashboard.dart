@@ -3,6 +3,9 @@ import 'dispenser_medicine_item.dart';
 import 'dispenser_profile.dart';
 import 'dispenser_inventory.dart';
 import 'package:backend_client/backend_client.dart';
+
+import '../date_time_utils.dart';
+import '../route_refresh.dart';
 import 'package:intl/intl.dart';
 
 // Use Map-based structures for prescriptions and logs to avoid custom classes
@@ -16,7 +19,8 @@ class DispenserDashboard extends StatefulWidget {
   State<DispenserDashboard> createState() => _DispenserDashboardState();
 }
 
-class _DispenserDashboardState extends State<DispenserDashboard> {
+class _DispenserDashboardState extends State<DispenserDashboard>
+    with RouteRefreshMixin<DispenserDashboard> {
   final _searchController = TextEditingController();
   PrescriptionMap? _currentPrescription;
   bool _isLoading = false;
@@ -70,7 +74,7 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     return 0;
   }
 
-@override
+  @override
   void initState() {
     super.initState();
 
@@ -89,7 +93,6 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     });
   }
 
-
   Future<bool> _verifyDispenser() async {
     try {
       final authKey = await client.authenticationKeyManager?.get();
@@ -105,7 +108,6 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
       try {
         role = (await client.patient.getUserRole(0)).toUpperCase();
       } catch (_) {
-      
         if (mounted) {
           Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
         }
@@ -122,9 +124,11 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     }
   }
 
-  Future<void> _loadHome() async {
+  Future<void> _loadHome({bool silent = false}) async {
     if (!mounted) return;
-    setState(() => _homeLoading = true);
+    if (!silent) {
+      setState(() => _homeLoading = true);
+    }
 
     try {
       final results = await Future.wait([
@@ -151,15 +155,19 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     } catch (e) {
       debugPrint('Failed to load home data: $e');
       if (!mounted) return;
-      setState(() => _homeLoading = false);
+      if (!silent) {
+        setState(() => _homeLoading = false);
+      }
     }
   }
 
   // Fetch pending prescriptions from backend
-  Future<void> _loadPendingPrescriptions() async {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _loadPendingPrescriptions({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       final serverList = await client.dispenser.getPendingPrescriptions();
@@ -187,13 +195,24 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
     } catch (e) {
       debugPrint('Failed to load pending prescriptions: $e');
       if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to load prescriptions from server'),
-        ),
-      );
+      if (!silent) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to load prescriptions from server'),
+          ),
+        );
+      }
     }
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    if (!_authChecked || !_authorized) return;
+    await Future.wait([
+      _loadPendingPrescriptions(silent: true),
+      _loadHome(silent: true),
+    ]);
   }
 
   Future<void> _selectPrescription(PrescriptionMap localPres) async {
@@ -526,7 +545,6 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
                         iconBg: const Color(0xFFF3DDB1),
                         iconColor: const Color(0xFFF59E0B),
                       ),
-
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -611,7 +629,9 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       trailing: Text(
-                        DateFormat('dd/MM/yyyy').format(d.dispensedAt),
+                        DateFormat(
+                          'dd/MM/yyyy',
+                        ).format(d.dispensedAt.toLocal()),
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
                     );
@@ -690,7 +710,7 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       trailing: Text(
-                        DateFormat('dd/MM/yyyy').format(h.timestamp),
+                        DateFormat('dd/MM/yyyy').format(h.timestamp.toLocal()),
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
                     );
@@ -1250,8 +1270,14 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
                   Text('Patient: ${_currentPrescription!['name']}'),
                   Text('Doctor: ${_currentPrescription!['doctorName']}'),
                   if (_currentPrescription!['prescriptionDate'] != null)
-                    Text(
-                      'Date: ${_currentPrescription!['prescriptionDate'].toString().split(' ')[0]}',
+                    Builder(
+                      builder: (_) {
+                        final d = _currentPrescription!['prescriptionDate'];
+                        if (d is DateTime) {
+                          return Text('Date: ${AppDateTime.formatDateOnly(d)}');
+                        }
+                        return Text('Date: ${d.toString()}');
+                      },
                     ),
                 ],
               ),
@@ -1386,8 +1412,7 @@ class _DispenserDashboardState extends State<DispenserDashboard> {
 
   @override
   Widget build(BuildContext context) {
-
-     if (!_authChecked) {
+    if (!_authChecked) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 

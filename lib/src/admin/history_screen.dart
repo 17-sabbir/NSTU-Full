@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:backend_client/backend_client.dart';
 
+import '../date_time_utils.dart';
+
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
@@ -199,13 +201,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   String _relativeTime(DateTime when) {
     final now = DateTime.now();
-    final diff = now.difference(when);
+    final localWhen = when.toLocal();
+    final diff = now.difference(localWhen);
 
     if (diff.inSeconds < 60) return 'just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
     if (diff.inHours < 24) return '${diff.inHours} hrs ago';
     if (diff.inDays < 7) return '${diff.inDays} days ago';
-    return DateFormat('dd MMM yyyy').format(when);
+    return DateFormat('dd MMM yyyy').format(localWhen);
   }
 
   Widget _ssTile({
@@ -350,7 +353,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ? log.adminName!.trim()
               : 'Unknown';
           final target = (log.targetName?.trim().isNotEmpty ?? false)
-              ? log.targetName!.trim()
+              ? AppDateTime.formatMaybeIsoRange(log.targetName!.trim())
               : '';
 
           final subtitle = target.isEmpty

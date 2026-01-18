@@ -4,8 +4,13 @@ import 'dosage_times.dart';
 import 'test_reports_view.dart';
 
 class DoctorHomePage extends StatefulWidget {
-  const DoctorHomePage({super.key, required this.doctorId});
+  const DoctorHomePage({
+    super.key,
+    required this.doctorId,
+    this.refreshSeed = 0,
+  });
   final int doctorId;
+  final int refreshSeed;
 
   @override
   State<DoctorHomePage> createState() => _DoctorHomePageState();
@@ -21,8 +26,18 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
     _fetchHomeData();
   }
 
-  Future<void> _fetchHomeData() async {
-    setState(() => _loading = true);
+  @override
+  void didUpdateWidget(covariant DoctorHomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshSeed != widget.refreshSeed) {
+      _fetchHomeData(silent: true);
+    }
+  }
+
+  Future<void> _fetchHomeData({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _loading = true);
+    }
     try {
       // Backend resolves doctor from auth user; doctorId not needed.
       final data = await client.doctor.getDoctorHomeData();
@@ -30,14 +45,16 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
       if (!mounted) return;
       setState(() {
         _homeData = data;
-        _loading = false;
+        if (!silent) _loading = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _homeData = null;
-        _loading = false;
-      });
+      if (!silent) {
+        setState(() {
+          _homeData = null;
+          _loading = false;
+        });
+      }
     }
   }
 

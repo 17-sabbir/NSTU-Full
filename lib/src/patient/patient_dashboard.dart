@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
 
+import '../date_time_utils.dart';
+import '../route_refresh.dart';
+
 class PatientDashboard extends StatefulWidget {
   final String name;
   final String email;
@@ -26,7 +29,8 @@ class PatientDashboard extends StatefulWidget {
   State<PatientDashboard> createState() => _PatientDashboardState();
 }
 
-class _PatientDashboardState extends State<PatientDashboard> {
+class _PatientDashboardState extends State<PatientDashboard>
+    with RouteRefreshMixin<PatientDashboard> {
   late String name;
   late String email;
   late String? profilePictureUrl;
@@ -50,8 +54,10 @@ class _PatientDashboardState extends State<PatientDashboard> {
     });
   }
 
-  Future<void> _fetchOnduty() async {
-    setState(() => loadingOnduty = true);
+  Future<void> _fetchOnduty({bool silent = false}) async {
+    if (!silent) {
+      setState(() => loadingOnduty = true);
+    }
     try {
       final data = await client.patient.getOndutyStaff();
       if (!mounted) return;
@@ -61,7 +67,9 @@ class _PatientDashboardState extends State<PatientDashboard> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => loadingOnduty = false);
+      if (!silent) {
+        setState(() => loadingOnduty = false);
+      }
     }
   }
 
@@ -120,10 +128,12 @@ class _PatientDashboardState extends State<PatientDashboard> {
     }
   }
 
-  Future<void> _fetchProfile() async {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _fetchProfile({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -136,10 +146,15 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
       if (numericId == null) {
         // No numeric id available - prompt sign in
-        setState(() {
-          _isLoading = false;
-        });
-        _showDialog('Not signed in', 'Please sign in to view your dashboard.');
+        if (!silent) {
+          setState(() {
+            _isLoading = false;
+          });
+          _showDialog(
+            'Not signed in',
+            'Please sign in to view your dashboard.',
+          );
+        }
         return;
       }
 
@@ -153,17 +168,30 @@ class _PatientDashboardState extends State<PatientDashboard> {
           _isLoading = false;
         });
       } else {
+        if (!silent) {
+          setState(() {
+            _isLoading = false;
+          });
+          _showDialog('No profile', 'No profile found for this user.');
+        }
+      }
+    } catch (e) {
+      if (!silent) {
         setState(() {
           _isLoading = false;
         });
-        _showDialog('No profile', 'No profile found for this user.');
+        _showDialog('Error', 'Failed to fetch profile: $e');
       }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      _showDialog('Error', 'Failed to fetch profile: $e');
     }
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    if (_checkingAuth || !_authorized) return;
+    await Future.wait([
+      _fetchProfile(silent: true),
+      _fetchOnduty(silent: true),
+    ]);
   }
 
   void _showDialog(String title, String message) {
@@ -436,7 +464,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                             const SizedBox(height: 2),
                             Text(
                               // shiftDate কে সুন্দরভাবে দেখাতে পারেন
-                              'Date: ${s.shiftDate.toLocal().toString().split(' ').first}',
+                              'Date: ${AppDateTime.formatDateOnly(s.shiftDate)}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],

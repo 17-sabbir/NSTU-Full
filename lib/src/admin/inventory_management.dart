@@ -5,6 +5,7 @@ import 'package:backend_client/backend_client.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'export_service.dart';
+import '../date_time_utils.dart';
 
 class InventoryManagement extends StatefulWidget {
   const InventoryManagement({super.key});
@@ -29,7 +30,7 @@ class _InventoryManagementState extends State<InventoryManagement> {
     _englishFont = pw.Font.ttf(data);
   }
 
-  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+  DateTime _dateOnly(DateTime d) => AppDateTime.startOfLocalDay(d);
 
   Future<void> _exportInventoryTransactionsPdf() async {
     if (_exportingPdf) return;
@@ -49,13 +50,12 @@ class _InventoryManagementState extends State<InventoryManagement> {
 
     if (picked == null) return;
 
-    final from = DateTime(
-      picked.start.year,
-      picked.start.month,
-      picked.start.day,
-    );
-    final to = DateTime(picked.end.year, picked.end.month, picked.end.day);
-    final toExclusive = to.add(const Duration(days: 1));
+    final fromLocal = AppDateTime.startOfLocalDay(picked.start);
+    final toLocal = AppDateTime.startOfLocalDay(picked.end);
+    final toExclusiveLocal = AppDateTime.startOfNextLocalDay(toLocal);
+
+    final fromUtc = fromLocal.toUtc();
+    final toExclusiveUtc = toExclusiveLocal.toUtc();
 
     if (!mounted) return;
     setState(() => _exportingPdf = true);
@@ -105,7 +105,9 @@ class _InventoryManagementState extends State<InventoryManagement> {
         for (final txs in results) {
           for (final tx in txs) {
             final createdAt = tx.createdAt;
-            if (createdAt.isBefore(from) || !createdAt.isBefore(toExclusive)) {
+            final createdUtc = createdAt.toUtc();
+            if (createdUtc.isBefore(fromUtc) ||
+                !createdUtc.isBefore(toExclusiveUtc)) {
               continue;
             }
             final meta = itemLookup[tx.itemId];
@@ -134,8 +136,8 @@ class _InventoryManagementState extends State<InventoryManagement> {
 
       await ExportService.exportInventoryTransactionsRangeAsPDF(
         rows: rows,
-        from: from,
-        to: to,
+        from: fromLocal,
+        to: toLocal,
         font: font,
       );
     } catch (e) {
@@ -870,8 +872,8 @@ class _InventoryManagementState extends State<InventoryManagement> {
                         controller: unitController,
                         onChanged: (_) => setStateDialog(() {}),
                         decoration: const InputDecoration(
-                          labelText: 'Unit',
-                          hintText: 'e.g. pcs / strip / ml',
+                          labelText: 'Type of medicine',
+                          hintText: 'e.g. tablet / Liquid / Capsule',
                           border: OutlineInputBorder(),
                         ),
                       ),

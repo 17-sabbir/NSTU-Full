@@ -7,6 +7,8 @@ import 'manage_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:backend_client/backend_client.dart';
 
+import '../route_refresh.dart';
+
 class LabTesterHome extends StatefulWidget {
   const LabTesterHome({super.key});
 
@@ -14,7 +16,8 @@ class LabTesterHome extends StatefulWidget {
   State<LabTesterHome> createState() => _LabTesterHomeState();
 }
 
-class _LabTesterHomeState extends State<LabTesterHome> {
+class _LabTesterHomeState extends State<LabTesterHome>
+    with RouteRefreshMixin<LabTesterHome> {
   final GlobalKey<ManageTestState> _manageTestKey =
       GlobalKey<ManageTestState>();
   int _selectedIndex = 0;
@@ -32,6 +35,8 @@ class _LabTesterHomeState extends State<LabTesterHome> {
   // Auth guard
   bool _checkingAuth = true;
   bool _authorized = false;
+
+  int? _userId;
 
   @override
   void initState() {
@@ -76,6 +81,7 @@ class _LabTesterHomeState extends State<LabTesterHome> {
           _authorized = true;
           _checkingAuth = false;
         });
+        _userId = numericId;
         await _loadBasicProfile(numericId);
         await _loadHomeData();
       } else {
@@ -108,10 +114,16 @@ class _LabTesterHomeState extends State<LabTesterHome> {
   }
 
   Future<void> _loadHomeData() async {
-    setState(() {
-      _homeLoading = true;
-      _homeError = null;
-    });
+    await _loadHomeDataInternal(silent: false);
+  }
+
+  Future<void> _loadHomeDataInternal({required bool silent}) async {
+    if (!silent) {
+      setState(() {
+        _homeLoading = true;
+        _homeError = null;
+      });
+    }
 
     try {
       final twoDay = await client.lab.getLabHomeTwoDaySummary();
@@ -121,15 +133,27 @@ class _LabTesterHomeState extends State<LabTesterHome> {
       setState(() {
         _twoDay = twoDay;
         _last10 = last10;
-        _homeLoading = false;
+        if (!silent) _homeLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _homeError = e.toString();
-        _homeLoading = false;
-      });
+      if (!silent) {
+        setState(() {
+          _homeError = e.toString();
+          _homeLoading = false;
+        });
+      }
     }
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    if (_checkingAuth || !_authorized) return;
+    final uid = _userId;
+    if (uid != null) {
+      await _loadBasicProfile(uid);
+    }
+    await _loadHomeDataInternal(silent: true);
   }
 
   String _getTitle() {

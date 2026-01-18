@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dishari/src/universal_login.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:flutter/services.dart';
+import '../date_time_utils.dart';
 
 class PatientSignupPage extends StatefulWidget {
   const PatientSignupPage({super.key});
@@ -139,7 +140,6 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
     return null;
   }
 
-
   String? _validateGender(String? value) {
     if (value == null || value.isEmpty) return 'Please select gender';
     return null;
@@ -262,7 +262,9 @@ class _PatientSignupPageState extends State<PatientSignupPage> {
         final name = _nameController!.text.trim();
         final role = _patientType;
         final bloodGroup = _bloodGroupController!.text.trim();
-        final dob = _dateOfBirth;
+        final dob = _dateOfBirth == null
+            ? null
+            : AppDateTime.utcDateOnly(_dateOfBirth!);
         final gender = _gender;
 
         final res = await client.auth.completeSignupWithPhoneOtp(

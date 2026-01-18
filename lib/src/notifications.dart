@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart';
+
+import 'date_time_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // SharedPreferences ইমপোর্ট করা হলো
 
 enum NotificationFilter { all, unread, read }
@@ -219,7 +221,10 @@ class _NotificationsState extends State<Notifications> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               trailing: Text(
-                                n.createdAt.toString().split(' ')[0],
+                                AppDateTime.formatLocal(
+                                  n.createdAt,
+                                  pattern: 'yyyy-MM-dd',
+                                ),
                                 style: const TextStyle(fontSize: 11),
                               ),
                               onTap: () async {

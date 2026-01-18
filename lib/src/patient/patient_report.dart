@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../download_pdf_image_from_link.dart';
+import '../date_time_utils.dart';
 
 class PatientReports extends StatefulWidget {
   const PatientReports({super.key});
@@ -189,7 +189,10 @@ class _PatientReportsState extends State<PatientReports> {
                                 Icon(Icons.calendar_month_outlined, size: 18),
                                 const SizedBox(width: 5),
                                 Text(
-                                  DateFormat('yyyy-MM-dd').format(report.date),
+                                  AppDateTime.formatDateOnly(
+                                    report.date,
+                                    pattern: 'yyyy-MM-dd',
+                                  ),
                                   style: TextStyle(
                                     color: kPrimaryColor,
                                     fontWeight: FontWeight.w600,
@@ -222,7 +225,7 @@ class _PatientReportsState extends State<PatientReports> {
                                     ? () => downloadReportFromLink(
                                         url: report.fileUrl!,
                                         suggestedBaseName:
-                                            'Report_${report.testName}_${DateFormat('yyyyMMdd').format(report.date)}',
+                                            'Report_${report.testName}_${AppDateTime.formatDateOnly(report.date, pattern: 'yyyyMMdd')}',
                                       )
                                     : null,
                                 icon: const Icon(Icons.download, size: 18),

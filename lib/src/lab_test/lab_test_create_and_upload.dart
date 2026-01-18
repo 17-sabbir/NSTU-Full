@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../cloudinary_upload.dart';
+import '../date_time_utils.dart';
 
 class LabTestCreateAndUpload extends StatefulWidget {
   const LabTestCreateAndUpload({super.key});
@@ -50,8 +51,7 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload> {
 
   String fmt(DateTime? dt) {
     if (dt == null) return '';
-    return "${dt.day}/${dt.month}/${dt.year} "
-        "${dt.hour}:${dt.minute.toString().padLeft(2, '0')}";
+    return AppDateTime.formatLocalDateTime(dt, pattern: 'dd/MM/yyyy HH:mm');
   }
 
   // Helper to display patient type nicely
@@ -104,7 +104,10 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload> {
             // Pick File button
             if (r.submittedAt == null)
               IconButton(
-                icon: const Icon(Icons.file_upload_outlined, color: Colors.orange),
+                icon: const Icon(
+                  Icons.file_upload_outlined,
+                  color: Colors.orange,
+                ),
                 onPressed: () async {
                   final res = await FilePicker.platform.pickFiles(
                     type: FileType.custom,

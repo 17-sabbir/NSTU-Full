@@ -7,6 +7,7 @@ import 'dart:async';
 
 import '../cloudinary_upload.dart';
 import '../mail_phn_update_verify.dart';
+import '../date_time_utils.dart';
 
 class PatientProfilePage extends StatefulWidget {
   final String? userId;
@@ -171,9 +172,15 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     final emailChanged = currentEmail != (_initialEmail ?? '').trim();
     final phoneChanged = currentPhone != (_initialPhone ?? '').trim();
     final bloodChanged = currentBlood != (_initialBloodGroup ?? '').trim();
-    final dobChanged =
-        _dateOfBirth?.millisecondsSinceEpoch !=
-        _initialDob?.millisecondsSinceEpoch;
+
+    bool sameDateOnly(DateTime? a, DateTime? b) {
+      if (a == null || b == null) return a == b;
+      final au = a.toUtc();
+      final bu = b.toUtc();
+      return au.year == bu.year && au.month == bu.month && au.day == bu.day;
+    }
+
+    final dobChanged = !sameDateOnly(_dateOfBirth, _initialDob);
     final genderChanged =
         (_gender ?? '').trim().toLowerCase() !=
         (_initialGender ?? '').trim().toLowerCase();
@@ -362,12 +369,16 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
         imageUrl = await _uploadProfileToCloudinary(_profileImageBytes!);
         if (imageUrl == null) throw Exception("Image upload failed");
       }
+
+      final dobToSend = _dateOfBirth == null
+          ? null
+          : AppDateTime.utcDateOnly(_dateOfBirth!);
       await client.patient.updatePatientProfile(
         0,
         _nameController.text.trim(),
         normalizedPhone,
         _bloodGroupController.text.isEmpty ? null : _bloodGroupController.text,
-        _dateOfBirth,
+        dobToSend,
         _gender,
         imageUrl,
       );
@@ -431,7 +442,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
 
   String _formatDob(DateTime? d) {
     if (d == null) return 'Not set';
-    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    return AppDateTime.formatDateOnly(d, pattern: 'dd/MM/yyyy');
   }
 
   // ================= UI Components =================
