@@ -136,11 +136,11 @@ class _UserManagementState extends State<UserManagement>
         }
       }
 
-      // If the UI selected 'Patient', show everyone except staff roles
+      // If the UI selected 'Patient', show patient-like roles.
       List<Map<String, dynamic>> resultList = list;
       if (selectedCategory == 'Patient') {
-        // Include only patient-like roles: student, teacher, staff
-        final include = {'student', 'teacher', 'outside'};
+        // Backend uses these as patient-facing roles.
+        final include = {'student', 'teacher', 'staff', 'outside'};
         resultList = list.where((u) {
           final r = (u['role'] ?? '').toString().toLowerCase();
           return include.contains(r);
