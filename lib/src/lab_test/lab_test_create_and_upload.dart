@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../cloudinary_upload.dart';
 import '../date_time_utils.dart';
+import '../route_refresh.dart';
 
 class LabTestCreateAndUpload extends StatefulWidget {
   const LabTestCreateAndUpload({super.key});
@@ -16,7 +17,8 @@ class LabTestCreateAndUpload extends StatefulWidget {
   State<LabTestCreateAndUpload> createState() => _LabTestCreateAndUploadState();
 }
 
-class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload> {
+class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
+    with RouteRefreshMixin<LabTestCreateAndUpload> {
   List<TestResult> results = [];
   bool loading = true;
   // key: resultId, value: picked file data
@@ -41,6 +43,11 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload> {
     super.initState();
     fetchResults();
     fetchTests();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    await Future.wait([fetchResults(), fetchTests()]);
   }
 
   Future<void> fetchResults() async {

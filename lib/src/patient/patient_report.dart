@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:printing/printing.dart';
 
 import '../download_pdf_image_from_link.dart';
 import '../date_time_utils.dart';
+import '../route_refresh.dart';
 
 class PatientReports extends StatefulWidget {
   const PatientReports({super.key});
@@ -13,7 +15,8 @@ class PatientReports extends StatefulWidget {
   State<PatientReports> createState() => _PatientReportsState();
 }
 
-class _PatientReportsState extends State<PatientReports> {
+class _PatientReportsState extends State<PatientReports>
+    with RouteRefreshMixin<PatientReports> {
   final Color kPrimaryColor = const Color(0xFF00796B);
 
   bool isLoading = true;
@@ -25,8 +28,16 @@ class _PatientReportsState extends State<PatientReports> {
     loadReports();
   }
 
-  Future<void> loadReports() async {
+  @override
+  Future<void> refreshOnFocus() async {
+    await loadReports(showSpinner: false);
+  }
+
+  Future<void> loadReports({bool showSpinner = true}) async {
     try {
+      if (showSpinner && mounted) {
+        setState(() => isLoading = true);
+      }
       final prefs = await SharedPreferences.getInstance();
 
       // SAME key as dashboard
@@ -80,17 +91,13 @@ class _PatientReportsState extends State<PatientReports> {
           : suggestedBaseName.trim();
       final fileName = safeBase.contains('.') ? safeBase : '$safeBase.$ext';
 
-      await downloadPdfImageFromLink(
-        url: url,
-        fileName: fileName,
-        context: context,
-      );
+      final result = await downloadBytesFromLink(url: url, fileName: fileName);
+
+      await Printing.sharePdf(bytes: result.bytes, filename: result.fileName);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Saved to Downloads (or browser downloads).'),
-        ),
+        const SnackBar(content: Text('Report ready to save/share.')),
       );
     } on CloudinaryPdfDeliveryBlockedException {
       if (!mounted) return;

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart'; // Ensure this matches your package name
 
+import '../route_refresh.dart';
+
 class ManageTest extends StatefulWidget {
   const ManageTest({super.key});
 
@@ -8,7 +10,8 @@ class ManageTest extends StatefulWidget {
   State<ManageTest> createState() => ManageTestState();
 }
 
-class ManageTestState extends State<ManageTest> {
+class ManageTestState extends State<ManageTest>
+    with RouteRefreshMixin<ManageTest> {
   List<LabTests> _tests = [];
   bool _isLoading = true;
 
@@ -19,6 +22,11 @@ class ManageTestState extends State<ManageTest> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       fetchData();
     });
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    await fetchData();
   }
 
   /// Create logic call

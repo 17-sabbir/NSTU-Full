@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../cloudinary_upload.dart';
 import '../mail_phn_update_verify.dart';
+import '../route_refresh.dart';
 
 class DispenserProfile extends StatefulWidget {
   const DispenserProfile({super.key});
@@ -14,7 +15,8 @@ class DispenserProfile extends StatefulWidget {
   State<DispenserProfile> createState() => _DispenserProfileState();
 }
 
-class _DispenserProfileState extends State<DispenserProfile> {
+class _DispenserProfileState extends State<DispenserProfile>
+    with RouteRefreshMixin<DispenserProfile> {
   String name = '';
   String email = '';
   String phone = '';
@@ -70,6 +72,13 @@ class _DispenserProfileState extends State<DispenserProfile> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _verifyAndLoad();
     });
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    if (_isSaving) return;
+    if (_isChanged) return;
+    await _verifyAndLoad();
   }
 
   Future<void> _verifyAndLoad() async {
@@ -307,7 +316,7 @@ class _DispenserProfileState extends State<DispenserProfile> {
     _onChanged();
   }
 
-void _confirmLogout() {
+  void _confirmLogout() {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -320,11 +329,9 @@ void _confirmLogout() {
           ),
           TextButton(
             onPressed: () async {
-            
               Navigator.pop(dialogContext);
 
               try {
-
                 await client.authenticationKeyManager?.remove();
                 try {
                   await client.auth.logout();

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../cloudinary_upload.dart';
 import '../mail_phn_update_verify.dart';
 import 'package:flutter/services.dart';
+import '../route_refresh.dart';
 
 class LabTesterProfile extends StatefulWidget {
   const LabTesterProfile({super.key});
@@ -14,7 +15,7 @@ class LabTesterProfile extends StatefulWidget {
 }
 
 class _LabTesterProfileState extends State<LabTesterProfile>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RouteRefreshMixin<LabTesterProfile> {
   // Fields populated from backend
   String name = '';
   String email = '';
@@ -62,6 +63,13 @@ class _LabTesterProfileState extends State<LabTesterProfile>
     _qualCtrl.addListener(_onChanged);
 
     _loadProfile();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    if (_isSaving) return;
+    if (_isChanged) return;
+    await _loadProfile();
   }
 
   @override

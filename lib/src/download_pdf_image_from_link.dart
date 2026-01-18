@@ -173,22 +173,22 @@ Future<Map<String, String>?> _authHeadersForUrl(String url) async {
   return {'Authorization': headerValue};
 }
 
-/// Downloads a Cloudinary-hosted PDF/image from a link.
+/// Downloads bytes from a URL (Cloudinary/back-end), with the same fallback logic as
+/// [downloadPdfImageFromLink] but without saving to disk.
 ///
-/// Behavior:
-/// - Web: triggers browser download (via `<a download>`), returns the download URL.
-/// - Android: saves into device Downloads folder (using MediaStore), returns saved content URI string.
-/// - iOS/desktop: saves into app Documents folder, returns local file path.
-Future<Object?> downloadPdfImageFromLink({
-  required String url,
-  String? fileName,
-  BuildContext? context,
-}) async {
+/// Returns:
+/// - `bytes`: downloaded content bytes
+/// - `contentType`: server-reported content type
+/// - `usedUrl`: which URL worked (original or attachment URL)
+/// - `fileName`: sanitized file name (with inferred extension if needed)
+Future<({Uint8List bytes, String contentType, String usedUrl, String fileName})>
+downloadBytesFromLink({required String url, String? fileName}) async {
   final dl = buildCloudinaryAttachmentUrl(url);
   final candidates = <String>{
     url,
     dl,
   }.where((e) => e.trim().isNotEmpty).toList();
+
   var safeName = _sanitizeFileName(
     (fileName == null || fileName.trim().isEmpty)
         ? _inferFileNameFromUrl(url)
@@ -203,56 +203,6 @@ Future<Object?> downloadPdfImageFromLink({
       connectTimeout: const Duration(seconds: 30),
     ),
   );
-
-  Future<({Uint8List bytes, String contentType, String usedUrl})>
-  downloadFirstOk() async {
-    Object? lastError;
-    DownloadHttpException? lastHttp;
-    CloudinaryPdfDeliveryBlockedException? cloudinaryPdfBlocked;
-    for (final u in candidates) {
-      try {
-        final headers = await _authHeadersForUrl(u);
-        final resp = await dio.get<List<int>>(
-          u,
-          options: Options(responseType: ResponseType.bytes, headers: headers),
-        );
-        final bytes = Uint8List.fromList(resp.data ?? const <int>[]);
-        if (bytes.isEmpty) throw Exception('Empty download');
-        final contentType =
-            resp.headers.value('content-type') ?? 'application/octet-stream';
-        return (bytes: bytes, contentType: contentType, usedUrl: u);
-      } catch (e) {
-        lastError = e;
-
-        if (e is DioException) {
-          final status = e.response?.statusCode;
-          if (status != null) {
-            lastHttp = DownloadHttpException(
-              statusCode: status,
-              url: u,
-              details: e.message,
-            );
-
-            // Cloudinary-specific: Free plans can block PDF delivery unless
-            // explicitly enabled in the Cloudinary Console (Security settings).
-            if ((status == 401 || status == 403) &&
-                _isCloudinaryHost(u) &&
-                _looksLikePdfRequest(url: u, fileName: safeName)) {
-              cloudinaryPdfBlocked ??= CloudinaryPdfDeliveryBlockedException(
-                url: u,
-                statusCode: status,
-              );
-            }
-          }
-        }
-        continue;
-      }
-    }
-
-    if (cloudinaryPdfBlocked != null) throw cloudinaryPdfBlocked;
-    if (lastHttp != null) throw lastHttp;
-    throw Exception('Download failed for all URLs: $lastError');
-  }
 
   // Some Cloudinary/raw URLs don't include an extension; try to infer it.
   if (!_hasExtension(safeName)) {
@@ -271,11 +221,103 @@ Future<Object?> downloadPdfImageFromLink({
     if (ext.isNotEmpty) safeName = '$safeName.$ext';
   }
 
-  // Web: always use browser download, even on Android browsers.
+  Object? lastError;
+  DownloadHttpException? lastHttp;
+  CloudinaryPdfDeliveryBlockedException? cloudinaryPdfBlocked;
+
+  for (final u in candidates) {
+    try {
+      final headers = await _authHeadersForUrl(u);
+      final resp = await dio.get<List<int>>(
+        u,
+        options: Options(responseType: ResponseType.bytes, headers: headers),
+      );
+      final bytes = Uint8List.fromList(resp.data ?? const <int>[]);
+      if (bytes.isEmpty) throw Exception('Empty download');
+      final contentType =
+          resp.headers.value('content-type') ?? 'application/octet-stream';
+      return (
+        bytes: bytes,
+        contentType: contentType,
+        usedUrl: u,
+        fileName: safeName,
+      );
+    } catch (e) {
+      lastError = e;
+
+      if (e is DioException) {
+        final status = e.response?.statusCode;
+        if (status != null) {
+          lastHttp = DownloadHttpException(
+            statusCode: status,
+            url: u,
+            details: e.message,
+          );
+
+          // Cloudinary-specific: Free plans can block PDF delivery unless enabled.
+          if ((status == 401 || status == 403) &&
+              _isCloudinaryHost(u) &&
+              _looksLikePdfRequest(url: u, fileName: safeName)) {
+            cloudinaryPdfBlocked ??= CloudinaryPdfDeliveryBlockedException(
+              url: u,
+              statusCode: status,
+            );
+          }
+        }
+      }
+      continue;
+    }
+  }
+
+  if (cloudinaryPdfBlocked != null) throw cloudinaryPdfBlocked;
+  if (lastHttp != null) throw lastHttp;
+  throw Exception('Download failed for all URLs: $lastError');
+}
+
+/// Downloads a Cloudinary-hosted PDF/image from a link.
+///
+/// Behavior:
+/// - Web: triggers browser download (via `<a download>`), returns the download URL.
+/// - Android: saves into device Downloads folder (using MediaStore), returns saved content URI string.
+/// - iOS/desktop: saves into app Documents folder, returns local file path.
+Future<Object?> downloadPdfImageFromLink({
+  required String url,
+  String? fileName,
+  BuildContext? context,
+}) async {
+  final result = await downloadBytesFromLink(url: url, fileName: fileName);
+
+  // Web: keep old contract (return the used URL) while triggering download.
   if (kIsWeb) {
-    final result = await downloadFirstOk();
-    final bytes = result.bytes;
-    final contentType = result.contentType;
+    await saveBytesAsDownload(
+      bytes: result.bytes,
+      fileName: result.fileName,
+      contentType: result.contentType,
+    );
+    return result.usedUrl;
+  }
+
+  return saveBytesAsDownload(
+    bytes: result.bytes,
+    fileName: result.fileName,
+    contentType: result.contentType,
+  );
+}
+
+/// Saves in-memory bytes as a downloadable file.
+///
+/// Behavior:
+/// - Web: triggers browser download and returns `null`.
+/// - Android: saves into device Downloads folder (MediaStore), returns saved content URI string.
+/// - iOS/desktop: saves into app Documents folder, returns local file path.
+Future<Object?> saveBytesAsDownload({
+  required Uint8List bytes,
+  required String fileName,
+  String contentType = 'application/octet-stream',
+}) async {
+  final safeName = _sanitizeFileName(fileName);
+
+  if (kIsWeb) {
     final blob = html.Blob([bytes], contentType);
     final objectUrl = html.Url.createObjectUrlFromBlob(blob);
     final a = html.AnchorElement(href: objectUrl)
@@ -285,17 +327,11 @@ Future<Object?> downloadPdfImageFromLink({
     a.click();
     a.remove();
     html.Url.revokeObjectUrl(objectUrl);
-    return result.usedUrl;
+    return null;
   }
 
-  // Non-web: download bytes then save to temp file first.
-  final result = await downloadFirstOk();
-  final tmpDir = await getTemporaryDirectory();
-  final tmpPath = p.join(tmpDir.path, safeName);
-  final bytes = result.bytes;
-  await uio.File(tmpPath).writeAsBytes(bytes, flush: true);
+  final tmpPath = await writeTempFileBytes(bytes, fileName: safeName);
 
-  // Android: write to public Downloads using MediaStore.
   if (uio.Platform.isAndroid) {
     await MediaStore.ensureInitialized();
     MediaStore.appFolder = 'Dishari';
@@ -305,11 +341,9 @@ Future<Object?> downloadPdfImageFromLink({
       dirType: DirType.download,
       dirName: DirName.download,
     );
-
     return info?.uri;
   }
 
-  // iOS/desktop: best-effort save to app Documents (user can share/export).
   final docs = await getApplicationDocumentsDirectory();
   final outPath = p.join(docs.path, safeName);
   await uio.File(tmpPath).copy(outPath);
@@ -326,7 +360,6 @@ Future<String> writeTempFileBytes(
   if (kIsWeb) {
     throw UnsupportedError('Temporary file writing is not supported on Web');
   }
-
   final dir = await getTemporaryDirectory();
   final safe = fileName.trim().isEmpty ? 'temp.bin' : fileName.trim();
   final path = p.join(dir.path, safe);

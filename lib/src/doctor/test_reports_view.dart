@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../download_pdf_image_from_link.dart';
 import '../platform_temp_file.dart';
+import '../route_refresh.dart';
 import 'dosage_times.dart';
 
 class TestReportsView extends StatefulWidget {
@@ -19,7 +20,8 @@ class TestReportsView extends StatefulWidget {
   State<TestReportsView> createState() => _TestReportsViewState();
 }
 
-class _TestReportsViewState extends State<TestReportsView> {
+class _TestReportsViewState extends State<TestReportsView>
+    with RouteRefreshMixin<TestReportsView> {
   List<PatientExternalReport> _reports = [];
   bool _isLoading = true;
   String? _error;
@@ -35,6 +37,12 @@ class _TestReportsViewState extends State<TestReportsView> {
   void initState() {
     super.initState();
     _fetchReports();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    if (isSubmitting) return;
+    await _fetchReports();
   }
 
   @override
@@ -1198,13 +1206,7 @@ class _TestReportsViewState extends State<TestReportsView> {
         foregroundColor: Colors.blue,
         automaticallyImplyLeading: false,
         elevation: 0,
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: _fetchReports,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
+        actions: const [],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

@@ -20,6 +20,7 @@ class _LabTesterHomeState extends State<LabTesterHome>
     with RouteRefreshMixin<LabTesterHome> {
   final GlobalKey<ManageTestState> _manageTestKey =
       GlobalKey<ManageTestState>();
+  final GlobalKey _uploadKey = GlobalKey();
   int _selectedIndex = 0;
   final Color primaryColor = Colors.blueAccent;
   final List<int> _navigationHistory = [];
@@ -176,7 +177,7 @@ class _LabTesterHomeState extends State<LabTesterHome>
       index: _selectedIndex,
       children: [
         _homeUI(),
-        const LabTestCreateAndUpload(),
+        LabTestCreateAndUpload(key: _uploadKey),
         ManageTest(key: _manageTestKey),
         const LabTesterProfile(),
       ],
@@ -342,11 +343,6 @@ class _LabTesterHomeState extends State<LabTesterHome>
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const Spacer(),
-              IconButton(
-                tooltip: 'Refresh',
-                onPressed: _loadHomeData,
-                icon: const Icon(Icons.refresh),
-              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -630,13 +626,6 @@ class _LabTesterHomeState extends State<LabTesterHome>
                     _manageTestKey.currentState?.openTestDialog();
                   },
                 ),
-                IconButton(
-                  tooltip: "Refresh",
-                  icon: const Icon(Icons.refresh, color: Colors.blueAccent),
-                  onPressed: () {
-                    _manageTestKey.currentState?.fetchData();
-                  },
-                ),
               ],
             ],
           ),
@@ -651,6 +640,21 @@ class _LabTesterHomeState extends State<LabTesterHome>
               if (index != _selectedIndex) {
                 _navigationHistory.add(_selectedIndex);
                 setState(() => _selectedIndex = index);
+
+                // Auto-refresh the newly selected tab (no manual refresh icons).
+                if (index == 0) {
+                  _loadHomeDataInternal(silent: true);
+                } else if (index == 1) {
+                  final st = _uploadKey.currentState as dynamic;
+                  try {
+                    st.fetchResults();
+                    st.fetchTests();
+                  } catch (_) {}
+                } else if (index == 2) {
+                  _manageTestKey.currentState?.fetchData();
+                } else if (index == 3) {
+                  // Profile tab: RouteRefreshMixin will refresh on resume/return.
+                }
               }
             },
             items: const [

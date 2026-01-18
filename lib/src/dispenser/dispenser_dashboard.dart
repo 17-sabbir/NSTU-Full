@@ -973,13 +973,7 @@ class _DispenserDashboardState extends State<DispenserDashboard>
             _buildPageHeader(
               title: 'Dispense',
               subtitle: subtitle,
-              actions: [
-                IconButton(
-                  tooltip: 'Refresh',
-                  onPressed: _refresh,
-                  icon: const Icon(Icons.refresh, color: Colors.white),
-                ),
-              ],
+              actions: const [],
             ),
             _buildSearchSection(),
             _buildDispenseControls(),

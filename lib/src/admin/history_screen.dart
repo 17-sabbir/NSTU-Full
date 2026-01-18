@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:backend_client/backend_client.dart';
 
 import '../date_time_utils.dart';
+import '../route_refresh.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -11,7 +12,8 @@ class HistoryScreen extends StatefulWidget {
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class _HistoryScreenState extends State<HistoryScreen>
+    with RouteRefreshMixin<HistoryScreen> {
   final Color primaryColor = const Color(0xFF00796B); // Deep Teal
   static const int _initialLoadCount = 10;
   static const int _loadMoreCount = 50;
@@ -32,22 +34,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _refreshAll();
   }
 
-  Future<void> _refreshAll() async {
+  @override
+  Future<void> refreshOnFocus() async {
+    await _refreshAll(showSpinner: false);
+  }
+
+  Future<void> _refreshAll({bool showSpinner = true}) async {
     if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _inventoryLogs.clear();
-      _allGeneralLogs.clear();
-      _generalVisibleCount = 0;
-      _inventoryOffset = 0;
-      _inventoryHasMore = true;
-      _inventoryLoadingMore = false;
-    });
+    if (showSpinner) {
+      setState(() {
+        _loading = true;
+        _inventoryLogs.clear();
+        _allGeneralLogs.clear();
+        _generalVisibleCount = 0;
+        _inventoryOffset = 0;
+        _inventoryHasMore = true;
+        _inventoryLoadingMore = false;
+      });
+    }
 
     await Future.wait([_loadInitialInventory(), _loadAllGeneralLogs()]);
 
     if (!mounted) return;
-    setState(() => _loading = false);
+    if (showSpinner) {
+      setState(() => _loading = false);
+    }
   }
 
   Future<void> _loadInitialInventory() async {

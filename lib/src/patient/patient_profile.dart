@@ -8,6 +8,7 @@ import 'dart:async';
 import '../cloudinary_upload.dart';
 import '../mail_phn_update_verify.dart';
 import '../date_time_utils.dart';
+import '../route_refresh.dart';
 
 class PatientProfilePage extends StatefulWidget {
   final String? userId;
@@ -17,7 +18,8 @@ class PatientProfilePage extends StatefulWidget {
   State<PatientProfilePage> createState() => _PatientProfilePageState();
 }
 
-class _PatientProfilePageState extends State<PatientProfilePage> {
+class _PatientProfilePageState extends State<PatientProfilePage>
+    with RouteRefreshMixin<PatientProfilePage> {
   // ================= Controllers & State =================
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
@@ -63,6 +65,14 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     _phoneController.addListener(_checkChanges);
     _bloodGroupController.addListener(_checkChanges);
     _loadProfileData();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    // Don't clobber unsaved form edits.
+    if (_isSaving) return;
+    if (_isChanged) return;
+    await _loadProfileData();
   }
 
   @override

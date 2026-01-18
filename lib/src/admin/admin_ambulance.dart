@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart';
 
+import '../route_refresh.dart';
+
 class AdminAmbulance extends StatefulWidget {
   const AdminAmbulance({super.key});
 
@@ -8,7 +10,8 @@ class AdminAmbulance extends StatefulWidget {
   State<AdminAmbulance> createState() => _AdminAmbulanceState();
 }
 
-class _AdminAmbulanceState extends State<AdminAmbulance> {
+class _AdminAmbulanceState extends State<AdminAmbulance>
+    with RouteRefreshMixin<AdminAmbulance> {
   late Future<List<AmbulanceContact>> _ambulances;
 
   final Color _primaryTeal = const Color(0xFF00695C);
@@ -17,6 +20,12 @@ class _AdminAmbulanceState extends State<AdminAmbulance> {
   void initState() {
     super.initState();
     _loadAmbulances();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    if (!mounted) return;
+    setState(_loadAmbulances);
   }
 
   void _loadAmbulances() {

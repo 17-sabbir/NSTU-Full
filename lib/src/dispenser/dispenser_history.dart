@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:intl/intl.dart';
 
+import '../route_refresh.dart';
+
 class DispenseLogsScreen extends StatefulWidget {
   const DispenseLogsScreen({super.key});
 
@@ -9,7 +11,8 @@ class DispenseLogsScreen extends StatefulWidget {
   State<DispenseLogsScreen> createState() => _DispenseLogsScreenState();
 }
 
-class _DispenseLogsScreenState extends State<DispenseLogsScreen> {
+class _DispenseLogsScreenState extends State<DispenseLogsScreen>
+    with RouteRefreshMixin<DispenseLogsScreen> {
   List<DispenseHistoryEntry> _dispenses = [];
   bool _isLoading = true;
   bool _isLoadingMore = false;
@@ -22,6 +25,11 @@ class _DispenseLogsScreenState extends State<DispenseLogsScreen> {
   void initState() {
     super.initState();
     _loadHistory();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    await _loadHistory(reset: true);
   }
 
   Future<void> _loadHistory({bool reset = false}) async {

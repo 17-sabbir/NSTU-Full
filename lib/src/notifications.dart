@@ -5,6 +5,7 @@ import 'package:backend_client/backend_client.dart';
 
 import 'date_time_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // SharedPreferences ইমপোর্ট করা হলো
+import 'route_refresh.dart';
 
 enum NotificationFilter { all, unread, read }
 
@@ -15,7 +16,8 @@ class Notifications extends StatefulWidget {
   State<Notifications> createState() => _NotificationsState();
 }
 
-class _NotificationsState extends State<Notifications> {
+class _NotificationsState extends State<Notifications>
+    with RouteRefreshMixin<Notifications> {
   bool loading = true;
 
   int unreadCount = 0;
@@ -43,6 +45,11 @@ class _NotificationsState extends State<Notifications> {
   void initState() {
     super.initState();
     _loadAll();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    await _loadAll();
   }
 
   // 1. SharedPreferences থেকে User ID নেওয়ার ফাংশন

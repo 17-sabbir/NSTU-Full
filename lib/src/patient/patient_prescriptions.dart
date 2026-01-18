@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
@@ -8,10 +7,10 @@ import 'package:bangla_pdf_fixer/bangla_pdf_fixer.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:dishari/src/doctor/dosage_times.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:universal_html/html.dart' as html;
-import 'dart:io' show File;
-import 'package:path_provider/path_provider.dart';
 import 'package:backend_client/backend_client.dart';
+import 'package:printing/printing.dart';
+
+import '../route_refresh.dart';
 
 class PatientPrescriptions extends StatefulWidget {
   const PatientPrescriptions({super.key});
@@ -20,7 +19,8 @@ class PatientPrescriptions extends StatefulWidget {
   State<PatientPrescriptions> createState() => _PatientPrescriptionsPageState();
 }
 
-class _PatientPrescriptionsPageState extends State<PatientPrescriptions> {
+class _PatientPrescriptionsPageState extends State<PatientPrescriptions>
+    with RouteRefreshMixin<PatientPrescriptions> {
   Uint8List? _logoBytes;
   bool _isLoading = true;
   bool _isDisposed = false;
@@ -33,6 +33,11 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptions> {
   void initState() {
     super.initState();
     _loadResourcesAndData();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    await _fetchPrescriptions();
   }
 
   @override
@@ -174,7 +179,15 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptions> {
     );
 
     final bytes = await pdf.save();
-    _savePdfFile(bytes, "Prescription_${detail.prescription.id}.pdf");
+    final fileName = "Prescription_${detail.prescription.id}.pdf";
+
+    // Use Printing to let users download/share reliably on mobile.
+    await Printing.sharePdf(bytes: bytes, filename: fileName);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Prescription ready to save/share.')),
+    );
   }
 
   pw.Widget _buildHeader(pw.TextStyle style) {
@@ -578,27 +591,5 @@ class _PatientPrescriptionsPageState extends State<PatientPrescriptions> {
       'assets/fonts/OpenSans-VariableFont.ttf',
     );
     _englishFont = pw.Font.ttf(data);
-  }
-
-  Future<void> _savePdfFile(Uint8List bytes, String fileName) async {
-    if (kIsWeb) {
-      final blob = html.Blob([bytes], 'application/pdf');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      html.AnchorElement(href: url)
-        ..setAttribute("download", fileName)
-        ..click();
-      html.Url.revokeObjectUrl(url);
-    } else {
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/$fileName');
-      await file.writeAsBytes(bytes);
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Saved to: ${file.path}"),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
   }
 }

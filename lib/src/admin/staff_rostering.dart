@@ -4,6 +4,8 @@ import 'dart:async';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../route_refresh.dart';
+
 class StaffRostering extends StatefulWidget {
   const StaffRostering({super.key});
 
@@ -11,7 +13,8 @@ class StaffRostering extends StatefulWidget {
   State<StaffRostering> createState() => _StaffRosteringState();
 }
 
-class _StaffRosteringState extends State<StaffRostering> {
+class _StaffRosteringState extends State<StaffRostering>
+    with RouteRefreshMixin<StaffRostering> {
   // ---------------- Tables ----------------
   final List<Map<String, dynamic>> _doctorTable = [];
   final List<Map<String, dynamic>> _nurseTable = [];
@@ -60,6 +63,13 @@ class _StaffRosteringState extends State<StaffRostering> {
   void initState() {
     super.initState();
     _initData();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    // Best-effort refresh. Keep existing in-memory edits intact.
+    if (_changed.values.any((v) => v)) return;
+    await _initData();
   }
 
   Future<void> _initData() async {

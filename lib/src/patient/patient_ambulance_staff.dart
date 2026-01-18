@@ -3,6 +3,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:backend_client/backend_client.dart';
 
+import '../route_refresh.dart';
+
 class PatientAmbulanceStaff extends StatefulWidget {
   const PatientAmbulanceStaff({super.key});
 
@@ -10,7 +12,8 @@ class PatientAmbulanceStaff extends StatefulWidget {
   State<PatientAmbulanceStaff> createState() => _PatientAmbulanceStaffState();
 }
 
-class _PatientAmbulanceStaffState extends State<PatientAmbulanceStaff> {
+class _PatientAmbulanceStaffState extends State<PatientAmbulanceStaff>
+    with RouteRefreshMixin<PatientAmbulanceStaff> {
   final Color kPrimaryColor = const Color(0xFF00796B);
 
   late Future<List<StaffInfo>> _staff;
@@ -21,6 +24,15 @@ class _PatientAmbulanceStaffState extends State<PatientAmbulanceStaff> {
     super.initState();
     _staff = client.patient.getMedicalStaff();
     _ambulances = client.patient.getAmbulanceContacts(); // fetch from backend
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    if (!mounted) return;
+    setState(() {
+      _staff = client.patient.getMedicalStaff();
+      _ambulances = client.patient.getAmbulanceContacts();
+    });
   }
 
   Future<void> _makePhoneCall(String phoneNumber, String displayName) async {

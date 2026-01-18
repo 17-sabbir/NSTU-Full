@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:backend_client/backend_client.dart';
 
 import '../cloudinary_upload.dart';
+import '../route_refresh.dart';
 
 enum UploadStatus { idle, success, failure }
 
@@ -15,7 +16,8 @@ class PatientReportUpload extends StatefulWidget {
   State<PatientReportUpload> createState() => _PatientReportUploadState();
 }
 
-class _PatientReportUploadState extends State<PatientReportUpload> {
+class _PatientReportUploadState extends State<PatientReportUpload>
+    with RouteRefreshMixin<PatientReportUpload> {
   final _formKey = GlobalKey<FormState>();
   final Color kPrimaryColor = const Color(0xFF00796B);
 
@@ -52,6 +54,21 @@ class _PatientReportUploadState extends State<PatientReportUpload> {
   void initState() {
     super.initState();
     _loadAllData();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    if (_isUploading) return;
+
+    // Don't wipe in-progress form values.
+    final hasDraft =
+        _selectedPrescriptionId != null ||
+        _selectedType != null ||
+        _selectedFile != null ||
+        _fileBytes != null;
+    if (hasDraft) return;
+
+    await _loadAllData();
   }
 
   Future<void> _loadAllData() async {

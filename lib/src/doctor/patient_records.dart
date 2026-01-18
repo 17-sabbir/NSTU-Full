@@ -6,6 +6,8 @@ import 'package:backend_client/backend_client.dart';
 import 'package:dishari/src/doctor/prescription_page.dart';
 import 'dosage_times.dart';
 
+import '../route_refresh.dart';
+
 class PatientRecordsPage extends StatefulWidget {
   const PatientRecordsPage({super.key});
 
@@ -13,7 +15,8 @@ class PatientRecordsPage extends StatefulWidget {
   State<PatientRecordsPage> createState() => _PatientRecordsPageState();
 }
 
-class _PatientRecordsPageState extends State<PatientRecordsPage> {
+class _PatientRecordsPageState extends State<PatientRecordsPage>
+    with RouteRefreshMixin<PatientRecordsPage> {
   final TextEditingController _searchController = TextEditingController();
 
   Timer? _searchDebounce;
@@ -36,6 +39,13 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
     // Don't show any records until user searches.
     _patients = [];
     _filteredPatients = [];
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    final q = _searchController.text.trim();
+    if (q.isEmpty) return;
+    await _fetchPatients(showSpinner: false);
   }
 
   @override

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../route_refresh.dart';
+
 class PatientLabTestAvailability extends StatefulWidget {
   const PatientLabTestAvailability({super.key});
 
@@ -10,8 +12,8 @@ class PatientLabTestAvailability extends StatefulWidget {
       _PatientLabTestAvailabilityState();
 }
 
-class _PatientLabTestAvailabilityState
-    extends State<PatientLabTestAvailability> {
+class _PatientLabTestAvailabilityState extends State<PatientLabTestAvailability>
+    with RouteRefreshMixin<PatientLabTestAvailability> {
   final Color kPrimaryColor = const Color(0xFF00796B);
 
   // Fetched from backend (generated DTO LabTests)
@@ -27,7 +29,12 @@ class _PatientLabTestAvailabilityState
     _loadData();
   }
 
-  Future<void> _loadData() async {
+  @override
+  Future<void> refreshOnFocus() async {
+    await _loadData(showSnackBar: false);
+  }
+
+  Future<void> _loadData({bool showSnackBar = true}) async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -67,22 +74,24 @@ class _PatientLabTestAvailabilityState
       });
 
       // Provide immediate visible feedback so it's clear something happened
-      try {
-        final fetchedCount = tests.length;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Fetched $fetchedCount tests (role: ${_role.isEmpty ? 'OUTSIDE' : _role})',
+      if (showSnackBar) {
+        try {
+          final fetchedCount = tests.length;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Fetched $fetchedCount tests (role: ${_role.isEmpty ? 'OUTSIDE' : _role})',
+              ),
+              duration: const Duration(seconds: 2),
             ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      } catch (_) {
-        // ignore if context unavailable
+          );
+        } catch (_) {
+          // ignore if context unavailable
+        }
       }
     } catch (e, st) {
       debugPrint('Failed to load tests: $e\n$st');
-      if (mounted) {
+      if (mounted && showSnackBar) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to load tests: $e'),

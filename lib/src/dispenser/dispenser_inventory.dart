@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart';
 
+import '../route_refresh.dart';
+
 class InventoryManagement extends StatefulWidget {
   const InventoryManagement({super.key});
 
@@ -8,7 +10,8 @@ class InventoryManagement extends StatefulWidget {
   State<InventoryManagement> createState() => _InventoryManagementState();
 }
 
-class _InventoryManagementState extends State<InventoryManagement> {
+class _InventoryManagementState extends State<InventoryManagement>
+    with RouteRefreshMixin<InventoryManagement> {
   // Start with an empty inventory; real data will be loaded from backend in _loadInventory().
   List<Map<String, dynamic>> _inventory = [];
 
@@ -19,6 +22,11 @@ class _InventoryManagementState extends State<InventoryManagement> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInventory();
     });
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    await _loadInventory();
   }
 
   /// Refresh inventory list from backend

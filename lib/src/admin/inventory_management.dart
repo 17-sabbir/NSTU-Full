@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import 'export_service.dart';
 import '../date_time_utils.dart';
+import '../route_refresh.dart';
 
 class InventoryManagement extends StatefulWidget {
   const InventoryManagement({super.key});
@@ -14,7 +15,8 @@ class InventoryManagement extends StatefulWidget {
   State<InventoryManagement> createState() => _InventoryManagementState();
 }
 
-class _InventoryManagementState extends State<InventoryManagement> {
+class _InventoryManagementState extends State<InventoryManagement>
+    with RouteRefreshMixin<InventoryManagement> {
   final Color primaryColor = const Color(0xFF00796B); // Deep Teal
   final Color lowStockColor = Colors.orange.shade700;
   final Color criticalStockColor = Colors.red.shade700;
@@ -428,280 +430,318 @@ class _InventoryManagementState extends State<InventoryManagement> {
               );
             }
 
-            return Dialog(
-              insetPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 24,
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.85,
-                  child: Padding(
-                    padding: const EdgeInsets.all(18.0),
-                    child: Column(
-                      children: [
-                        // Header row with title and close
-                        Row(
-                          children: [
-                            Icon(Icons.inventory_2, color: primaryColor),
-                            const SizedBox(width: 10),
-                            Expanded(
+            final mediaQuery = MediaQuery.of(dialogContext);
+            final bottomInset = mediaQuery.viewInsets.bottom;
+            final availableHeight = mediaQuery.size.height - bottomInset;
+            final dialogHeight = (availableHeight * 0.9).clamp(
+              320.0,
+              mediaQuery.size.height * 0.9,
+            );
+
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: bottomInset),
+              child: Dialog(
+                insetPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 24,
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: SizedBox(
+                    height: dialogHeight,
+                    child: Padding(
+                      padding: const EdgeInsets.all(18.0),
+                      child: CustomScrollView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: Row(
+                              children: [
+                                Icon(Icons.inventory_2, color: primaryColor),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    product['name'] ?? 'Item',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () => Navigator.pop(dialogContext),
+                                  icon: const Icon(Icons.close),
+                                  tooltip: 'Close',
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                          SliverToBoxAdapter(
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Status',
+                                        style: TextStyle(
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: status['color'].withAlpha(
+                                            (0.12 * 255).round(),
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          status['text'],
+                                          style: TextStyle(
+                                            color: status['color'],
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Current Stock',
+                                        style: TextStyle(
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                      Text(
+                                        '${_getTotalStock(product)} ${product['unit'] ?? ''}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Minimum Threshold',
+                                        style: TextStyle(
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                      Text(
+                                        '${product['minThreshold'] ?? 0} ${product['unit'] ?? ''}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Category',
+                                        style: TextStyle(
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                      Text(
+                                        product['category'] ?? 'Unassigned',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SliverToBoxAdapter(child: SizedBox(height: 14)),
+                          SliverToBoxAdapter(
+                            child: CheckboxListTile(
+                              title: const Text('Dispenser can restock'),
+                              value: canRestockDispenser,
+                              activeColor: primaryColor,
+                              contentPadding: EdgeInsets.zero,
+                              onChanged: (val) {
+                                setStateDialog(() {
+                                  canRestockDispenser = val ?? false;
+                                });
+                              },
+                              controlAffinity: ListTileControlAffinity.leading,
+                            ),
+                          ),
+                          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                          SliverToBoxAdapter(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
                               child: Text(
-                                product['name'] ?? 'Item',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                'Update Stock Quantity',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[800],
                                 ),
                               ),
                             ),
-                            IconButton(
-                              onPressed: () => Navigator.pop(dialogContext),
-                              icon: const Icon(Icons.close),
-                              tooltip: 'Close',
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Info card
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Status',
-                                    style: TextStyle(color: Colors.grey[700]),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: status['color'].withAlpha(
-                                        (0.12 * 255).round(),
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      status['text'],
-                                      style: TextStyle(
-                                        color: status['color'],
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                          SliverToBoxAdapter(
+                            child: TextField(
+                              controller: quantityController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                hintText: 'Enter quantity (e.g. 10)',
+                                labelText: 'Quantity',
+                                helperText: 'Enter a positive whole number',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                errorText: errorText,
                               ),
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Current Stock',
-                                    style: TextStyle(color: Colors.grey[700]),
-                                  ),
-                                  Text(
-                                    '${_getTotalStock(product)} ${product['unit'] ?? ''}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Minimum Threshold',
-                                    style: TextStyle(color: Colors.grey[700]),
-                                  ),
-                                  Text(
-                                    '${product['minThreshold'] ?? 0} ${product['unit'] ?? ''}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Category',
-                                    style: TextStyle(color: Colors.grey[700]),
-                                  ),
-                                  Text(
-                                    product['category'] ?? 'Unassigned',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 14),
-                        CheckboxListTile(
-                          title: const Text("Dispenser can restock"),
-                          value: canRestockDispenser,
-                          activeColor: primaryColor,
-                          contentPadding: EdgeInsets.zero,
-                          onChanged: (val) {
-                            setStateDialog(() {
-                              canRestockDispenser = val ?? false;
-                            });
-                          },
-                          controlAffinity: ListTileControlAffinity.leading,
-                        ),
-                        const SizedBox(height: 8),
-                        // Quantity input
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Update Stock Quantity',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[800],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: quantityController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: 'Enter quantity (e.g. 10)',
-                            labelText: 'Quantity',
-                            helperText: 'Enter a positive whole number',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
+                          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                          SliverToBoxAdapter(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => _applyStockChange(1),
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: const Text('Add Stock'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => _applyStockChange(-1),
+                                    icon: const Icon(Icons.remove, size: 18),
+                                    label: const Text('Remove Stock'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            errorText: errorText,
                           ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // Buttons row
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () => _applyStockChange(1),
-                                icon: const Icon(Icons.add, size: 18),
-                                label: const Text('Add Stock'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
+                          const SliverToBoxAdapter(child: SizedBox(height: 14)),
+                          SliverToBoxAdapter(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Recent Transactions',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[800],
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () => _applyStockChange(-1),
-                                icon: const Icon(Icons.remove, size: 18),
-                                label: const Text('Remove Stock'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange.shade700,
+                          ),
+                          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                          if (txLoading)
+                            const SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 14),
-
-                        // Recent transactions
-                        // Recent transactions
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Recent Transactions',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[800],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: txLoading
-                              ? const Center(child: CircularProgressIndicator())
-                              : (product['transactions'] as List).isEmpty
-                              ? const Center(
+                            )
+                          else if ((product['transactions'] as List).isEmpty)
+                            const SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24),
+                                child: Center(
                                   child: Text('No recent transactions'),
-                                )
-                              : ListView.builder(
-                                  // shrinkWrap: true, // Expanded এর ভেতর থাকলে এটি না দিলেও চলে
-                                  itemCount:
-                                      (product['transactions']
-                                              as List<InventoryTransactionInfo>)
-                                          .length,
-                                  itemBuilder: (context, index) {
-                                    final t =
-                                        (product['transactions']
-                                            as List<
-                                              InventoryTransactionInfo
-                                            >)[index];
-                                    final qty = t.quantity;
-                                    final type = t.transactionType;
-                                    final dt = t.createdAt;
-                                    final signedQty = type == 'OUT'
-                                        ? -qty
-                                        : qty;
-
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 4,
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                          Text(
-                                            signedQty > 0
-                                                ? '+$signedQty'
-                                                : signedQty.toString(),
-                                            style: TextStyle(
-                                              color: signedQty < 0
-                                                  ? Colors.red
-                                                  : Colors.green,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
                                 ),
-                        ),
-                      ],
+                              ),
+                            )
+                          else
+                            SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final t =
+                                      (product['transactions']
+                                          as List<
+                                            InventoryTransactionInfo
+                                          >)[index];
+                                  final qty = t.quantity;
+                                  final type = t.transactionType;
+                                  final dt = t.createdAt;
+                                  final signedQty = type == 'OUT' ? -qty : qty;
+
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 4,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                        Text(
+                                          signedQty > 0
+                                              ? '+$signedQty'
+                                              : signedQty.toString(),
+                                          style: TextStyle(
+                                            color: signedQty < 0
+                                                ? Colors.red
+                                                : Colors.green,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                                childCount:
+                                    (product['transactions']
+                                            as List<InventoryTransactionInfo>)
+                                        .length,
+                              ),
+                            ),
+                          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -795,6 +835,11 @@ class _InventoryManagementState extends State<InventoryManagement> {
     _loadCategories();
     _loadInventory();
     _ensurePdfFontLoaded();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    await Future.wait([_loadCategories(), _loadInventory()]);
   }
 
   @override

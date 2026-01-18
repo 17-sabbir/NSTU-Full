@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 
 import '../date_time_utils.dart';
+import '../route_refresh.dart';
 
 class ReportsAnalytics extends StatefulWidget {
   const ReportsAnalytics({super.key});
@@ -16,7 +17,8 @@ class ReportsAnalytics extends StatefulWidget {
   State<ReportsAnalytics> createState() => _ReportsAnalyticsState();
 }
 
-class _ReportsAnalyticsState extends State<ReportsAnalytics> {
+class _ReportsAnalyticsState extends State<ReportsAnalytics>
+    with RouteRefreshMixin<ReportsAnalytics> {
   int? _selectedMonthIndex = 0;
   DashboardAnalytics? _analytics;
   bool _loading = true;
@@ -62,6 +64,11 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
     super.initState();
     _fetchAnalytics();
     _loadFont();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    await _fetchAnalytics(silent: true);
   }
 
   DateTime _dateOnly(DateTime d) => AppDateTime.startOfLocalDay(d);
@@ -344,10 +351,12 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
   //     months: _months,
   //   );
   // }
-  Future<void> _fetchAnalytics() async {
+  Future<void> _fetchAnalytics({bool silent = false}) async {
     try {
       if (!mounted) return;
-      setState(() => _loading = true);
+      if (!silent) {
+        setState(() => _loading = true);
+      }
       final data = await client.adminReportEndpoints.getDashboardAnalytics();
       // debugPrint('Raw dashboard analytics: $data');
       // Fill missing months with zero
@@ -379,7 +388,9 @@ class _ReportsAnalyticsState extends State<ReportsAnalytics> {
     } catch (e) {
       debugPrint('Error fetching analytics: $e');
       if (!mounted) return;
-      setState(() => _loading = false);
+      if (!silent) {
+        setState(() => _loading = false);
+      }
     }
   }
 

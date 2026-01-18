@@ -3,6 +3,8 @@ import 'package:backend_client/backend_client.dart';
 import 'dosage_times.dart';
 import 'test_reports_view.dart';
 
+import '../route_refresh.dart';
+
 class DoctorHomePage extends StatefulWidget {
   const DoctorHomePage({
     super.key,
@@ -16,7 +18,8 @@ class DoctorHomePage extends StatefulWidget {
   State<DoctorHomePage> createState() => _DoctorHomePageState();
 }
 
-class _DoctorHomePageState extends State<DoctorHomePage> {
+class _DoctorHomePageState extends State<DoctorHomePage>
+    with RouteRefreshMixin<DoctorHomePage> {
   DoctorHomeData? _homeData;
   bool _loading = false;
 
@@ -24,6 +27,11 @@ class _DoctorHomePageState extends State<DoctorHomePage> {
   void initState() {
     super.initState();
     _fetchHomeData();
+  }
+
+  @override
+  Future<void> refreshOnFocus() async {
+    await _fetchHomeData(silent: true);
   }
 
   @override
