@@ -100,6 +100,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _login() async {
+    if (_isLoading) return;
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -182,9 +183,11 @@ class _HomePageState extends State<HomePage> {
 
         _showDialog('Login Error', 'An error occurred during login: $e');
       } finally {
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
