@@ -19,16 +19,47 @@ class _DoctorDashboardState extends State<DoctorDashboard>
     with RouteRefreshMixin<DoctorDashboard> {
   int _currentIndex = 0;
 
+  int? _reviewHighlightReportId;
+  bool _reviewHighlightAllUnreviewed = false;
+  DateTime? _reviewHighlightUnreviewedSinceUtc;
+
   // keep track of visited page history
   final List<int> _navigationHistory = [];
 
   // Pages are generated dynamically so we always pass the latest doctorId.
   List<Widget> get _pages => [
-    DoctorHomePage(doctorId: _doctorId, refreshSeed: _refreshSeed),
+    DoctorHomePage(
+      doctorId: _doctorId,
+      refreshSeed: _refreshSeed,
+      onOpenReviewReports: _openReviewReports,
+    ),
     const PatientRecordsPage(),
-    TestReportsView(doctorId: _doctorId),
+    TestReportsView(
+      doctorId: _doctorId,
+      highlightReportId: _reviewHighlightReportId,
+      highlightAllUnreviewed: _reviewHighlightAllUnreviewed,
+      highlightUnreviewedSinceUtc: _reviewHighlightUnreviewedSinceUtc,
+    ),
     const ProfilePage(),
   ];
+
+  void _openReviewReports({
+    int? highlightReportId,
+    bool highlightAllUnreviewed = false,
+    DateTime? highlightUnreviewedSinceUtc,
+  }) {
+    setState(() {
+      _reviewHighlightReportId = highlightReportId;
+      _reviewHighlightAllUnreviewed = highlightAllUnreviewed;
+      _reviewHighlightUnreviewedSinceUtc = highlightUnreviewedSinceUtc;
+
+      const reviewTabIndex = 2;
+      if (_currentIndex != reviewTabIndex) {
+        _navigationHistory.add(_currentIndex);
+        _currentIndex = reviewTabIndex;
+      }
+    });
+  }
 
   // Auth guard state
   bool _checkingAuth = true;

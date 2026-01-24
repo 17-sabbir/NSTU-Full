@@ -86,16 +86,18 @@ class DoctorEndpoint extends Endpoint {
           ? (lastWeekRows.first.toColumnMap()['total'] as int? ?? 0)
           : 0;
 
-      final now = DateTime.now().toUtc();
+      final now = DateTime.now();
 
-      // Recent activity: last 10 prescriptions
+      // Recent activity: last 24 hours (for dashboard)
       final recentRows = await session.db.unsafeQuery(
         r'''
         SELECT prescription_id, name, created_at
         FROM prescriptions
         WHERE doctor_id = @id
+          AND created_at IS NOT NULL
+          AND created_at >= (NOW() - INTERVAL '24 hours')
         ORDER BY created_at DESC NULLS LAST, prescription_id DESC
-        LIMIT 10
+        LIMIT 300
         ''',
         parameters: QueryParameters.named({'id': resolvedDoctorId}),
       );
@@ -103,7 +105,9 @@ class DoctorEndpoint extends Endpoint {
       final recent = <DoctorHomeRecentItem>[];
       for (final r in recentRows) {
         final m = r.toColumnMap();
-        final createdAt = (m['created_at'] as DateTime?)?.toUtc();
+        final createdAt = m['created_at'] as DateTime?;
+
+        if (createdAt == null) continue;
 
         recent.add(
           DoctorHomeRecentItem(
@@ -116,20 +120,25 @@ class DoctorEndpoint extends Endpoint {
         );
       }
 
-      // Reviewed reports: last 10 UploadpatientR for this doctor
+      // Reviewed reports: last 24 hours (for dashboard)
       final reportRows = await session.db.unsafeQuery(
         r'''
         SELECT
           r.report_id,
           r.type,
+          r.report_date,
           r.created_at,
           r.prescription_id,
           COALESCE(u.name, '') AS uploaded_by_name
         FROM UploadpatientR r
         LEFT JOIN users u ON u.user_id = r.uploaded_by
         WHERE r.prescribed_doctor_id = @id
+          AND (
+            (r.created_at IS NOT NULL AND r.created_at >= (NOW() - INTERVAL '24 hours'))
+            OR (r.report_date IS NOT NULL AND r.report_date >= (CURRENT_DATE - INTERVAL '1 day'))
+          )
         ORDER BY r.created_at DESC NULLS LAST, r.report_id DESC
-        LIMIT 10
+        LIMIT 300
         ''',
         parameters: QueryParameters.named({'id': resolvedDoctorId}),
       );
@@ -137,7 +146,10 @@ class DoctorEndpoint extends Endpoint {
       final reviewedReports = <DoctorHomeReviewedReport>[];
       for (final r in reportRows) {
         final m = r.toColumnMap();
-        final createdAt = (m['created_at'] as DateTime?)?.toUtc();
+        final createdAt =
+            (m['created_at'] as DateTime?) ?? (m['report_date'] as DateTime?);
+
+        if (createdAt == null) continue;
 
         reviewedReports.add(
           DoctorHomeReviewedReport(

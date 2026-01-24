@@ -14,7 +14,17 @@ import 'dosage_times.dart';
 
 class TestReportsView extends StatefulWidget {
   final int doctorId;
-  const TestReportsView({super.key, required this.doctorId});
+  final int? highlightReportId;
+  final bool highlightAllUnreviewed;
+  final DateTime? highlightUnreviewedSinceUtc;
+
+  const TestReportsView({
+    super.key,
+    required this.doctorId,
+    this.highlightReportId,
+    this.highlightAllUnreviewed = false,
+    this.highlightUnreviewedSinceUtc,
+  });
 
   @override
   State<TestReportsView> createState() => _TestReportsViewState();
@@ -25,6 +35,11 @@ class _TestReportsViewState extends State<TestReportsView>
   List<PatientExternalReport> _reports = [];
   bool _isLoading = true;
   String? _error;
+  final ScrollController _scrollController = ScrollController();
+  int? _highlightReportId;
+  late bool _highlightAllUnreviewed;
+  DateTime? _highlightUnreviewedSinceUtc;
+  final Map<int, GlobalKey> _reportItemKeys = <int, GlobalKey>{};
   bool sheetOpen = true;
   bool isPrefillLoading = true;
   bool isSubmitting = false;
@@ -36,7 +51,26 @@ class _TestReportsViewState extends State<TestReportsView>
   @override
   void initState() {
     super.initState();
+    _highlightReportId = widget.highlightReportId;
+    _highlightAllUnreviewed = widget.highlightAllUnreviewed;
+    _highlightUnreviewedSinceUtc = widget.highlightUnreviewedSinceUtc;
     _fetchReports();
+  }
+
+  @override
+  void didUpdateWidget(covariant TestReportsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.highlightReportId != widget.highlightReportId ||
+        oldWidget.highlightAllUnreviewed != widget.highlightAllUnreviewed ||
+        oldWidget.highlightUnreviewedSinceUtc !=
+            widget.highlightUnreviewedSinceUtc) {
+      _highlightReportId = widget.highlightReportId;
+      _highlightAllUnreviewed = widget.highlightAllUnreviewed;
+      _highlightUnreviewedSinceUtc = widget.highlightUnreviewedSinceUtc;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToHighlighted();
+      });
+    }
   }
 
   @override
@@ -49,6 +83,8 @@ class _TestReportsViewState extends State<TestReportsView>
   void dispose() {
     adviceController.dispose();
 
+    _scrollController.dispose();
+
     for (final m in itemCtrls) {
       (m['name'] as TextEditingController?)?.dispose();
       (m['duration'] as TextEditingController?)?.dispose();
@@ -58,6 +94,52 @@ class _TestReportsViewState extends State<TestReportsView>
     }
 
     super.dispose();
+  }
+
+  GlobalKey _keyForReportId(int reportId) {
+    return _reportItemKeys.putIfAbsent(reportId, () => GlobalKey());
+  }
+
+  void _scrollToHighlighted() {
+    int? targetReportId = _highlightReportId;
+
+    if (targetReportId == null) {
+      if (_highlightAllUnreviewed) {
+        for (final r in _reports) {
+          final id = r.reportId;
+          if (id == null) continue;
+          if (r.reviewed == true) continue;
+          targetReportId = id;
+          break;
+        }
+      }
+
+      final since = _highlightUnreviewedSinceUtc;
+      if (targetReportId == null && since != null) {
+        for (final r in _reports) {
+          final id = r.reportId;
+          if (id == null) continue;
+          if (r.reviewed == true) continue;
+          final createdAt = r.createdAt;
+          if (createdAt == null) continue;
+          if (createdAt.toUtc().isBefore(since)) continue;
+          targetReportId = id;
+          break;
+        }
+      }
+    }
+
+    if (targetReportId == null) return;
+    final key =
+        _reportItemKeys[targetReportId] ?? _keyForReportId(targetReportId);
+    final ctx = key.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      alignment: 0.25,
+    );
   }
 
   bool _isPdf(String url) {
@@ -116,8 +198,14 @@ class _TestReportsViewState extends State<TestReportsView>
       final list = await client.doctor.getReportsForDoctor(0);
       if (!mounted) return;
       setState(() {
-        _reports = list;
+        _reports = List<PatientExternalReport>.from(list);
+        _sortReports();
         _isLoading = false;
+      });
+
+      // After list is rendered, scroll & highlight the selected item (if any).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToHighlighted();
       });
     } catch (e) {
       if (!mounted) return;
@@ -126,6 +214,32 @@ class _TestReportsViewState extends State<TestReportsView>
         _isLoading = false;
       });
     }
+  }
+
+  void _sortReports() {
+    _reports.sort((a, b) {
+      final aReviewed = a.reviewed == true;
+      final bReviewed = b.reviewed == true;
+      if (aReviewed != bReviewed) {
+        // Unreviewed first.
+        return aReviewed ? 1 : -1;
+      }
+
+      final aCreated = a.createdAt;
+      final bCreated = b.createdAt;
+      if (aCreated != null && bCreated != null) {
+        final cmp = bCreated.compareTo(aCreated); // newest first
+        if (cmp != 0) return cmp;
+      } else if (aCreated != null) {
+        return -1;
+      } else if (bCreated != null) {
+        return 1;
+      }
+
+      final aId = a.reportId ?? -1;
+      final bId = b.reportId ?? -1;
+      return bId.compareTo(aId);
+    });
   }
 
   // review a click korle bottom sheet UI (interactive)
@@ -155,6 +269,7 @@ class _TestReportsViewState extends State<TestReportsView>
       if (mounted) {
         setState(() {
           report.reviewed = true;
+          _sortReports();
         });
       }
       unawaited(
@@ -1202,11 +1317,18 @@ class _TestReportsViewState extends State<TestReportsView>
           'Review Test Reports',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications),
+            onPressed: () async {
+              await Navigator.pushNamed(context, '/notifications');
+            },
+          ),
+        ],
         backgroundColor: Colors.white,
         foregroundColor: Colors.blue,
         automaticallyImplyLeading: false,
         elevation: 0,
-        actions: const [],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -1248,34 +1370,59 @@ class _TestReportsViewState extends State<TestReportsView>
           : RefreshIndicator(
               onRefresh: _fetchReports,
               child: ListView.separated(
+                controller: _scrollController,
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
                 itemCount: _reports.length,
                 // ignore: unnecessary_underscores
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final report = _reports[index];
+                  final reportId = report.reportId;
                   final createdAt = report.createdAt;
+                  final isReviewed = report.reviewed == true;
+                  final byIdHighlight =
+                      reportId != null && reportId == _highlightReportId;
+
+                  final byAllUnreviewedHighlight =
+                      _highlightAllUnreviewed && !isReviewed;
+
+                  final since = _highlightUnreviewedSinceUtc;
+                  final byUnreviewedHighlight =
+                      since != null &&
+                      !isReviewed &&
+                      createdAt != null &&
+                      createdAt.toUtc().isAfter(since);
+
+                  final isHighlighted =
+                      byIdHighlight ||
+                      byAllUnreviewedHighlight ||
+                      byUnreviewedHighlight;
                   final dateText = createdAt == null
                       ? '-'
                       : '${createdAt.year.toString().padLeft(4, '0')}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')}';
 
                   final isPdf = report.filePath.toLowerCase().endsWith('.pdf');
-                  final isReviewed = report.reviewed == true;
 
                   return InkWell(
+                    key: reportId == null ? null : _keyForReportId(reportId),
                     borderRadius: BorderRadius.circular(16),
                     onTap: () => _onReviewReport(report),
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isReviewed
-                            ? const Color(0xFFF1FBF4)
-                            : Colors.white,
+                        color: isHighlighted
+                            ? const Color(0xFFFFF7ED)
+                            : (isReviewed
+                                  ? const Color(0xFFF1FBF4)
+                                  : Colors.white),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isReviewed
-                              ? Colors.green.shade200
-                              : Colors.grey.shade200,
+                          color: isHighlighted
+                              ? Colors.orange.shade400
+                              : (isReviewed
+                                    ? Colors.green.shade200
+                                    : Colors.grey.shade200),
+                          width: isHighlighted ? 1.6 : 1.0,
                         ),
                         boxShadow: const [
                           BoxShadow(

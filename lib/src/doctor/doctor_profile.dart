@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +9,8 @@ import 'package:backend_client/backend_client.dart';
 
 import '../cloudinary_upload.dart';
 import '../mail_phn_update_verify.dart';
+import 'signature_background_processing.dart';
+import 'doctor_signature_pad.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -40,6 +43,9 @@ class _ProfilePageState extends State<ProfilePage> {
   final ImagePicker _picker = ImagePicker();
   Uint8List? _webProfileImageBytes; // web-only profile image
   Uint8List? _webSignatureImageBytes; // web-only signature image
+  Uint8List? _signatureBytes; // processed PNG bytes (transparent background)
+
+  bool _isProcessingSignature = false;
 
   bool _isChanged = false;
   bool _isLoading = true;
@@ -182,6 +188,7 @@ class _ProfilePageState extends State<ProfilePage> {
         // _ageController.text != initialAge || // include age in change detection
         _profileImage != null ||
         _webProfileImageBytes != null ||
+        _signatureBytes != null ||
         _signatureImage != null ||
         _webSignatureImageBytes != null;
 
@@ -353,6 +360,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
         _profileImageUrl = profile.profilePictureUrl;
         _signatureImageUrl = profile.signatureUrl;
+        _signatureBytes = null;
+        _signatureImage = null;
+        _webSignatureImageBytes = null;
 
         if (!mounted) return;
         setState(() {
@@ -379,9 +389,11 @@ class _ProfilePageState extends State<ProfilePage> {
     required Uint8List bytes,
     required String folder,
     required String filePrefix,
+    String fileExtension = 'jpg',
   }) {
+    final ext = fileExtension.trim().isEmpty ? 'jpg' : fileExtension.trim();
     final fileName =
-        '${filePrefix}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        '${filePrefix}_${DateTime.now().millisecondsSinceEpoch}.$ext';
     return CloudinaryUpload.uploadBytes(
       bytes: bytes,
       folder: folder,
@@ -437,37 +449,117 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 80,
+        // Keep quality high for clean edge detection in background removal.
+        imageQuality: 100,
       );
       if (image == null) return;
 
-      if (kIsWeb) {
-        final bytes = await image.readAsBytes();
+      setState(() {
+        _isProcessingSignature = true;
+      });
+
+      final rawBytes = await image.readAsBytes();
+      if (rawBytes.lengthInBytes > 2 * 1024 * 1024) {
+        if (!mounted) return;
         setState(() {
-          _signatureImage = null;
-          _signatureImageUrl = null;
-          _webSignatureImageBytes = bytes;
+          _isProcessingSignature = false;
         });
-      } else {
-        final file = File(image.path);
-        final int bytes = await file.length();
-        if (bytes > 2 * 1024 * 1024) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Selected signature exceeds 2 MB')),
-          );
-          return;
-        }
-        setState(() {
-          _signatureImage = file;
-          _signatureImageUrl = null;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Selected signature exceeds 2 MB')),
+        );
+        return;
       }
+
+      // Convert to ink-only transparent PNG (also crops around the writing).
+      final processed = await processSignatureToTransparentPng(rawBytes);
+      if (processed.lengthInBytes > 2 * 1024 * 1024) {
+        if (!mounted) return;
+        setState(() {
+          _isProcessingSignature = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Processed signature exceeds 2 MB. Try a smaller image.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        // Always keep signature as processed PNG bytes so alpha is preserved.
+        _signatureBytes = processed;
+        _signatureImage = null;
+        _webSignatureImageBytes = null;
+        _signatureImageUrl = null;
+        _isProcessingSignature = false;
+      });
       _checkChanges();
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessingSignature = false;
+        });
+      }
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to pick signature: $e')));
     }
+  }
+
+  Future<void> _drawSignature() async {
+    if (_isProcessingSignature || _isSaving) return;
+
+    final bytes = await showSignaturePadDialog(
+      context,
+      title: 'Draw signature',
+      width: 420,
+      height: 160,
+    );
+
+    if (bytes == null) return;
+    if (bytes.lengthInBytes > 2 * 1024 * 1024) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Signature exceeds 2 MB. Try drawing smaller.'),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _isProcessingSignature = true;
+    });
+
+    // Even though the pad exports a transparent PNG, we still crop it tightly.
+    final processed = await processSignatureToTransparentPng(bytes);
+    if (processed.lengthInBytes > 2 * 1024 * 1024) {
+      if (!mounted) return;
+      setState(() {
+        _isProcessingSignature = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Processed signature exceeds 2 MB. Draw smaller.'),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _signatureBytes = processed;
+      _signatureImage = null;
+      _webSignatureImageBytes = null;
+      _signatureImageUrl = null;
+      _isProcessingSignature = false;
+    });
+    _checkChanges();
   }
 
   Future<void> _saveProfile() async {
@@ -578,12 +670,32 @@ class _ProfilePageState extends State<ProfilePage> {
       }
 
       // Signature upload
-      if (_signatureImage != null) {
-        final bytes = await _signatureImage!.readAsBytes();
+      if (_signatureBytes != null) {
         signatureUrl = await _uploadDoctorImageToCloudinary(
-          bytes: bytes,
+          bytes: _signatureBytes!,
           folder: 'doctor_signatures',
           filePrefix: 'doctor_signature',
+          fileExtension: 'png',
+        );
+        if (signatureUrl == null) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to upload signature')),
+          );
+          setState(() {
+            _isSaving = false;
+          });
+          return;
+        }
+      } else if (_signatureImage != null) {
+        // Legacy path: still process to transparent PNG.
+        final bytes = await _signatureImage!.readAsBytes();
+        final processed = await processSignatureToTransparentPng(bytes);
+        signatureUrl = await _uploadDoctorImageToCloudinary(
+          bytes: processed,
+          folder: 'doctor_signatures',
+          filePrefix: 'doctor_signature',
+          fileExtension: 'png',
         );
         if (signatureUrl == null) {
           if (!mounted) return;
@@ -596,10 +708,15 @@ class _ProfilePageState extends State<ProfilePage> {
           return;
         }
       } else if (_webSignatureImageBytes != null) {
+        // Legacy web path: process to transparent PNG.
+        final processed = await processSignatureToTransparentPng(
+          _webSignatureImageBytes!,
+        );
         signatureUrl = await _uploadDoctorImageToCloudinary(
-          bytes: _webSignatureImageBytes!,
+          bytes: processed,
           folder: 'doctor_signatures',
           filePrefix: 'doctor_signature',
+          fileExtension: 'png',
         );
         if (signatureUrl == null) {
           if (!mounted) return;
@@ -653,6 +770,7 @@ class _ProfilePageState extends State<ProfilePage> {
         _signatureImage = null;
         _webProfileImageBytes = null;
         _webSignatureImageBytes = null;
+        _signatureBytes = null;
         await _loadProfile();
       } else {
         if (!mounted) return;
@@ -1060,7 +1178,13 @@ class _ProfilePageState extends State<ProfilePage> {
                                   child: Row(
                                     children: [
                                       const SizedBox(width: 12),
-                                      _signatureImage != null
+                                      _signatureBytes != null
+                                          ? _TransparentSignaturePreview(
+                                              bytes: _signatureBytes!,
+                                              width: 120,
+                                              height: 44,
+                                            )
+                                          : (_signatureImage != null)
                                           ? Image.file(
                                               _signatureImage!,
                                               height: 44,
@@ -1084,16 +1208,51 @@ class _ProfilePageState extends State<ProfilePage> {
                                               width: 120,
                                               fit: BoxFit.contain,
                                             )
-                                          : Text('No signature uploaded'),
+                                          : const Text('No signature uploaded'),
 
                                       const Spacer(),
-                                      ElevatedButton.icon(
-                                        onPressed: _pickSignatureImage,
-                                        icon: const Icon(
-                                          Icons.upload_file,
-                                          size: 18,
+                                      OutlinedButton.icon(
+                                        onPressed: _isProcessingSignature
+                                            ? null
+                                            : _drawSignature,
+                                        icon: const Icon(Icons.draw, size: 18),
+                                        label: const Text('Draw'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.deepPurple,
+                                          side: const BorderSide(
+                                            color: Colors.deepPurple,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
                                         ),
-                                        label: const Text('Upload'),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ElevatedButton.icon(
+                                        onPressed: _isProcessingSignature
+                                            ? null
+                                            : _pickSignatureImage,
+                                        icon: _isProcessingSignature
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.white,
+                                                    ),
+                                              )
+                                            : const Icon(
+                                                Icons.upload_file,
+                                                size: 18,
+                                              ),
+                                        label: Text(
+                                          _isProcessingSignature
+                                              ? 'Processing'
+                                              : 'Upload',
+                                        ),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.deepPurple,
                                           foregroundColor: Colors.white,
@@ -1243,4 +1402,60 @@ class _ProfilePageState extends State<ProfilePage> {
       child: const Text('Verify'),
     );
   }
+}
+
+class _TransparentSignaturePreview extends StatelessWidget {
+  final Uint8List bytes;
+  final double width;
+  final double height;
+
+  const _TransparentSignaturePreview({
+    required this.bytes,
+    required this.width,
+    required this.height,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CustomPaint(painter: _CheckerboardPainter()),
+            Image.memory(
+              bytes,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckerboardPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    const cell = 8.0;
+    final paint1 = Paint()..color = const Color(0xFFE5E7EB); // grey-200
+    final paint2 = Paint()..color = const Color(0xFFF3F4F6); // grey-100
+
+    for (double y = 0; y < size.height; y += cell) {
+      for (double x = 0; x < size.width; x += cell) {
+        final isEven = (((x / cell).floor() + (y / cell).floor()) % 2 == 0);
+        canvas.drawRect(
+          Rect.fromLTWH(x, y, cell, cell),
+          isEven ? paint1 : paint2,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

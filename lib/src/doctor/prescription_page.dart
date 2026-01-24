@@ -948,6 +948,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     return TextField(
       controller: controller,
       maxLines: null,
+      scrollPadding: const EdgeInsets.only(bottom: 220),
       decoration: _roundedInputDecoration(hint),
     );
   }
@@ -995,6 +996,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
           const SizedBox(height: 8),
           TextField(
             controller: medicine.nameController,
+            scrollPadding: const EdgeInsets.only(bottom: 220),
             decoration: _roundedInputDecoration('Medicine name'),
           ),
           if (_medicineNameErrors[index ?? 0] != null) ...[
@@ -1080,6 +1082,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                 width: 110,
                 child: TextField(
                   controller: medicine.mealTimeController,
+                  scrollPadding: const EdgeInsets.only(bottom: 220),
                   decoration: InputDecoration(
                     hintText: 'time',
                     filled: true,
@@ -1159,6 +1162,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                   controller: medicine.durationController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  scrollPadding: const EdgeInsets.only(bottom: 220),
                   decoration: _roundedInputDecoration('Duration'),
                 ),
               ),
@@ -1221,8 +1225,10 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobileLayout = !kIsWeb && screenWidth < 600;
+    final keyboardBottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: const Text(
           'Prescription',
@@ -1240,634 +1246,689 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // University Logo
-                  Image.asset(
-                    'assets/images/nstu_logo.jpg',
-                    height: screenWidth * 0.1,
-                    width: screenWidth * 0.098,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const Icon(Icons.local_hospital, size: 40),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(bottom: keyboardBottomInset),
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 8,
                   ),
-                  const SizedBox(width: 8),
-
-                  // University Text
-                  Column(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Text(
-                        "মেডিকেল সেন্টার",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        "নোয়াখালী বিজ্ঞান ও প্রযুক্তি বিশ্ববিদ্যালয়",
-                        style: TextStyle(fontSize: 14),
-                      ),
-                      Text(
-                        "Noakhali Science and Technology University",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.blueAccent,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Patient Information card only contains patient fields and validation messages
-            _buildLargeCard(
-              title: 'Patient Information',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 🔹 Row 1: Patient Name + Date
-                  Row(
                     children: [
-                      const Text(
-                        'Patient Name:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      // University Logo
+                      Image.asset(
+                        'assets/images/nstu_logo.jpg',
+                        height: screenWidth * 0.1,
+                        width: screenWidth * 0.098,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.local_hospital, size: 40),
                       ),
                       const SizedBox(width: 8),
-                      Flexible(
-                        flex: 3,
-                        child: TextField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            hintText: 'Enter patient name',
-                            border: UnderlineInputBorder(),
-                            contentPadding: EdgeInsets.only(bottom: 4),
-                            isDense: true,
+
+                      // University Text
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Text(
+                            "মেডিকেল সেন্টার",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                          style: const TextStyle(fontSize: 14),
-                        ),
+                          Text(
+                            "নোয়াখালী বিজ্ঞান ও প্রযুক্তি বিশ্ববিদ্যালয়",
+                            style: TextStyle(fontSize: 14),
+                          ),
+                          Text(
+                            "Noakhali Science and Technology University",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.blueAccent,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Date:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        flex: 1,
-                        child: TextField(
-                          controller: TextEditingController(
-                            text:
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Patient Information card only contains patient fields and validation messages
+                _buildLargeCard(
+                  title: 'Patient Information',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 🔹 Row 1: Patient Name + Date
+                      Row(
+                        children: [
+                          const Text(
+                            'Patient Name:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            flex: 3,
+                            child: TextField(
+                              controller: _nameController,
+                              decoration: const InputDecoration(
+                                hintText: 'Enter patient name',
+                                border: UnderlineInputBorder(),
+                                contentPadding: EdgeInsets.only(bottom: 4),
+                                isDense: true,
+                              ),
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Date:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            flex: 1,
+                            child: Container(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              decoration: const BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(color: Colors.black26),
+                                ),
+                              ),
+                              child: Text(
                                 "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
                           ),
-                          enabled: false, // make the date non-editable
-                          decoration: const InputDecoration(
-                            border: UnderlineInputBorder(),
-                            isDense: true,
-                            contentPadding: EdgeInsets.only(bottom: 4),
+                        ],
+                      ),
+
+                      const SizedBox(height: 15),
+
+                      // Mobile: row2 number, row3 age+gender
+                      // Web/desktop: keep existing one-row layout
+                      if (isMobileLayout) ...[
+                        // 🔹 Row 2 (Mobile): Number
+                        Row(
+                          children: [
+                            const Text(
+                              'Mobile No:',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _rollController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                scrollPadding: const EdgeInsets.only(
+                                  bottom: 220,
+                                ),
+                                decoration: InputDecoration(
+                                  prefixText: "+88 ",
+                                  prefixStyle: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  border: const UnderlineInputBorder(),
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.only(
+                                    bottom: 4,
+                                  ),
+                                ),
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 15),
+
+                        // 🔹 Row 3 (Mobile): Age + Gender
+                        Row(
+                          children: [
+                            const Text(
+                              'Age:',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 70,
+                              child: TextField(
+                                controller: _ageController,
+                                scrollPadding: const EdgeInsets.only(
+                                  bottom: 220,
+                                ),
+                                decoration: const InputDecoration(
+                                  hintText: 'Age',
+                                  border: UnderlineInputBorder(),
+                                  contentPadding: EdgeInsets.only(bottom: 4),
+                                  isDense: true,
+                                ),
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            const Text(
+                              'Gender:',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Wrap(
+                                spacing: 12,
+                                runSpacing: 6,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: Radio<String>(
+                                          value: 'Male',
+                                          groupValue: _selectedGender,
+                                          onChanged: (v) {
+                                            setState(() {
+                                              _selectedGender = v;
+                                              _genderController.text = v ?? '';
+                                              _markUnsaved();
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Text('M'),
+                                    ],
+                                  ),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: Radio<String>(
+                                          value: 'Female',
+                                          groupValue: _selectedGender,
+                                          onChanged: (v) {
+                                            setState(() {
+                                              _selectedGender = v;
+                                              _genderController.text = v ?? '';
+                                              _markUnsaved();
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Text('F'),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        // 🔹 Row 2 (Web/desktop): Number + Age + Gender
+                        Row(
+                          children: [
+                            const Text(
+                              'Mobile No:',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              flex: 3,
+                              child: TextField(
+                                controller: _rollController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                scrollPadding: const EdgeInsets.only(
+                                  bottom: 220,
+                                ),
+                                decoration: InputDecoration(
+                                  prefixText: "+88 ",
+                                  prefixStyle: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  border: const UnderlineInputBorder(),
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.only(
+                                    bottom: 4,
+                                  ),
+                                ),
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'Age:',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              flex: 1,
+                              child: TextField(
+                                controller: _ageController,
+                                scrollPadding: const EdgeInsets.only(
+                                  bottom: 220,
+                                ),
+                                decoration: const InputDecoration(
+                                  hintText: 'Age',
+                                  border: UnderlineInputBorder(),
+                                  contentPadding: EdgeInsets.only(bottom: 4),
+                                  isDense: true,
+                                ),
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'Gender:',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              flex: 2,
+                              child: Wrap(
+                                spacing: 12,
+                                runSpacing: 6,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: Radio<String>(
+                                          value: 'Male',
+                                          groupValue: _selectedGender,
+                                          onChanged: (v) {
+                                            setState(() {
+                                              _selectedGender = v;
+                                              _genderController.text = v ?? '';
+                                              _markUnsaved();
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Text('M'),
+                                    ],
+                                  ),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: Radio<String>(
+                                          value: 'Female',
+                                          groupValue: _selectedGender,
+                                          onChanged: (v) {
+                                            setState(() {
+                                              _selectedGender = v;
+                                              _genderController.text = v ?? '';
+                                              _markUnsaved();
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Text('F'),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      // Show patient validation errors (if any)
+                      if (_nameError != null ||
+                          _numberError != null ||
+                          _ageError != null ||
+                          _genderError != null) ...[
+                        const SizedBox(height: 6),
+                        if (_nameError != null)
+                          Text(
+                            _nameError!,
+                            style: TextStyle(
+                              color: Colors.red.shade600,
+                              fontSize: 12,
+                            ),
                           ),
-                          style: const TextStyle(fontSize: 14),
+                        if (_numberError != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _numberError!,
+                            style: TextStyle(
+                              color: Colors.red.shade600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                        if (_ageError != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _ageError!,
+                            style: TextStyle(
+                              color: Colors.red.shade600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                        if (_genderError != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _genderError!,
+                            style: TextStyle(
+                              color: Colors.red.shade600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Clinical Details card (separate)
+                _buildLargeCard(
+                  title: 'Clinical Details',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 🔹 C/C Section
+                      const Text(
+                        'C/C',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _buildTextArea(
+                        _complainController,
+                        hint: 'Chief complaint',
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 🔹 O/E Section
+                      const Text(
+                        'O/E',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _buildTextArea(
+                        _examinationController,
+                        hint: 'On examination',
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 🔹 Advice Section
+                      const Text(
+                        'Adv',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _buildTextArea(_adviceController, hint: 'Advice'),
+                      const SizedBox(height: 12),
+
+                      // 🔹 Investigations Section
+                      const Text(
+                        'Inv',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _buildTextArea(_testsController, hint: 'Investigations'),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Rx full-width card (separate)
+                _buildLargeCard(
+                  title: 'Rx',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Column(
+                        children: _medicineRows
+                            .asMap()
+                            .entries
+                            .map((e) => _buildMedicineCard(e.value, e.key))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: ElevatedButton.icon(
+                          onPressed: _addMedicineRow,
+                          icon: const Icon(Icons.add_circle_outline),
+                          label: const Text('Add Medicine'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _accent,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 2,
+                          ),
                         ),
                       ),
                     ],
                   ),
+                ),
 
-                  const SizedBox(height: 15),
+                const SizedBox(height: 12),
 
-                  // Mobile: row2 number, row3 age+gender
-                  // Web/desktop: keep existing one-row layout
-                  if (isMobileLayout) ...[
-                    // 🔹 Row 2 (Mobile): Number
+                // Signature & options (aligned underlines)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Left side: Outside checkbox + Next visit (underline)
                     Row(
                       children: [
-                        const Text(
-                          'Number:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Checkbox(
+                          value: _isOutside,
+                          onChanged: (v) => setState(() {
+                            _isOutside = v ?? false;
+                            _markUnsaved();
+                          }),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _rollController,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            decoration: InputDecoration(
-                              prefixText: "+88 ",
-                              prefixStyle: const TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
+                        const SizedBox(width: 6),
+                        const Text('Outside'),
+                        const SizedBox(width: 12),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 100,
+                              child: TextField(
+                                controller: _nextVisitController,
+                                keyboardType: TextInputType.number,
+                                scrollPadding: const EdgeInsets.only(
+                                  bottom: 260,
+                                ),
+                                decoration: const InputDecoration(
+                                  hintText: 'Next visit',
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 6,
+                                  ),
+                                ),
                               ),
-                              border: const UnderlineInputBorder(),
-                              isDense: true,
-                              contentPadding: const EdgeInsets.only(bottom: 4),
                             ),
-                            style: const TextStyle(fontSize: 14),
-                          ),
+                            Container(
+                              width: 100,
+                              height: 1,
+                              color: Colors.black,
+                            ),
+                          ],
                         ),
                       ],
                     ),
 
-                    const SizedBox(height: 15),
-
-                    // 🔹 Row 3 (Mobile): Age + Gender
-                    Row(
+                    // Right side: Signature with same underline width
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text(
-                          'Age:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
                         SizedBox(
-                          width: 70,
-                          child: TextField(
-                            controller: _ageController,
-                            decoration: const InputDecoration(
-                              hintText: 'Age',
-                              border: UnderlineInputBorder(),
-                              contentPadding: EdgeInsets.only(bottom: 4),
-                              isDense: true,
-                            ),
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        const Text(
-                          'Gender:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Wrap(
-                            spacing: 12,
-                            runSpacing: 6,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
+                          width: 150,
+                          height: 60,
+                          child: _loadingDoctorInfo
+                              ? const Center(
+                                  child: SizedBox(
                                     width: 18,
                                     height: 18,
-                                    child: Radio<String>(
-                                      value: 'Male',
-                                      groupValue: _selectedGender,
-                                      onChanged: (v) {
-                                        setState(() {
-                                          _selectedGender = v;
-                                          _genderController.text = v ?? '';
-                                          _markUnsaved();
-                                        });
-                                      },
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
-                                  const Text('M'),
-                                ],
-                              ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: Radio<String>(
-                                      value: 'Female',
-                                      groupValue: _selectedGender,
-                                      onChanged: (v) {
-                                        setState(() {
-                                          _selectedGender = v;
-                                          _genderController.text = v ?? '';
-                                          _markUnsaved();
-                                        });
-                                      },
-                                    ),
+                                )
+                              : (_doctorSignatureUrl != null &&
+                                    _doctorSignatureUrl!.startsWith('http'))
+                              ? Image.network(
+                                  _doctorSignatureUrl!,
+                                  fit: BoxFit.contain,
+                                  // ignore: unnecessary_underscores
+                                  errorBuilder: (_, __, ___) => const Center(
+                                    child: Text('Invalid signature'),
                                   ),
-                                  const SizedBox(width: 6),
-                                  const Text('F'),
-                                ],
-                              ),
-                            ],
-                          ),
+                                )
+                              : const Center(
+                                  child: Text('No signature uploaded'),
+                                ),
                         ),
-                      ],
-                    ),
-                  ] else ...[
-                    // 🔹 Row 2 (Web/desktop): Number + Age + Gender
-                    Row(
-                      children: [
-                        const Text(
-                          'Number:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          flex: 3,
-                          child: TextField(
-                            controller: _rollController,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            decoration: InputDecoration(
-                              prefixText: "+88 ",
-                              prefixStyle: const TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              border: const UnderlineInputBorder(),
-                              isDense: true,
-                              contentPadding: const EdgeInsets.only(bottom: 4),
-                            ),
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Text(
-                          'Age:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          flex: 1,
-                          child: TextField(
-                            controller: _ageController,
-                            decoration: const InputDecoration(
-                              hintText: 'Age',
-                              border: UnderlineInputBorder(),
-                              contentPadding: EdgeInsets.only(bottom: 4),
-                              isDense: true,
-                            ),
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Text(
-                          'Gender:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          flex: 2,
-                          child: Wrap(
-                            spacing: 12,
-                            runSpacing: 6,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: Radio<String>(
-                                      value: 'Male',
-                                      groupValue: _selectedGender,
-                                      onChanged: (v) {
-                                        setState(() {
-                                          _selectedGender = v;
-                                          _genderController.text = v ?? '';
-                                          _markUnsaved();
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Text('M'),
-                                ],
-                              ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: Radio<String>(
-                                      value: 'Female',
-                                      groupValue: _selectedGender,
-                                      onChanged: (v) {
-                                        setState(() {
-                                          _selectedGender = v;
-                                          _genderController.text = v ?? '';
-                                          _markUnsaved();
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Text('F'),
-                                ],
-                              ),
-                            ],
+                        const SizedBox(height: 6),
+                        // show doctor name under signature (if available)
+                        SizedBox(
+                          width: 160,
+                          child: Text(
+                            'Name: ${_doctorName ?? ''}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),
                       ],
                     ),
                   ],
-                  // Show patient validation errors (if any)
-                  if (_nameError != null ||
-                      _numberError != null ||
-                      _ageError != null ||
-                      _genderError != null) ...[
-                    const SizedBox(height: 6),
-                    if (_nameError != null)
-                      Text(
-                        _nameError!,
-                        style: TextStyle(
-                          color: Colors.red.shade600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    if (_numberError != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        _numberError!,
-                        style: TextStyle(
-                          color: Colors.red.shade600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                    if (_ageError != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        _ageError!,
-                        style: TextStyle(
-                          color: Colors.red.shade600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                    if (_genderError != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        _genderError!,
-                        style: TextStyle(
-                          color: Colors.red.shade600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ],
-                ],
-              ),
-            ),
+                ),
 
-            const SizedBox(height: 12),
+                const SizedBox(height: 20),
 
-            // Clinical Details card (separate)
-            _buildLargeCard(
-              title: 'Clinical Details',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 🔹 C/C Section
-                  const Text(
-                    'C/C',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  const SizedBox(height: 6),
-                  _buildTextArea(_complainController, hint: 'Chief complaint'),
-                  const SizedBox(height: 12),
-
-                  // 🔹 O/E Section
-                  const Text(
-                    'O/E',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  const SizedBox(height: 6),
-                  _buildTextArea(
-                    _examinationController,
-                    hint: 'On examination',
-                  ),
-                  const SizedBox(height: 12),
-
-                  // 🔹 Advice Section
-                  const Text(
-                    'Adv',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  const SizedBox(height: 6),
-                  _buildTextArea(_adviceController, hint: 'Advice'),
-                  const SizedBox(height: 12),
-
-                  // 🔹 Investigations Section
-                  const Text(
-                    'Inv',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  const SizedBox(height: 6),
-                  _buildTextArea(_testsController, hint: 'Investigations'),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Rx full-width card (separate)
-            _buildLargeCard(
-              title: 'Rx',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Column(
-                    children: _medicineRows
-                        .asMap()
-                        .entries
-                        .map((e) => _buildMedicineCard(e.value, e.key))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: ElevatedButton.icon(
-                      onPressed: _addMedicineRow,
-                      icon: const Icon(Icons.add_circle_outline),
-                      label: const Text('Add Medicine'),
+                Row(
+                  children: [
+                    ElevatedButton(
+                      onPressed: _savePrescription,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _accent,
+                        // Blue when saved, red when not saved
+                        backgroundColor: _isSaved ? Colors.blue : Colors.red,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        elevation: 2,
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Signature & options (aligned underlines)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Left side: Outside checkbox + Next visit (underline)
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _isOutside,
-                      onChanged: (v) => setState(() {
-                        _isOutside = v ?? false;
-                        _markUnsaved();
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text('Outside'),
-                    const SizedBox(width: 12),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 100,
-                          child: TextField(
-                            controller: _nextVisitController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              hintText: 'Next visit',
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                vertical: 8,
-                                horizontal: 6,
-                              ),
-                            ),
-                          ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 12,
                         ),
-                        Container(width: 100, height: 1, color: Colors.black),
-                      ],
+                        child: Text(
+                          'Save',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ),
-                  ],
-                ),
-
-                // Right side: Signature with same underline width
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    SizedBox(
-                      width: 150,
-                      height: 60,
-                      child: _loadingDoctorInfo
-                          ? const Center(
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            )
-                          : (_doctorSignatureUrl != null &&
-                                _doctorSignatureUrl!.startsWith('http'))
-                          ? Image.network(
-                              _doctorSignatureUrl!,
-                              fit: BoxFit.contain,
-                              // ignore: unnecessary_underscores
-                              errorBuilder: (_, __, ___) => const Center(
-                                child: Text('Invalid signature'),
-                              ),
-                            )
-                          : const Center(child: Text('No signature uploaded')),
-                    ),
-                    const SizedBox(height: 6),
-                    // show doctor name under signature (if available)
-                    SizedBox(
-                      width: 160,
-                      child: Text(
-                        'Name: ${_doctorName ?? ''}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                    const SizedBox(width: 12),
+                    OutlinedButton(
+                      onPressed: _clearForm,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: _accent),
+                        foregroundColor: _accent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        child: Text('Clear'),
                       ),
                     ),
                   ],
                 ),
               ],
             ),
-
-            const SizedBox(height: 20),
-
-            Row(
-              children: [
-                ElevatedButton(
-                  onPressed: _savePrescription,
-                  style: ElevatedButton.styleFrom(
-                    // Blue when saved, red when not saved
-                    backgroundColor: _isSaved ? Colors.blue : Colors.red,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 12,
-                    ),
-                    child: Text(
-                      'Save',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton(
-                  onPressed: _clearForm,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: _accent),
-                    foregroundColor: _accent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    child: Text('Clear'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

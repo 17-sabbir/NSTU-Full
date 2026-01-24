@@ -21,7 +21,6 @@ class _PatientRecordsPageState extends State<PatientRecordsPage>
 
   Timer? _searchDebounce;
   int _fetchToken = 0;
-  bool _searching = false;
 
   bool _loading = false;
   String? _error;
@@ -109,7 +108,6 @@ class _PatientRecordsPageState extends State<PatientRecordsPage>
       });
     } else {
       setState(() {
-        _searching = true;
         _error = null;
       });
     }
@@ -128,7 +126,6 @@ class _PatientRecordsPageState extends State<PatientRecordsPage>
         _patients = data;
         _filterPatients();
         _loading = false;
-        _searching = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -136,7 +133,6 @@ class _PatientRecordsPageState extends State<PatientRecordsPage>
       setState(() {
         _error = e.toString();
         _loading = false;
-        _searching = false;
       });
     }
   }
@@ -296,14 +292,7 @@ class _PatientRecordsPageState extends State<PatientRecordsPage>
             fontWeight: FontWeight.bold,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () async {
-              await Navigator.pushNamed(context, '/notifications');
-            },
-          ),
-        ],
+        centerTitle: true,
         automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.blueAccent),

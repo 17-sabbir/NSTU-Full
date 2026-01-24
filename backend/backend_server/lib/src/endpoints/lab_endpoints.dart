@@ -193,7 +193,8 @@ class LabEndpoint extends Endpoint {
         final m = rows.first.toColumnMap();
         final name = m['patient_name']?.toString() ?? 'Patient';
         final mobile = m['mobile_number']?.toString() ?? '';
-        final message = 'প্রিয় $name, আপনার lab result submit হয়েছে।';
+        final message =
+            'প্রিয় $name, আপনার lab result submit হয়েছে।\nডাউনলোড লিংক: $url';
         await sendDummySms(session, mobileNumber: mobile, message: message);
       }
 

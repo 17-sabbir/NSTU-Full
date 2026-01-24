@@ -14,10 +14,12 @@ class LabTestCreateAndUpload extends StatefulWidget {
   const LabTestCreateAndUpload({super.key});
 
   @override
-  State<LabTestCreateAndUpload> createState() => _LabTestCreateAndUploadState();
+  State<LabTestCreateAndUpload> createState() => LabTestCreateAndUploadState();
 }
 
-class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
+enum LabUploadFocus { none, pending, submitted }
+
+class LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
     with RouteRefreshMixin<LabTestCreateAndUpload> {
   List<TestResult> results = [];
   bool loading = true;
@@ -27,6 +29,43 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
 
   // List of available lab tests fetched from backend
   List<LabTests> availableTests = [];
+
+  static const int _initialCompletedVisibleCount = 10;
+  static const int _pageSize = 50;
+  int _visibleCompletedCount = _initialCompletedVisibleCount;
+  int _visiblePendingCount = _pageSize;
+
+  LabUploadFocus _focus = LabUploadFocus.none;
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _pendingHeaderKey = GlobalKey();
+  final GlobalKey _completedHeaderKey = GlobalKey();
+
+  void focusOn(LabUploadFocus focus) {
+    if (!mounted) return;
+    setState(() {
+      _focus = focus;
+      if (focus == LabUploadFocus.submitted) {
+        _visibleCompletedCount = _initialCompletedVisibleCount;
+      }
+      if (focus == LabUploadFocus.pending) {
+        _visiblePendingCount = _pageSize;
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final key = focus == LabUploadFocus.pending
+          ? _pendingHeaderKey
+          : _completedHeaderKey;
+      final ctx = key.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        alignment: 0.1,
+      );
+    });
+  }
 
   Future<void> fetchTests() async {
     try {
@@ -51,9 +90,19 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
   }
 
   Future<void> fetchResults() async {
+    if (!mounted) return;
     setState(() => loading = true);
-    results = await client.lab.getAllTestResults();
-    setState(() => loading = false);
+    try {
+      final data = await client.lab.getAllTestResults();
+      if (!mounted) return;
+      setState(() {
+        results = data;
+        loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => loading = false);
+    }
   }
 
   String fmt(DateTime? dt) {
@@ -73,11 +122,30 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
 
   // ------------------ UPDATED TILE ------------------
   Widget buildTile(TestResult r) {
+    final isPending = r.submittedAt == null;
+    final bool highlight =
+        (_focus == LabUploadFocus.pending && isPending) ||
+        (_focus == LabUploadFocus.submitted && !isPending);
+
+    final Color highlightColor = isPending ? Colors.red : Colors.blue;
+
     final bytes = pickedFiles[r.resultId];
     final fileName = pickedFileNames[r.resultId];
 
+    final submittedAt = r.submittedAt;
+    final bool canReplace =
+        submittedAt != null &&
+        DateTime.now().difference(submittedAt).inHours < 12;
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
+      color: highlight ? highlightColor.withAlpha((0.06 * 255).round()) : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: highlight
+            ? BorderSide(color: highlightColor, width: 1.4)
+            : BorderSide.none,
+      ),
       child: ListTile(
         title: Text(
           "${r.patientName} (${r.mobileNumber}) — ${_displayType(r.patientType)}",
@@ -108,8 +176,8 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
                 onPressed: () => _showPreviewDialog(r),
               ),
 
-            // Pick File button
-            if (r.submittedAt == null)
+            // Pick File button (also allow replace within 12h of submission)
+            if (r.submittedAt == null || canReplace)
               IconButton(
                 icon: const Icon(
                   Icons.file_upload_outlined,
@@ -131,13 +199,18 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
                 },
               ),
 
-            // Submit button (only if file selected)
-            if (bytes != null && r.submittedAt == null)
+            // Submit / Replace button (only if file selected)
+            if (bytes != null && (r.submittedAt == null || canReplace))
               IconButton(
-                icon: const Icon(Icons.send, color: Colors.blue),
+                icon: Icon(
+                  r.submittedAt == null ? Icons.send : Icons.autorenew,
+                  color: Colors.blue,
+                ),
                 onPressed: () async {
                   if (r.resultId == null) return;
                   setState(() => loading = true);
+
+                  final wasSubmitted = r.submittedAt != null;
 
                   final pickedName =
                       fileName ??
@@ -174,7 +247,11 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
                     });
                     // ignore: use_build_context_synchronously
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Result submitted')),
+                      SnackBar(
+                        content: Text(
+                          wasSubmitted ? 'Result replaced' : 'Result submitted',
+                        ),
+                      ),
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -186,9 +263,22 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
                 },
               ),
 
-            // Completed icon
-            if (r.submittedAt != null)
-              const Icon(Icons.check_circle, color: Colors.green),
+            // Completed: show Replace option within 12h, otherwise show completed badge
+            if (r.submittedAt != null) ...[
+              if (canReplace)
+                TextButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Select a file then press Replace'),
+                      ),
+                    );
+                  },
+                  child: const Text('Replace'),
+                )
+              else
+                const Icon(Icons.check_circle, color: Colors.green),
+            ],
           ],
         ),
       ),
@@ -434,8 +524,38 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
   // ------------------ UI ------------------
   @override
   Widget build(BuildContext context) {
-    final pending = results.where((r) => r.submittedAt == null).toList();
-    final completed = results.where((r) => r.submittedAt != null).toList();
+    final since = DateTime.now().subtract(const Duration(days: 365));
+    final yearResults = results.where((r) {
+      final created = r.createdAt;
+      if (created == null) return false;
+      return created.isAfter(since);
+    }).toList();
+
+    final pendingAll = yearResults.where((r) => r.submittedAt == null).toList()
+      ..sort((a, b) {
+        final ad = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bd = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bd.compareTo(ad);
+      });
+
+    final completedAll =
+        yearResults.where((r) => r.submittedAt != null).toList()..sort((a, b) {
+          final ad =
+              a.submittedAt ??
+              a.createdAt ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          final bd =
+              b.submittedAt ??
+              b.createdAt ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          return bd.compareTo(ad);
+        });
+
+    final pending = pendingAll.take(_visiblePendingCount).toList();
+    final completed = completedAll.take(_visibleCompletedCount).toList();
+
+    final canReadMorePending = pending.length < pendingAll.length;
+    final canReadMoreCompleted = completed.length < completedAll.length;
 
     return Scaffold(
       body: loading
@@ -443,13 +563,15 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
           : RefreshIndicator(
               onRefresh: refreshFromPull,
               child: ListView(
+                controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(12),
                 children: [
-                  const Center(
+                  Center(
+                    key: _pendingHeaderKey,
                     child: Text(
-                      "Pending Upload",
-                      style: TextStyle(
+                      "Pending (Last 1 year) — ${pendingAll.length}",
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -460,12 +582,32 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
                     const Center(child: Text("No pending results")),
                   ...pending.map(buildTile),
 
+                  if (canReadMorePending) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _visiblePendingCount =
+                                (_visiblePendingCount + _pageSize).clamp(
+                                  0,
+                                  pendingAll.length,
+                                );
+                          });
+                        },
+                        child: const Text('Read more'),
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 24),
 
-                  const Center(
+                  Center(
+                    key: _completedHeaderKey,
                     child: Text(
-                      "Completed",
-                      style: TextStyle(
+                      "Completed (Last 1 year) — ${completedAll.length}",
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -475,6 +617,25 @@ class _LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
                   if (completed.isEmpty)
                     const Center(child: Text("No completed results")),
                   ...completed.map(buildTile),
+
+                  if (canReadMoreCompleted) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _visibleCompletedCount =
+                                (_visibleCompletedCount + _pageSize).clamp(
+                                  0,
+                                  completedAll.length,
+                                );
+                          });
+                        },
+                        child: const Text('Read more'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

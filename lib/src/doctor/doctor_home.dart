@@ -1,3 +1,4 @@
+// ignore_for_file: unused_local_variable, deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart';
 import 'dosage_times.dart';
@@ -10,9 +11,16 @@ class DoctorHomePage extends StatefulWidget {
     super.key,
     required this.doctorId,
     this.refreshSeed = 0,
+    this.onOpenReviewReports,
   });
   final int doctorId;
   final int refreshSeed;
+  final void Function({
+    int? highlightReportId,
+    bool highlightAllUnreviewed,
+    DateTime? highlightUnreviewedSinceUtc,
+  })?
+  onOpenReviewReports;
 
   @override
   State<DoctorHomePage> createState() => _DoctorHomePageState();
@@ -22,6 +30,13 @@ class _DoctorHomePageState extends State<DoctorHomePage>
     with RouteRefreshMixin<DoctorHomePage> {
   DoctorHomeData? _homeData;
   bool _loading = false;
+
+  bool _reviewStatusLoading = false;
+  int _allTimeUnreviewedReports = 0;
+  static const int _initialVisibleCount = 10;
+  static const int _pageSize = 20;
+  int _visibleRecentCount = _initialVisibleCount;
+  int _visibleReviewedCount = _initialVisibleCount;
 
   @override
   void initState() {
@@ -53,8 +68,14 @@ class _DoctorHomePageState extends State<DoctorHomePage>
       if (!mounted) return;
       setState(() {
         _homeData = data;
+        _visibleRecentCount = _initialVisibleCount;
+        _visibleReviewedCount = _initialVisibleCount;
         if (!silent) _loading = false;
       });
+
+      // Also compute review status (all-time) for the indicator.
+      // Uses the full reports endpoint since home payload doesn't include a reviewed flag.
+      _fetchAllTimeReviewStatus();
     } catch (_) {
       if (!mounted) return;
       if (!silent) {
@@ -64,6 +85,62 @@ class _DoctorHomePageState extends State<DoctorHomePage>
         });
       }
     }
+  }
+
+  Future<void> _fetchAllTimeReviewStatus() async {
+    if (!mounted) return;
+    setState(() {
+      _reviewStatusLoading = true;
+    });
+
+    try {
+      // Backend resolves doctor from auth user.
+      final all = await client.doctor.getReportsForDoctor(0);
+      if (!mounted) return;
+
+      int total = 0;
+      int unreviewed = 0;
+      for (final r in all) {
+        total++;
+        if (r.reviewed != true) unreviewed++;
+      }
+
+      setState(() {
+        _allTimeUnreviewedReports = unreviewed;
+        _reviewStatusLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _allTimeUnreviewedReports = 0;
+        _reviewStatusLoading = false;
+      });
+    }
+  }
+
+  void _handleReviewStatusTap() {
+    if (_reviewStatusLoading) return;
+
+    if (_allTimeUnreviewedReports <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All reports are reviewed.')),
+      );
+      return;
+    }
+
+    if (widget.onOpenReviewReports != null) {
+      widget.onOpenReviewReports!(highlightAllUnreviewed: true);
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TestReportsView(
+          doctorId: widget.doctorId,
+          highlightAllUnreviewed: true,
+        ),
+      ),
+    );
   }
 
   @override
@@ -80,8 +157,29 @@ class _DoctorHomePageState extends State<DoctorHomePage>
 
     final profilePictureUrl = _homeData?.doctorProfilePictureUrl;
 
-    final recent = _homeData?.recent ?? <DoctorHomeRecentItem>[];
-    final reports = _homeData?.reviewedReports ?? <DoctorHomeReviewedReport>[];
+    final recentAll = _homeData?.recent ?? <DoctorHomeRecentItem>[];
+    final reportsAll =
+        _homeData?.reviewedReports ?? <DoctorHomeReviewedReport>[];
+
+    final visibleRecent = recentAll
+        .take(_visibleRecentCount.clamp(0, recentAll.length))
+        .toList();
+    final canReadMoreRecent = visibleRecent.length < recentAll.length;
+
+    final visibleReports = reportsAll
+        .take(_visibleReviewedCount.clamp(0, reportsAll.length))
+        .toList();
+    final canReadMoreReviewed = visibleReports.length < reportsAll.length;
+
+    final hasUnreviewed = _allTimeUnreviewedReports > 0;
+    final statusColor = _reviewStatusLoading
+        ? Colors.grey
+        : (hasUnreviewed ? Colors.red : Colors.blue);
+    final statusText = _reviewStatusLoading
+        ? 'Checking review status...'
+        : (hasUnreviewed
+              ? 'Pending review: $_allTimeUnreviewedReports'
+              : 'All reviewed');
 
     return SafeArea(
       child: RefreshIndicator(
@@ -102,13 +200,65 @@ class _DoctorHomePageState extends State<DoctorHomePage>
                 loading: _loading,
               ),
               const SizedBox(height: 14),
-              RecentActivityCard(
-                items: recent,
-                titleStyle: theme.textTheme.titleMedium,
-                onTapItem: _handleRecentTap,
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _reviewStatusLoading
+                      ? null
+                      : _handleReviewStatusTap,
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              ReviewedReportsCard(
+                items: visibleReports,
+                subtitle: 'Last 24 hours',
+                showReadMore: canReadMoreReviewed,
+                onReadMore: () {
+                  setState(() {
+                    _visibleReviewedCount = (_visibleReviewedCount + _pageSize)
+                        .clamp(0, reportsAll.length);
+                  });
+                },
+                onTapItem: (item) {
+                  if (!mounted) return;
+                  if (widget.onOpenReviewReports != null) {
+                    widget.onOpenReviewReports!(
+                      highlightReportId: item.reportId,
+                      highlightAllUnreviewed: false,
+                    );
+                    return;
+                  }
+
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TestReportsView(
+                        doctorId: widget.doctorId,
+                        highlightReportId: item.reportId,
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 14),
-              ReviewedReportsCard(items: reports),
+              RecentActivityCard(
+                items: visibleRecent,
+                titleStyle: theme.textTheme.titleMedium,
+                onTapItem: _handleRecentTap,
+                subtitle: 'Last 24 hours',
+                showReadMore: canReadMoreRecent,
+                onReadMore: () {
+                  setState(() {
+                    _visibleRecentCount = (_visibleRecentCount + _pageSize)
+                        .clamp(0, recentAll.length);
+                  });
+                },
+              ),
               const SizedBox(height: 16),
             ],
           ),
@@ -147,6 +297,12 @@ class _DoctorHomePageState extends State<DoctorHomePage>
     }
 
     if (!mounted) return;
+
+    if (widget.onOpenReviewReports != null) {
+      widget.onOpenReviewReports!(highlightAllUnreviewed: false);
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => TestReportsView(doctorId: widget.doctorId),
@@ -472,17 +628,23 @@ class RecentActivityCard extends StatelessWidget {
     required this.items,
     required this.titleStyle,
     required this.onTapItem,
+    this.subtitle,
+    this.showReadMore = false,
+    this.onReadMore,
   });
 
   final List<DoctorHomeRecentItem> items;
   final TextStyle? titleStyle;
   final Future<void> Function(DoctorHomeRecentItem item) onTapItem;
+  final String? subtitle;
+  final bool showReadMore;
+  final VoidCallback? onReadMore;
 
   @override
   Widget build(BuildContext context) {
     return DashboardCard(
       title: 'Recent Activity',
-      subtitle: '', //subtaitel thakbe na
+      subtitle: subtitle ?? '',
       trailing: Icon(Icons.show_chart_rounded, color: Colors.grey.shade600),
       child: items.isEmpty
           ? Padding(
@@ -508,6 +670,17 @@ class RecentActivityCard extends StatelessWidget {
                   ),
                   if (i != items.length - 1)
                     Divider(height: 18, color: Colors.grey.shade200),
+                ],
+
+                if (showReadMore && onReadMore != null) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: onReadMore,
+                      child: const Text('Read more'),
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -570,15 +743,26 @@ class _RecentActivityRow extends StatelessWidget {
 }
 
 class ReviewedReportsCard extends StatelessWidget {
-  const ReviewedReportsCard({super.key, required this.items});
+  const ReviewedReportsCard({
+    super.key,
+    required this.items,
+    this.subtitle,
+    this.showReadMore = false,
+    this.onReadMore,
+    this.onTapItem,
+  });
 
   final List<DoctorHomeReviewedReport> items;
+  final String? subtitle;
+  final bool showReadMore;
+  final VoidCallback? onReadMore;
+  final void Function(DoctorHomeReviewedReport item)? onTapItem;
 
   @override
   Widget build(BuildContext context) {
     return DashboardCard(
-      title: 'Reviewed Reports',
-      subtitle: 'Last 10',
+      title: 'Reports',
+      subtitle: subtitle ?? '',
       trailing: Icon(Icons.fact_check_rounded, color: Colors.purple.shade700),
       child: items.isEmpty
           ? Text(
@@ -591,9 +775,29 @@ class ReviewedReportsCard extends StatelessWidget {
           : Column(
               children: [
                 for (int i = 0; i < items.length; i++) ...[
-                  _ReviewedReportRow(item: items[i]),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: onTapItem == null
+                        ? null
+                        : () => onTapItem!(items[i]),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: _ReviewedReportRow(item: items[i]),
+                    ),
+                  ),
                   if (i != items.length - 1)
                     Divider(height: 18, color: Colors.grey.shade200),
+                ],
+
+                if (showReadMore && onReadMore != null) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: onReadMore,
+                      child: const Text('Read more'),
+                    ),
+                  ),
                 ],
               ],
             ),

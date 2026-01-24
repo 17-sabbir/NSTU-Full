@@ -1,6 +1,10 @@
 // ignore_for_file: unused_local_variable, deprecated_member_use
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'lab_test_create_and_upload.dart';
 import 'lab_staff_profile.dart';
 import 'manage_test.dart';
@@ -20,7 +24,8 @@ class _LabTesterHomeState extends State<LabTesterHome>
     with RouteRefreshMixin<LabTesterHome> {
   final GlobalKey<ManageTestState> _manageTestKey =
       GlobalKey<ManageTestState>();
-  final GlobalKey _uploadKey = GlobalKey();
+  final GlobalKey<LabTestCreateAndUploadState> _uploadKey =
+      GlobalKey<LabTestCreateAndUploadState>();
   int _selectedIndex = 0;
   final Color primaryColor = Colors.blueAccent;
   final List<int> _navigationHistory = [];
@@ -28,10 +33,17 @@ class _LabTesterHomeState extends State<LabTesterHome>
   String name = '';
   String designation = '';
   String? profilePictureUrl;
-  LabToday? _twoDay;
-  List<LabTenHistory> _last10 = [];
+  int _yearPendingCount = 0;
+  int _yearSubmittedCount = 0;
   bool _homeLoading = false;
   String? _homeError;
+
+  DateTime _summaryFrom = DateTime.now().subtract(const Duration(days: 365));
+  DateTime _summaryTo = DateTime.now();
+
+  List<_LabTestSummaryRow> _summaryRows = const [];
+
+  bool _summaryRangeSelectedByUser = false;
 
   // Auth guard
   bool _checkingAuth = true;
@@ -43,11 +55,13 @@ class _LabTesterHomeState extends State<LabTesterHome>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
       await _verifyLabStaff();
     });
   }
 
   Future<void> _verifyLabStaff() async {
+    if (!mounted) return;
     try {
       final authKey = await client.authenticationKeyManager?.get();
       if (authKey == null || authKey.isEmpty) {
@@ -78,6 +92,7 @@ class _LabTesterHomeState extends State<LabTesterHome>
       }
 
       if (role == 'LABSTAFF' || role == 'LAB') {
+        if (!mounted) return;
         setState(() {
           _authorized = true;
           _checkingAuth = false;
@@ -99,6 +114,7 @@ class _LabTesterHomeState extends State<LabTesterHome>
   }
 
   Future<void> _loadBasicProfile(int userId) async {
+    if (!mounted) return;
     try {
       final profile = await client.lab.getStaffProfile(0);
 
@@ -119,6 +135,7 @@ class _LabTesterHomeState extends State<LabTesterHome>
   }
 
   Future<void> _loadHomeDataInternal({required bool silent}) async {
+    if (!mounted) return;
     if (!silent) {
       setState(() {
         _homeLoading = true;
@@ -127,13 +144,69 @@ class _LabTesterHomeState extends State<LabTesterHome>
     }
 
     try {
-      final twoDay = await client.lab.getLabHomeTwoDaySummary();
-      final last10 = await client.lab.getLast10TestHistory();
+      final allResults = await client.lab.getAllTestResults();
+      final allTests = await client.lab.getAllLabTests();
+
+      final range = _effectiveSummaryRange();
+
+      int pending = 0;
+      int submitted = 0;
+      final Map<int, _LabTestCounts> byTest = <int, _LabTestCounts>{};
+
+      for (final r in allResults) {
+        final created = r.createdAt;
+        final tid = r.testId;
+        if (created == null) continue;
+        if (created.isBefore(range.start) || created.isAfter(range.end)) {
+          continue;
+        }
+
+        final counts = byTest.putIfAbsent(tid, () => _LabTestCounts());
+        counts.total++;
+        if (r.submittedAt == null) {
+          counts.pending++;
+          pending++;
+        } else {
+          counts.submitted++;
+          submitted++;
+        }
+      }
+
+      final Map<int, String> testNameById = <int, String>{
+        for (final t in allTests)
+          if (t.id != null)
+            t.id!: (t.testName.isEmpty ? 'Test ${t.id}' : t.testName),
+      };
+
+      final rows = <_LabTestSummaryRow>[];
+      for (final entry in byTest.entries) {
+        final testId = entry.key;
+        final c = entry.value;
+        rows.add(
+          _LabTestSummaryRow(
+            testId: testId,
+            testName: testNameById[testId] ?? 'Test $testId',
+            total: c.total,
+            pending: c.pending,
+            submitted: c.submitted,
+          ),
+        );
+      }
+
+      rows.sort((a, b) {
+        // pending first, then total desc, then name
+        final p = b.pending.compareTo(a.pending);
+        if (p != 0) return p;
+        final t = b.total.compareTo(a.total);
+        if (t != 0) return t;
+        return a.testName.toLowerCase().compareTo(b.testName.toLowerCase());
+      });
 
       if (!mounted) return;
       setState(() {
-        _twoDay = twoDay;
-        _last10 = last10;
+        _yearPendingCount = pending;
+        _yearSubmittedCount = submitted;
+        _summaryRows = rows;
         if (!silent) _homeLoading = false;
       });
     } catch (e) {
@@ -185,10 +258,8 @@ class _LabTesterHomeState extends State<LabTesterHome>
   }
 
   Widget _homeUI() {
-    final todayPending = (_twoDay?.todayPendingUploads ?? 0).toString();
-    final todaySubmitted = (_twoDay?.todaySubmitted ?? 0).toString();
-    final yesterdayPending = (_twoDay?.yesterdayPendingUploads ?? 0).toString();
-    final yesterdaySubmitted = (_twoDay?.yesterdaySubmitted ?? 0).toString();
+    final yearPending = _yearPendingCount.toString();
+    final yearSubmitted = _yearSubmittedCount.toString();
 
     return RefreshIndicator(
       onRefresh: refreshFromPull,
@@ -286,7 +357,7 @@ class _LabTesterHomeState extends State<LabTesterHome>
 
             const SizedBox(height: 20),
             const Text(
-              "Two Day Overview",
+              "Overview",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
@@ -304,10 +375,12 @@ class _LabTesterHomeState extends State<LabTesterHome>
                           ? constraints.maxWidth
                           : constraints.maxWidth * 0.48,
                       child: _interactiveStat(
-                        todayPending,
-                        'Pending (Today)',
+                        yearPending,
+                        'Pending (Last 1 year)',
                         Icons.pending_actions,
-                        Colors.orange,
+                        Colors.red,
+                        onTap: () =>
+                            _openUploadAndHighlight(LabUploadFocus.pending),
                       ),
                     ),
                     SizedBox(
@@ -315,32 +388,12 @@ class _LabTesterHomeState extends State<LabTesterHome>
                           ? constraints.maxWidth
                           : constraints.maxWidth * 0.48,
                       child: _interactiveStat(
-                        todaySubmitted,
-                        'Submitted (Today)',
+                        yearSubmitted,
+                        'Submitted (Last 1 year)',
                         Icons.task_alt,
-                        Colors.green,
-                      ),
-                    ),
-                    SizedBox(
-                      width: isMobile
-                          ? constraints.maxWidth
-                          : constraints.maxWidth * 0.48,
-                      child: _interactiveStat(
-                        yesterdayPending,
-                        'Pending (Yesterday)',
-                        Icons.pending_actions,
-                        Colors.deepOrange,
-                      ),
-                    ),
-                    SizedBox(
-                      width: isMobile
-                          ? constraints.maxWidth
-                          : constraints.maxWidth * 0.48,
-                      child: _interactiveStat(
-                        yesterdaySubmitted,
-                        'Submitted (Yesterday)',
-                        Icons.task_alt,
-                        Colors.teal,
+                        Colors.blue,
+                        onTap: () =>
+                            _openUploadAndHighlight(LabUploadFocus.submitted),
                       ),
                     ),
                   ],
@@ -349,14 +402,61 @@ class _LabTesterHomeState extends State<LabTesterHome>
             ),
 
             const SizedBox(height: 18),
-            Row(
-              children: [
-                const Text(
-                  "Last 10 Test History",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 520;
+                final controls = Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    TextButton(
+                      onPressed: _homeLoading ? null : _pickSummaryFromDate,
+                      child: Text('From: ${_formatDate(_summaryFrom)}'),
+                    ),
+                    TextButton(
+                      onPressed: _homeLoading ? null : _pickSummaryToDate,
+                      child: Text('To: ${_formatDate(_summaryTo)}'),
+                    ),
+                    IconButton(
+                      tooltip: 'Export PDF',
+                      onPressed: _homeLoading ? null : _exportSummaryPdf,
+                      icon: const Icon(Icons.picture_as_pdf),
+                    ),
+                  ],
+                );
+
+                if (isNarrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Test Summary',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      controls,
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    const Text(
+                      'Test Summary',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    controls,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 8),
 
@@ -380,121 +480,31 @@ class _LabTesterHomeState extends State<LabTesterHome>
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Column(
-                  children: _last10.isEmpty
-                      ? [const ListTile(title: Text('No history found'))]
-                      : _last10.map((item) {
-                          final isPending = item.isUploaded == false;
-                          final isSubmitted = item.submittedAt != null;
-
-                          String fmt(DateTime? dt) {
-                            if (dt == null) return '';
-                            return '${dt.day}/${dt.month}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-                          }
-
-                          final dateText = fmt(item.createdAt);
-                          final statusText = isPending
-                              ? 'Pending'
-                              : (isSubmitted ? 'Submitted' : 'Uploaded');
-
-                          final statusColor = isPending
-                              ? Colors.orange
-                              : Colors.green;
-                          // Keep a consistent badge width so the last character aligns.
-                          const double statusBadgeWidth = 90;
-
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: Colors.grey.shade200,
-                                  child: Icon(
-                                    isPending
-                                        ? Icons.pending_actions
-                                        : Icons.task_alt,
-                                    color: statusColor,
+                child: _summaryRows.isEmpty
+                    ? const ListTile(title: Text('No data found in this range'))
+                    : Column(
+                        children: _summaryRows
+                            .map(
+                              (row) => ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Colors.blue.shade50,
+                                  child: const Icon(Icons.science),
+                                ),
+                                title: Text(
+                                  row.testName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-
-                                // ✅ This takes all remaining space
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.patientName.isNotEmpty
-                                            ? item.patientName
-                                            : 'Unknown',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${item.mobileNumber}  •  $dateText',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.grey.shade700,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                subtitle: Text(
+                                  'Total: ${row.total}   Pending: ${row.pending}   Submitted: ${row.submitted}',
                                 ),
-
-                                const SizedBox(width: 12),
-
-                                // right badges (no big gap)
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withAlpha(
-                                          (0.12 * 255).round(),
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        statusText,
-                                        style: TextStyle(
-                                          color: statusColor,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      item.testName ?? '',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade700,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
               ),
           ],
         ),
@@ -502,16 +512,183 @@ class _LabTesterHomeState extends State<LabTesterHome>
     );
   }
 
+  String _formatDate(DateTime d) => '${d.day}/${d.month}/${d.year}';
+
+  DateTimeRange _effectiveSummaryRange() {
+    final from = DateTime(
+      _summaryFrom.year,
+      _summaryFrom.month,
+      _summaryFrom.day,
+    );
+    final to = DateTime(
+      _summaryTo.year,
+      _summaryTo.month,
+      _summaryTo.day,
+      23,
+      59,
+      59,
+      999,
+    );
+    return DateTimeRange(start: from, end: to);
+  }
+
+  Future<void> _pickSummaryFromDate() async {
+    DateTime? picked;
+    try {
+      picked = await showDatePicker(
+        context: context,
+        initialDate: _summaryFrom,
+        firstDate: DateTime(2020),
+        lastDate: DateTime.now().add(const Duration(days: 1)),
+      );
+    } catch (_) {
+      return;
+    }
+    if (picked == null) return;
+    if (!mounted) return;
+    setState(() {
+      _summaryFrom = picked!;
+      if (_summaryTo.isBefore(_summaryFrom)) {
+        _summaryTo = _summaryFrom;
+      }
+      _summaryRangeSelectedByUser = true;
+    });
+    if (!mounted) return;
+    await _loadHomeDataInternal(silent: true);
+  }
+
+  Future<void> _pickSummaryToDate() async {
+    DateTime? picked;
+    try {
+      picked = await showDatePicker(
+        context: context,
+        initialDate: _summaryTo,
+        firstDate: DateTime(2020),
+        lastDate: DateTime.now().add(const Duration(days: 1)),
+      );
+    } catch (_) {
+      return;
+    }
+    if (picked == null) return;
+    if (!mounted) return;
+    setState(() {
+      _summaryTo = picked!;
+      if (_summaryTo.isBefore(_summaryFrom)) {
+        _summaryFrom = _summaryTo;
+      }
+      _summaryRangeSelectedByUser = true;
+    });
+    if (!mounted) return;
+    await _loadHomeDataInternal(silent: true);
+  }
+
+  Future<void> _exportSummaryPdf() async {
+    if (!_summaryRangeSelectedByUser) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select From and To dates first')),
+      );
+      return;
+    }
+
+    final rows = List<_LabTestSummaryRow>.from(_summaryRows);
+    final range = _effectiveSummaryRange();
+
+    if (rows.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No data found in this date range')),
+      );
+      return;
+    }
+
+    final fontData = await rootBundle.load('assets/fonts/Kalpurush.ttf');
+    if (!mounted) return;
+    final baseFont = pw.Font.ttf(fontData);
+    final doc = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: baseFont,
+        bold: baseFont,
+        italic: baseFont,
+        boldItalic: baseFont,
+      ),
+    );
+
+    doc.addPage(
+      pw.MultiPage(
+        build: (context) => [
+          pw.Text(
+            'Lab Test Summary',
+            style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            'Range: ${_formatDate(range.start)} - ${_formatDate(range.end)}',
+          ),
+          pw.SizedBox(height: 12),
+          pw.Table.fromTextArray(
+            headers: const ['Test', 'Total', 'Pending', 'Submitted'],
+            data: rows
+                .map(
+                  (r) => [
+                    r.testName,
+                    r.total.toString(),
+                    r.pending.toString(),
+                    r.submitted.toString(),
+                  ],
+                )
+                .toList(),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            cellAlignment: pw.Alignment.centerLeft,
+            cellStyle: const pw.TextStyle(fontSize: 10),
+            headerDecoration: const pw.BoxDecoration(),
+          ),
+        ],
+      ),
+    );
+
+    final bytes = await doc.save();
+    if (!mounted) return;
+    if (kIsWeb) {
+      await Printing.sharePdf(bytes: bytes, filename: 'lab_test_summary.pdf');
+    } else {
+      await Printing.layoutPdf(
+        onLayout: (format) async => bytes,
+        name: 'lab_test_summary.pdf',
+      );
+    }
+  }
+
+  void _openUploadAndHighlight(LabUploadFocus focus) {
+    if (!mounted) return;
+
+    // Switch to Upload tab (reuse existing page)
+    if (_selectedIndex != 1) {
+      _navigationHistory.add(_selectedIndex);
+    }
+    setState(() {
+      _selectedIndex = 1;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Ensure latest data is present
+      _uploadKey.currentState?.fetchResults();
+      _uploadKey.currentState?.fetchTests();
+      _uploadKey.currentState?.focusOn(focus);
+    });
+  }
+
   // Helper: interactive stat card
   Widget _interactiveStat(
     String count,
     String label,
     IconData icon,
-    Color color,
-  ) {
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      onTap: null,
+      onTap: onTap,
       child: Card(
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -575,6 +752,82 @@ class _LabTesterHomeState extends State<LabTesterHome>
       return const Scaffold(body: Center(child: Text('Unauthorized')));
     }
 
+    final scaffold = Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: Text(
+          _getTitle(),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.blueAccent,
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+        elevation: 0,
+        actions: [
+          if (_selectedIndex == 2) ...[
+            IconButton(
+              tooltip: "Add New Test",
+              icon: const Icon(
+                Icons.add_circle_outline,
+                color: Colors.blueAccent,
+              ),
+              onPressed: () {
+                _manageTestKey.currentState?.openTestDialog();
+              },
+            ),
+          ],
+        ],
+      ),
+
+      body: _getBody(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        selectedItemColor: primaryColor,
+        unselectedItemColor: Colors.grey.shade600,
+        type: BottomNavigationBarType.fixed,
+        onTap: (index) {
+          if (index != _selectedIndex) {
+            _navigationHistory.add(_selectedIndex);
+            setState(() => _selectedIndex = index);
+
+            // Auto-refresh the newly selected tab (no manual refresh icons).
+            if (index == 0) {
+              _loadHomeDataInternal(silent: true);
+            } else if (index == 1) {
+              final st = _uploadKey.currentState as dynamic;
+              try {
+                st.fetchResults();
+                st.fetchTests();
+              } catch (_) {}
+            } else if (index == 2) {
+              _manageTestKey.currentState?.fetchData();
+            } else if (index == 3) {
+              // Profile tab: RouteRefreshMixin will refresh on resume/return.
+            }
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.cloud_upload),
+            label: "Upload",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.manage_accounts),
+            label: "ManageTest",
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+        ],
+      ),
+    );
+
+    // Web: avoid PopScope/WillPopScope wrappers (browser back stack differs
+    // and these wrappers sometimes contribute to disposed-view issues in debug).
+    if (kIsWeb) {
+      return scaffold;
+    }
+
     return WillPopScope(
       onWillPop: () async {
         // If we have navigation history inside the bottom nav, consume the back
@@ -617,79 +870,30 @@ class _LabTesterHomeState extends State<LabTesterHome>
             });
           }
         },
-        child: Scaffold(
-          backgroundColor: Colors.grey[50],
-          appBar: AppBar(
-            title: Text(
-              _getTitle(),
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.blueAccent,
-            centerTitle: true,
-            automaticallyImplyLeading: false,
-            elevation: 0,
-            actions: [
-              if (_selectedIndex == 2) ...[
-                IconButton(
-                  tooltip: "Add New Test",
-                  icon: const Icon(
-                    Icons.add_circle_outline,
-                    color: Colors.blueAccent,
-                  ),
-                  onPressed: () {
-                    _manageTestKey.currentState?.openTestDialog();
-                  },
-                ),
-              ],
-            ],
-          ),
-
-          body: _getBody(),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            selectedItemColor: primaryColor,
-            unselectedItemColor: Colors.grey.shade600,
-            type: BottomNavigationBarType.fixed,
-            onTap: (index) {
-              if (index != _selectedIndex) {
-                _navigationHistory.add(_selectedIndex);
-                setState(() => _selectedIndex = index);
-
-                // Auto-refresh the newly selected tab (no manual refresh icons).
-                if (index == 0) {
-                  _loadHomeDataInternal(silent: true);
-                } else if (index == 1) {
-                  final st = _uploadKey.currentState as dynamic;
-                  try {
-                    st.fetchResults();
-                    st.fetchTests();
-                  } catch (_) {}
-                } else if (index == 2) {
-                  _manageTestKey.currentState?.fetchData();
-                } else if (index == 3) {
-                  // Profile tab: RouteRefreshMixin will refresh on resume/return.
-                }
-              }
-            },
-            items: const [
-              BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.cloud_upload),
-                label: "Upload",
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.manage_accounts),
-                label: "ManageTest",
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: "Profile",
-              ),
-            ],
-          ),
-        ),
+        child: scaffold,
       ),
     );
   }
+}
+
+class _LabTestCounts {
+  int total = 0;
+  int pending = 0;
+  int submitted = 0;
+}
+
+class _LabTestSummaryRow {
+  const _LabTestSummaryRow({
+    required this.testId,
+    required this.testName,
+    required this.total,
+    required this.pending,
+    required this.submitted,
+  });
+
+  final int testId;
+  final String testName;
+  final int total;
+  final int pending;
+  final int submitted;
 }

@@ -41,6 +41,17 @@ class _PatientDashboardState extends State<PatientDashboard>
   List<OndutyStaff> onduty = [];
   bool loadingOnduty = true;
 
+  String _shiftTimeRangeLabel(ShiftType shift) {
+    switch (shift) {
+      case ShiftType.MORNING:
+        return '8:00 AM - 2:00 PM';
+      case ShiftType.AFTERNOON:
+        return '2:00 PM - 8:00 PM';
+      case ShiftType.NIGHT:
+        return '8:00 PM - 8:00 AM';
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -455,7 +466,7 @@ class _PatientDashboardState extends State<PatientDashboard>
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${s.staffRole.name} • ${s.shift.name}',
+                              '${s.staffRole.name} • ${s.shift.name} • ${_shiftTimeRangeLabel(s.shift)}',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.grey[700],

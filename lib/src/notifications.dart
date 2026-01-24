@@ -25,7 +25,7 @@ class _NotificationsState extends State<Notifications>
 
   List<NotificationInfo> _all = [];
 
-  // ডিফল্টভাবে সব নোটিফিকেশন দেখাবে
+  // dealt to showing all, read, unread
   NotificationFilter _filter = NotificationFilter.all;
 
   List<NotificationInfo> get _filtered {
@@ -52,15 +52,14 @@ class _NotificationsState extends State<Notifications>
     await _loadAll();
   }
 
-  // 1. SharedPreferences থেকে User ID নেওয়ার ফাংশন
-  // notifications.dart
+  // get user ID function
   Future<int> _getUserId() async {
     final prefs = await SharedPreferences.getInstance();
     final stored = prefs.getString('user_id');
     return int.tryParse(stored ?? '') ?? 0;
   }
 
-  // 2. ডাটা লোড করার ফাংশন (ID সহ)
+  // load all data function
   Future<void> _loadAll() async {
     setState(() => loading = true);
     try {
@@ -90,13 +89,13 @@ class _NotificationsState extends State<Notifications>
     }
   }
 
-  // সব মার্ক রিড করা
+  // mark as read all function
   Future<void> _markAllRead() async {
     final ok = await client.notification.markAllAsRead(userId: 0);
     if (ok) await _loadAll();
   }
 
-  // একটা মার্ক রিড করা
+  //mark as read one function
   Future<void> _markOneRead(NotificationInfo n) async {
     if (n.isRead) return;
 
@@ -107,13 +106,15 @@ class _NotificationsState extends State<Notifications>
     await _loadAll();
   }
 
-  // 3. ৩-ডট মেনুর জন্য কাস্টম উইজেট (রেড ডট লজিক)
+  // dot badge widget
   Widget _badgeDot({required Widget child}) {
     return Stack(
       clipBehavior: Clip.none,
+      fit: StackFit.passthrough,
       children: [
         child,
-        // যদি unread মেসেজ থাকে তবেই লাল ডট দেখাবে
+
+        // if unreadCount is more than 0, show red dot
         if (unreadCount > 0)
           Positioned(
             right: -2,
@@ -151,7 +152,7 @@ class _NotificationsState extends State<Notifications>
         ),
         actions: [
           PopupMenuButton<String>(
-            // এখানে রেড ডট লজিক অ্যাপ্লাই করা হয়েছে
+            // apply badge dot to menu icon
             icon: _badgeDot(
               child: const Icon(Icons.more_vert, color: Colors.blueAccent),
             ),
@@ -256,7 +257,7 @@ class _NotificationsState extends State<Notifications>
   }
 }
 
-// ডিটেইলস পেজেও ID পাস করা হয়েছে সিকিউরিটির জন্য
+// notification details page
 class NotificationDetails extends StatefulWidget {
   final int notificationId;
   final int userID;
@@ -285,7 +286,7 @@ class _NotificationDetailsState extends State<NotificationDetails> {
     try {
       final res = await client.notification.getNotificationById(
         notificationId: widget.notificationId,
-        userId: widget.userID, // ID পাস করা হলো
+        userId: widget.userID, // userID from parent widget
       );
 
       if (mounted) {
