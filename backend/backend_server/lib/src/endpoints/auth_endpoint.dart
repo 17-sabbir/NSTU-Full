@@ -8,8 +8,7 @@ import 'package:backend_server/src/generated/protocol.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 
 class AuthEndpoint extends Endpoint {
-    @override
-  bool get requireLogin => true;
+ 
   int? _authenticatedUserId(Session session) {
     final auth = session.authenticated;
     if (auth == null) return null;
@@ -1305,37 +1304,39 @@ class AuthEndpoint extends Endpoint {
     String newPassword,
   ) async {
     try {
+      final uid = _authenticatedUserId(session);
+      if (uid == null) return 'Not authenticated';
+
       if (email.trim().isEmpty) return 'Email is required';
       if (currentPassword.trim().isEmpty) return 'Current password is required';
 
       final err = _validateNewPassword(newPassword);
       if (err != null) return err;
 
+      final normalizedEmail = email.trim().toLowerCase();
+
       final result = await session.db.unsafeQuery(
-        'SELECT passwordhash FROM users WHERE email = e LIMIT 1',
-        parameters: QueryParameters.named({'e': email.trim()}),
+        'SELECT email, password_hash FROM users WHERE user_id = @uid LIMIT 1',
+        parameters: QueryParameters.named({'uid': uid}),
       );
       if (result.isEmpty) return 'User not found';
 
       final row = result.first.toColumnMap();
-      final ph = row['passwordhash'];
 
-      String storedHash = '';
-      if (ph == null) {
-        storedHash = '';
-      } else if (ph is List<int>) {
-        storedHash = String.fromCharCodes(ph);
-      } else {
-        storedHash = ph.toString();
+      final dbEmail = _decodeDbValue(row['email']).trim().toLowerCase();
+      if (dbEmail.isEmpty || dbEmail != normalizedEmail) {
+        return 'Not authorized';
       }
+
+      final storedHash = _decodeDbValue(row['password_hash']);
 
       final currHash = sha256.convert(utf8.encode(currentPassword)).toString();
       if (storedHash != currHash) return 'Incorrect current password';
 
       final newHash = sha256.convert(utf8.encode(newPassword)).toString();
       await session.db.unsafeExecute(
-        'UPDATE users SET passwordhash = p WHERE email = e',
-        parameters: QueryParameters.named({'p': newHash, 'e': email.trim()}),
+        'UPDATE users SET password_hash = @p WHERE user_id = @uid',
+        parameters: QueryParameters.named({'p': newHash, 'uid': uid}),
       );
 
       return 'OK';
