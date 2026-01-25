@@ -266,7 +266,7 @@ class _LabTesterProfileState extends State<LabTesterProfile>
 
       // ✅ FIX: Use the typed class instead of Map<String, dynamic>
       // Note: Use 'client.lab.getStaffProfile' (the endpoint you showed in the previous message)
-      StaffProfileDto? profile = await client.lab.getStaffProfile(0);
+      StaffProfileDto? profile = await client.lab.getStaffProfile();
 
       if (profile != null) {
         if (!mounted) return;
@@ -451,7 +451,6 @@ class _LabTesterProfileState extends State<LabTesterProfile>
       }
 
       final success = await client.lab.updateStaffProfile(
-        userId: 0,
         name: _nameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         phone: normalized,

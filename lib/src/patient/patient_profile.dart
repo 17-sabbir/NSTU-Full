@@ -384,7 +384,6 @@ class _PatientProfilePageState extends State<PatientProfilePage>
           ? null
           : AppDateTime.utcDateOnly(_dateOfBirth!);
       await client.patient.updatePatientProfile(
-        0,
         _nameController.text.trim(),
         normalizedPhone,
         _bloodGroupController.text.isEmpty ? null : _bloodGroupController.text,

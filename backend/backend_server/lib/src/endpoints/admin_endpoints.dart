@@ -8,6 +8,8 @@ import '../generated/protocol.dart';
 /// AdminEndpoints: server-side methods used by the admin UI to manage users,
 /// inventory, rosters, audit logs and notifications.
 class AdminEndpoints extends Endpoint {
+
+  
   /// Helper: map a DB row to a serializable map for the client.
   Map<String, dynamic> _rowToUserMap(Map<String, dynamic> row) {
     String decode(dynamic v) {

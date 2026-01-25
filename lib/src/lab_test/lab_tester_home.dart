@@ -30,6 +30,11 @@ class _LabTesterHomeState extends State<LabTesterHome>
   final Color primaryColor = Colors.blueAccent;
   final List<int> _navigationHistory = [];
 
+  // Lazy-load tabs to avoid duplicate network calls at startup.
+  Widget? _uploadPage;
+  Widget? _managePage;
+  Widget? _profilePage;
+
   String name = '';
   String designation = '';
   String? profilePictureUrl;
@@ -86,7 +91,7 @@ class _LabTesterHomeState extends State<LabTesterHome>
 
       String role = '';
       try {
-        role = (await client.patient.getUserRole(0)).toUpperCase();
+        role = (await client.patient.getUserRole()).toUpperCase();
       } catch (e) {
         debugPrint('Failed to fetch user role: $e');
       }
@@ -116,7 +121,7 @@ class _LabTesterHomeState extends State<LabTesterHome>
   Future<void> _loadBasicProfile(int userId) async {
     if (!mounted) return;
     try {
-      final profile = await client.lab.getStaffProfile(0);
+      final profile = await client.lab.getStaffProfile();
 
       if (profile != null && mounted) {
         setState(() {
@@ -250,11 +255,28 @@ class _LabTesterHomeState extends State<LabTesterHome>
       index: _selectedIndex,
       children: [
         _homeUI(),
-        LabTestCreateAndUpload(key: _uploadKey),
-        ManageTest(key: _manageTestKey),
-        const LabTesterProfile(),
+        _uploadPage ?? const SizedBox.shrink(),
+        _managePage ?? const SizedBox.shrink(),
+        _profilePage ?? const SizedBox.shrink(),
       ],
     );
+  }
+
+  bool _ensureTabCreated(int index) {
+    var created = false;
+    if (index == 1 && _uploadPage == null) {
+      _uploadPage = LabTestCreateAndUpload(key: _uploadKey);
+      created = true;
+    }
+    if (index == 2 && _managePage == null) {
+      _managePage = ManageTest(key: _manageTestKey);
+      created = true;
+    }
+    if (index == 3 && _profilePage == null) {
+      _profilePage = const LabTesterProfile();
+      created = true;
+    }
+    return created;
   }
 
   Widget _homeUI() {
@@ -662,6 +684,9 @@ class _LabTesterHomeState extends State<LabTesterHome>
   void _openUploadAndHighlight(LabUploadFocus focus) {
     if (!mounted) return;
 
+    final uploadWasCreated = _uploadPage != null;
+    final createdNow = _ensureTabCreated(1);
+
     // Switch to Upload tab (reuse existing page)
     if (_selectedIndex != 1) {
       _navigationHistory.add(_selectedIndex);
@@ -671,9 +696,11 @@ class _LabTesterHomeState extends State<LabTesterHome>
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Ensure latest data is present
-      _uploadKey.currentState?.fetchResults();
-      _uploadKey.currentState?.fetchTests();
+      // Ensure latest data is present (avoid double fetch on first creation)
+      if (uploadWasCreated && !createdNow) {
+        _uploadKey.currentState?.fetchResults();
+        _uploadKey.currentState?.fetchTests();
+      }
       _uploadKey.currentState?.focusOn(focus);
     });
   }
@@ -789,21 +816,32 @@ class _LabTesterHomeState extends State<LabTesterHome>
         onTap: (index) {
           if (index != _selectedIndex) {
             _navigationHistory.add(_selectedIndex);
+            final wasUploadCreated = _uploadPage != null;
+            final wasManageCreated = _managePage != null;
+            final wasProfileCreated = _profilePage != null;
+
+            final createdNow = _ensureTabCreated(index);
             setState(() => _selectedIndex = index);
 
             // Auto-refresh the newly selected tab (no manual refresh icons).
             if (index == 0) {
               _loadHomeDataInternal(silent: true);
             } else if (index == 1) {
-              final st = _uploadKey.currentState as dynamic;
-              try {
-                st.fetchResults();
-                st.fetchTests();
-              } catch (_) {}
+              // If first time created, its initState already fetches.
+              if (wasUploadCreated && !createdNow) {
+                _uploadKey.currentState?.fetchResults();
+                _uploadKey.currentState?.fetchTests();
+              }
             } else if (index == 2) {
-              _manageTestKey.currentState?.fetchData();
+              if (wasManageCreated && !createdNow) {
+                _manageTestKey.currentState?.fetchData();
+              }
             } else if (index == 3) {
               // Profile tab: RouteRefreshMixin will refresh on resume/return.
+              // Lazy-loaded to avoid duplicate profile fetch at startup.
+              if (wasProfileCreated && !createdNow) {
+                // no-op
+              }
             }
           }
         },

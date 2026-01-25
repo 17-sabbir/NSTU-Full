@@ -8,6 +8,8 @@ import 'package:backend_server/src/generated/protocol.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 
 class AuthEndpoint extends Endpoint {
+    @override
+  bool get requireLogin => true;
   int? _authenticatedUserId(Session session) {
     final auth = session.authenticated;
     if (auth == null) return null;

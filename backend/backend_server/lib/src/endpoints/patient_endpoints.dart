@@ -117,7 +117,7 @@ class PatientEndpoint extends Endpoint {
 
   /// Return the role of a user (stored as text in users.role) by email/userId.
   /// Returns uppercase role string or empty string if not found.
-  Future<String> getUserRole(Session session, int userId) async {
+  Future<String> getUserRole(Session session) async {
     try {
       final resolvedUserId = requireAuthenticatedUserId(session);
       final result = await session.db.unsafeQuery(
@@ -132,7 +132,7 @@ class PatientEndpoint extends Endpoint {
       final roleVal = _safeString(row['role']).toUpperCase();
       return roleVal;
     } catch (e, stack) {
-      session.log('Error fetching user role for $userId: $e\n$stack',
+      session.log('Error fetching user role: $e\n$stack',
           level: LogLevel.error);
       return '';
     }
@@ -141,7 +141,6 @@ class PatientEndpoint extends Endpoint {
 // 2. Update Patient Profile
   Future<String> updatePatientProfile(
     Session session,
-    int userId,
     String name,
     String phone,
     String? bloodGroup,
@@ -204,7 +203,6 @@ class PatientEndpoint extends Endpoint {
   /// Fetch logged-in patient's lab reports using phone number
   Future<List<PatientReportDto>> getMyLabReports(
     Session session,
-    int userId,
   ) async {
     try {
       final resolvedUserId = requireAuthenticatedUserId(session);
@@ -248,8 +246,7 @@ class PatientEndpoint extends Endpoint {
   }
 
 // ১. ড্রপডাউনে দেখানোর জন্য রোগীর আগের প্রেসক্রিপশন লিস্ট আনা
-  Future<List<PrescriptionList>> getMyPrescriptionList(
-      Session session, int userId) async {
+  Future<List<PrescriptionList>> getMyPrescriptionList(Session session) async {
     final resolvedUserId = requireAuthenticatedUserId(session);
     final query = '''
       SELECT
@@ -313,7 +310,6 @@ class PatientEndpoint extends Endpoint {
   // ২. ক্লাউডিনারি আপলোডসহ রিপোর্ট ডাটা সেভ এবং নোটিফিকেশন পাঠানো
   Future<bool> finalizeReportUpload(
     Session session, {
-    required int patientId,
     required int prescriptionId,
     required String reportType,
     required String fileUrl,
@@ -391,7 +387,7 @@ class PatientEndpoint extends Endpoint {
 
   // আপনার আপলোড করা রিপোর্টগুলোর লিস্ট দেখার জন্য নতুন মেথড
   Future<List<PatientExternalReport>> getMyExternalReports(
-      Session session, int userId) async {
+      Session session) async {
     try {
       final resolvedUserId = requireAuthenticatedUserId(session);
       // এখানে আপনার টেবিলের নাম অনুযায়ী কুয়েরি হবে (ধরে নিচ্ছি 'upload_patient_reports')

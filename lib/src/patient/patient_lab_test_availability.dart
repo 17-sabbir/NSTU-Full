@@ -50,7 +50,7 @@ class _PatientLabTestAvailabilityState extends State<PatientLabTestAvailability>
         final int? numericId = int.tryParse(storedUserId);
         if (numericId != null) {
           try {
-            final role = await client.patient.getUserRole(0);
+            final role = await client.patient.getUserRole();
             _role = role.isEmpty ? '' : role.toUpperCase();
           } catch (e) {
             debugPrint('Failed to fetch role using numeric id: $e');

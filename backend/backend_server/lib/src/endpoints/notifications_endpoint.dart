@@ -6,22 +6,21 @@ class NotificationEndpoint extends Endpoint {
   @override
   bool get requireLogin => true;
 
-  // 1. Create Notification (Updated to accept userId if needed,
-  // or you can keep passing it from where you trigger this)
+  // 1. Create Notification for the authenticated user
   Future<bool> createNotification(
     Session session, {
-    required int userId, // Passed explicitly
     required String title,
     required String message,
   }) async {
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       await session.db.unsafeExecute(
         '''
         INSERT INTO notifications (user_id, title, message, is_read, created_at)
         VALUES (@uid, @t, @m, FALSE, NOW())
         ''',
         parameters: QueryParameters.named({
-          'uid': userId,
+          'uid': resolvedUserId,
           't': title.trim(),
           'm': message.trim(),
         }),
@@ -37,11 +36,10 @@ class NotificationEndpoint extends Endpoint {
     }
   }
 
-  // 2. Get Notifications (Accepts userId)
+  // 2. Get Notifications for the authenticated user
   Future<List<NotificationInfo>> getMyNotifications(
     Session session, {
     required int limit,
-    required int userId, // <--- Added parameter
   }) async {
     final resolvedUserId = requireAuthenticatedUserId(session);
     final rows = await session.db.unsafeQuery(
@@ -68,11 +66,8 @@ class NotificationEndpoint extends Endpoint {
     }).toList();
   }
 
-  // 3. Get Counts (Accepts userId)
-  Future<Map<String, int>> getMyNotificationCounts(
-    Session session, {
-    required int userId, // <--- Added parameter
-  }) async {
+  // 3. Get Counts for the authenticated user
+  Future<Map<String, int>> getMyNotificationCounts(Session session) async {
     final resolvedUserId = requireAuthenticatedUserId(session);
     final rows = await session.db.unsafeQuery(
       '''
@@ -94,11 +89,10 @@ class NotificationEndpoint extends Endpoint {
     };
   }
 
-  // 4. Get By ID (Accepts userId for security check)
+  // 4. Get By ID (scoped to authenticated user)
   Future<NotificationInfo?> getNotificationById(
     Session session, {
     required int notificationId,
-    required int userId, // <--- Added parameter
   }) async {
     final resolvedUserId = requireAuthenticatedUserId(session);
     final rows = await session.db.unsafeQuery(
@@ -125,11 +119,10 @@ class NotificationEndpoint extends Endpoint {
     );
   }
 
-  // 5. Mark One Read (Accepts userId)
+  // 5. Mark One Read (scoped to authenticated user)
   Future<bool> markAsRead(
     Session session, {
     required int notificationId,
-    required int userId, // <--- Added parameter
   }) async {
     final resolvedUserId = requireAuthenticatedUserId(session);
     try {
@@ -153,11 +146,8 @@ class NotificationEndpoint extends Endpoint {
     }
   }
 
-  // 6. Mark All Read (Accepts userId)
-  Future<bool> markAllAsRead(
-    Session session, {
-    required int userId, // <--- Added parameter
-  }) async {
+  // 6. Mark All Read (scoped to authenticated user)
+  Future<bool> markAllAsRead(Session session) async {
     final resolvedUserId = requireAuthenticatedUserId(session);
     try {
       await session.db.unsafeExecute(

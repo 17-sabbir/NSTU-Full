@@ -70,7 +70,6 @@ class AdminInventoryEndpoints extends Endpoint {
     required int minimumStock,
     int initialStock = 0,
     bool canRestockDispenser = false,
-    required int adminUserId,
   }) async {
     try {
       final resolvedAdminUserId = requireAuthenticatedUserId(session);
@@ -137,7 +136,6 @@ class AdminInventoryEndpoints extends Endpoint {
     required int itemId,
     required int quantity,
     required String type, // IN or OUT
-    required int userId,
   }) async {
     try {
       if (quantity <= 0) return false;
@@ -232,7 +230,6 @@ class AdminInventoryEndpoints extends Endpoint {
     Session session, {
     required int itemId,
     required bool canRestock,
-    required int adminUserId,
   }) async {
     try {
       final resolvedAdminUserId = requireAuthenticatedUserId(session);
@@ -331,7 +328,6 @@ class AdminInventoryEndpoints extends Endpoint {
     Session session, {
     required int itemId,
     required int newThreshold,
-    required int adminUserId,
   }) async {
     try {
       final resolvedAdminUserId = requireAuthenticatedUserId(session);

@@ -54,7 +54,7 @@ class _PatientReportsState extends State<PatientReports>
         return;
       }
 
-      final data = await client.patient.getMyLabReports(0);
+      final data = await client.patient.getMyLabReports();
       setState(() {
         reports = data;
         isLoading = false;

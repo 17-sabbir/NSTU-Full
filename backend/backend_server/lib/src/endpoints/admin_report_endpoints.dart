@@ -2,6 +2,8 @@ import 'package:serverpod/serverpod.dart';
 import 'package:backend_server/src/generated/protocol.dart';
 
 class AdminReportEndpoints extends Endpoint {
+    @override
+  bool get requireLogin => true;
   Future<AdminDashboardOverview> getAdminDashboardOverview(
     Session session,
   ) async {

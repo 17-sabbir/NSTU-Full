@@ -685,11 +685,6 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<bool>(),
               nullable: false,
             ),
-            'adminUserId': _i1.ParameterDescription(
-              name: 'adminUserId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
           },
           call:
               (
@@ -706,7 +701,6 @@ class Endpoints extends _i1.EndpointDispatch {
                         minimumStock: params['minimumStock'],
                         initialStock: params['initialStock'],
                         canRestockDispenser: params['canRestockDispenser'],
-                        adminUserId: params['adminUserId'],
                       ),
         ),
         'updateInventoryStock': _i1.MethodConnector(
@@ -727,11 +721,6 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<String>(),
               nullable: false,
             ),
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
           },
           call:
               (
@@ -745,7 +734,6 @@ class Endpoints extends _i1.EndpointDispatch {
                         itemId: params['itemId'],
                         quantity: params['quantity'],
                         type: params['type'],
-                        userId: params['userId'],
                       ),
         ),
         'updateDispenserRestockFlag': _i1.MethodConnector(
@@ -761,11 +749,6 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<bool>(),
               nullable: false,
             ),
-            'adminUserId': _i1.ParameterDescription(
-              name: 'adminUserId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
           },
           call:
               (
@@ -778,7 +761,6 @@ class Endpoints extends _i1.EndpointDispatch {
                         session,
                         itemId: params['itemId'],
                         canRestock: params['canRestock'],
-                        adminUserId: params['adminUserId'],
                       ),
         ),
         'listInventoryItems': _i1.MethodConnector(
@@ -806,11 +788,6 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<int>(),
               nullable: false,
             ),
-            'adminUserId': _i1.ParameterDescription(
-              name: 'adminUserId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
           },
           call:
               (
@@ -823,7 +800,6 @@ class Endpoints extends _i1.EndpointDispatch {
                         session,
                         itemId: params['itemId'],
                         newThreshold: params['newThreshold'],
-                        adminUserId: params['adminUserId'],
                       ),
         ),
         'getItemTransactions': _i1.MethodConnector(
@@ -2232,30 +2208,18 @@ class Endpoints extends _i1.EndpointDispatch {
         ),
         'getStaffProfile': _i1.MethodConnector(
           name: 'getStaffProfile',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-          },
+          params: {},
           call:
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async => (endpoints['lab'] as _i8.LabEndpoint).getStaffProfile(
                 session,
-                params['userId'],
               ),
         ),
         'updateStaffProfile': _i1.MethodConnector(
           name: 'updateStaffProfile',
           params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
             'name': _i1.ParameterDescription(
               name: 'name',
               type: _i1.getType<String>(),
@@ -2294,7 +2258,6 @@ class Endpoints extends _i1.EndpointDispatch {
               ) async =>
                   (endpoints['lab'] as _i8.LabEndpoint).updateStaffProfile(
                     session,
-                    userId: params['userId'],
                     name: params['name'],
                     phone: params['phone'],
                     email: params['email'],
@@ -2332,11 +2295,6 @@ class Endpoints extends _i1.EndpointDispatch {
         'createNotification': _i1.MethodConnector(
           name: 'createNotification',
           params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
             'title': _i1.ParameterDescription(
               name: 'title',
               type: _i1.getType<String>(),
@@ -2355,7 +2313,6 @@ class Endpoints extends _i1.EndpointDispatch {
               ) async => (endpoints['notification'] as _i9.NotificationEndpoint)
                   .createNotification(
                     session,
-                    userId: params['userId'],
                     title: params['title'],
                     message: params['message'],
                   ),
@@ -2368,11 +2325,6 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<int>(),
               nullable: false,
             ),
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
           },
           call:
               (
@@ -2382,38 +2334,23 @@ class Endpoints extends _i1.EndpointDispatch {
                   .getMyNotifications(
                     session,
                     limit: params['limit'],
-                    userId: params['userId'],
                   ),
         ),
         'getMyNotificationCounts': _i1.MethodConnector(
           name: 'getMyNotificationCounts',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-          },
+          params: {},
           call:
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async => (endpoints['notification'] as _i9.NotificationEndpoint)
-                  .getMyNotificationCounts(
-                    session,
-                    userId: params['userId'],
-                  ),
+                  .getMyNotificationCounts(session),
         ),
         'getNotificationById': _i1.MethodConnector(
           name: 'getNotificationById',
           params: {
             'notificationId': _i1.ParameterDescription(
               name: 'notificationId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
               type: _i1.getType<int>(),
               nullable: false,
             ),
@@ -2426,7 +2363,6 @@ class Endpoints extends _i1.EndpointDispatch {
                   .getNotificationById(
                     session,
                     notificationId: params['notificationId'],
-                    userId: params['userId'],
                   ),
         ),
         'markAsRead': _i1.MethodConnector(
@@ -2434,11 +2370,6 @@ class Endpoints extends _i1.EndpointDispatch {
           params: {
             'notificationId': _i1.ParameterDescription(
               name: 'notificationId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
               type: _i1.getType<int>(),
               nullable: false,
             ),
@@ -2451,27 +2382,17 @@ class Endpoints extends _i1.EndpointDispatch {
                   .markAsRead(
                     session,
                     notificationId: params['notificationId'],
-                    userId: params['userId'],
                   ),
         ),
         'markAllAsRead': _i1.MethodConnector(
           name: 'markAllAsRead',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-          },
+          params: {},
           call:
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async => (endpoints['notification'] as _i9.NotificationEndpoint)
-                  .markAllAsRead(
-                    session,
-                    userId: params['userId'],
-                  ),
+                  .markAllAsRead(session),
         ),
       },
     );
@@ -2532,31 +2453,17 @@ class Endpoints extends _i1.EndpointDispatch {
         ),
         'getUserRole': _i1.MethodConnector(
           name: 'getUserRole',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-          },
+          params: {},
           call:
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async =>
-                  (endpoints['patient'] as _i11.PatientEndpoint).getUserRole(
-                    session,
-                    params['userId'],
-                  ),
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
+                  .getUserRole(session),
         ),
         'updatePatientProfile': _i1.MethodConnector(
           name: 'updatePatientProfile',
           params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
             'name': _i1.ParameterDescription(
               name: 'name',
               type: _i1.getType<String>(),
@@ -2595,7 +2502,6 @@ class Endpoints extends _i1.EndpointDispatch {
               ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .updatePatientProfile(
                     session,
-                    params['userId'],
                     params['name'],
                     params['phone'],
                     params['bloodGroup'],
@@ -2606,50 +2512,27 @@ class Endpoints extends _i1.EndpointDispatch {
         ),
         'getMyLabReports': _i1.MethodConnector(
           name: 'getMyLabReports',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-          },
+          params: {},
           call:
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async => (endpoints['patient'] as _i11.PatientEndpoint)
-                  .getMyLabReports(
-                    session,
-                    params['userId'],
-                  ),
+                  .getMyLabReports(session),
         ),
         'getMyPrescriptionList': _i1.MethodConnector(
           name: 'getMyPrescriptionList',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-          },
+          params: {},
           call:
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async => (endpoints['patient'] as _i11.PatientEndpoint)
-                  .getMyPrescriptionList(
-                    session,
-                    params['userId'],
-                  ),
+                  .getMyPrescriptionList(session),
         ),
         'finalizeReportUpload': _i1.MethodConnector(
           name: 'finalizeReportUpload',
           params: {
-            'patientId': _i1.ParameterDescription(
-              name: 'patientId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
             'prescriptionId': _i1.ParameterDescription(
               name: 'prescriptionId',
               type: _i1.getType<int>(),
@@ -2673,7 +2556,6 @@ class Endpoints extends _i1.EndpointDispatch {
               ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .finalizeReportUpload(
                     session,
-                    patientId: params['patientId'],
                     prescriptionId: params['prescriptionId'],
                     reportType: params['reportType'],
                     fileUrl: params['fileUrl'],
@@ -2681,22 +2563,13 @@ class Endpoints extends _i1.EndpointDispatch {
         ),
         'getMyExternalReports': _i1.MethodConnector(
           name: 'getMyExternalReports',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-          },
+          params: {},
           call:
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async => (endpoints['patient'] as _i11.PatientEndpoint)
-                  .getMyExternalReports(
-                    session,
-                    params['userId'],
-                  ),
+                  .getMyExternalReports(session),
         ),
         'getPrescriptionList': _i1.MethodConnector(
           name: 'getPrescriptionList',

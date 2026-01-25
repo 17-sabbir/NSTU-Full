@@ -82,7 +82,7 @@ class _AdminProfileState extends State<AdminProfile> {
 
       String role = '';
       try {
-        role = (await client.patient.getUserRole(0)).toUpperCase();
+        role = (await client.patient.getUserRole()).toUpperCase();
       } catch (e) {
         debugPrint('Failed to fetch user role: $e');
       }

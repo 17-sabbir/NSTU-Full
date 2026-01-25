@@ -334,7 +334,6 @@ class EndpointAdminInventoryEndpoints extends _i1.EndpointRef {
     required int minimumStock,
     required int initialStock,
     required bool canRestockDispenser,
-    required int adminUserId,
   }) => caller.callServerEndpoint<bool>(
     'adminInventoryEndpoints',
     'addInventoryItem',
@@ -345,7 +344,6 @@ class EndpointAdminInventoryEndpoints extends _i1.EndpointRef {
       'minimumStock': minimumStock,
       'initialStock': initialStock,
       'canRestockDispenser': canRestockDispenser,
-      'adminUserId': adminUserId,
     },
   );
 
@@ -353,7 +351,6 @@ class EndpointAdminInventoryEndpoints extends _i1.EndpointRef {
     required int itemId,
     required int quantity,
     required String type,
-    required int userId,
   }) => caller.callServerEndpoint<bool>(
     'adminInventoryEndpoints',
     'updateInventoryStock',
@@ -361,21 +358,18 @@ class EndpointAdminInventoryEndpoints extends _i1.EndpointRef {
       'itemId': itemId,
       'quantity': quantity,
       'type': type,
-      'userId': userId,
     },
   );
 
   _i2.Future<bool> updateDispenserRestockFlag({
     required int itemId,
     required bool canRestock,
-    required int adminUserId,
   }) => caller.callServerEndpoint<bool>(
     'adminInventoryEndpoints',
     'updateDispenserRestockFlag',
     {
       'itemId': itemId,
       'canRestock': canRestock,
-      'adminUserId': adminUserId,
     },
   );
 
@@ -389,14 +383,12 @@ class EndpointAdminInventoryEndpoints extends _i1.EndpointRef {
   _i2.Future<bool> updateMinimumThreshold({
     required int itemId,
     required int newThreshold,
-    required int adminUserId,
   }) => caller.callServerEndpoint<bool>(
     'adminInventoryEndpoints',
     'updateMinimumThreshold',
     {
       'itemId': itemId,
       'newThreshold': newThreshold,
-      'adminUserId': adminUserId,
     },
   );
 
@@ -1122,17 +1114,16 @@ class EndpointLab extends _i1.EndpointRef {
         {},
       );
 
-  /// Fetch Lab Staff profile by userId
-  _i2.Future<_i32.StaffProfileDto?> getStaffProfile(int userId) =>
+  /// Fetch Lab Staff profile for the authenticated user
+  _i2.Future<_i32.StaffProfileDto?> getStaffProfile() =>
       caller.callServerEndpoint<_i32.StaffProfileDto?>(
         'lab',
         'getStaffProfile',
-        {'userId': userId},
+        {},
       );
 
   /// Update Staff Profile (Users + Staff_Profiles tables)
   _i2.Future<bool> updateStaffProfile({
-    required int userId,
     required String name,
     required String phone,
     required String email,
@@ -1143,7 +1134,6 @@ class EndpointLab extends _i1.EndpointRef {
     'lab',
     'updateStaffProfile',
     {
-      'userId': userId,
       'name': name,
       'phone': phone,
       'email': email,
@@ -1176,14 +1166,12 @@ class EndpointNotification extends _i1.EndpointRef {
   String get name => 'notification';
 
   _i2.Future<bool> createNotification({
-    required int userId,
     required String title,
     required String message,
   }) => caller.callServerEndpoint<bool>(
     'notification',
     'createNotification',
     {
-      'userId': userId,
       'title': title,
       'message': message,
     },
@@ -1191,53 +1179,39 @@ class EndpointNotification extends _i1.EndpointRef {
 
   _i2.Future<List<_i35.NotificationInfo>> getMyNotifications({
     required int limit,
-    required int userId,
   }) => caller.callServerEndpoint<List<_i35.NotificationInfo>>(
     'notification',
     'getMyNotifications',
-    {
-      'limit': limit,
-      'userId': userId,
-    },
+    {'limit': limit},
   );
 
-  _i2.Future<Map<String, int>> getMyNotificationCounts({required int userId}) =>
+  _i2.Future<Map<String, int>> getMyNotificationCounts() =>
       caller.callServerEndpoint<Map<String, int>>(
         'notification',
         'getMyNotificationCounts',
-        {'userId': userId},
+        {},
       );
 
   _i2.Future<_i35.NotificationInfo?> getNotificationById({
     required int notificationId,
-    required int userId,
   }) => caller.callServerEndpoint<_i35.NotificationInfo?>(
     'notification',
     'getNotificationById',
-    {
-      'notificationId': notificationId,
-      'userId': userId,
-    },
+    {'notificationId': notificationId},
   );
 
-  _i2.Future<bool> markAsRead({
-    required int notificationId,
-    required int userId,
-  }) => caller.callServerEndpoint<bool>(
-    'notification',
-    'markAsRead',
-    {
-      'notificationId': notificationId,
-      'userId': userId,
-    },
-  );
-
-  _i2.Future<bool> markAllAsRead({required int userId}) =>
+  _i2.Future<bool> markAsRead({required int notificationId}) =>
       caller.callServerEndpoint<bool>(
         'notification',
-        'markAllAsRead',
-        {'userId': userId},
+        'markAsRead',
+        {'notificationId': notificationId},
       );
+
+  _i2.Future<bool> markAllAsRead() => caller.callServerEndpoint<bool>(
+    'notification',
+    'markAllAsRead',
+    {},
+  );
 }
 
 /// {@category Endpoint}
@@ -1285,15 +1259,13 @@ class EndpointPatient extends _i1.EndpointRef {
 
   /// Return the role of a user (stored as text in users.role) by email/userId.
   /// Returns uppercase role string or empty string if not found.
-  _i2.Future<String> getUserRole(int userId) =>
-      caller.callServerEndpoint<String>(
-        'patient',
-        'getUserRole',
-        {'userId': userId},
-      );
+  _i2.Future<String> getUserRole() => caller.callServerEndpoint<String>(
+    'patient',
+    'getUserRole',
+    {},
+  );
 
   _i2.Future<String> updatePatientProfile(
-    int userId,
     String name,
     String phone,
     String? bloodGroup,
@@ -1304,7 +1276,6 @@ class EndpointPatient extends _i1.EndpointRef {
     'patient',
     'updatePatientProfile',
     {
-      'userId': userId,
       'name': name,
       'phone': phone,
       'bloodGroup': bloodGroup,
@@ -1315,22 +1286,21 @@ class EndpointPatient extends _i1.EndpointRef {
   );
 
   /// Fetch logged-in patient's lab reports using phone number
-  _i2.Future<List<_i37.PatientReportDto>> getMyLabReports(int userId) =>
+  _i2.Future<List<_i37.PatientReportDto>> getMyLabReports() =>
       caller.callServerEndpoint<List<_i37.PatientReportDto>>(
         'patient',
         'getMyLabReports',
-        {'userId': userId},
+        {},
       );
 
-  _i2.Future<List<_i38.PrescriptionList>> getMyPrescriptionList(int userId) =>
+  _i2.Future<List<_i38.PrescriptionList>> getMyPrescriptionList() =>
       caller.callServerEndpoint<List<_i38.PrescriptionList>>(
         'patient',
         'getMyPrescriptionList',
-        {'userId': userId},
+        {},
       );
 
   _i2.Future<bool> finalizeReportUpload({
-    required int patientId,
     required int prescriptionId,
     required String reportType,
     required String fileUrl,
@@ -1338,20 +1308,18 @@ class EndpointPatient extends _i1.EndpointRef {
     'patient',
     'finalizeReportUpload',
     {
-      'patientId': patientId,
       'prescriptionId': prescriptionId,
       'reportType': reportType,
       'fileUrl': fileUrl,
     },
   );
 
-  _i2.Future<List<_i27.PatientExternalReport>> getMyExternalReports(
-    int userId,
-  ) => caller.callServerEndpoint<List<_i27.PatientExternalReport>>(
-    'patient',
-    'getMyExternalReports',
-    {'userId': userId},
-  );
+  _i2.Future<List<_i27.PatientExternalReport>> getMyExternalReports() =>
+      caller.callServerEndpoint<List<_i27.PatientExternalReport>>(
+        'patient',
+        'getMyExternalReports',
+        {},
+      );
 
   /// ১. রোগীর সব প্রেসক্রিপশনের লিস্ট আনা
   _i2.Future<List<_i38.PrescriptionList>> getPrescriptionList(int patientId) =>

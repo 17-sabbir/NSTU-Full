@@ -6,6 +6,9 @@ import 'dart:typed_data';
 import '../utils/auth_user.dart';
 
 class LabEndpoint extends Endpoint {
+  @override
+  bool get requireLogin => true;
+
   /// Fetch all lab tests using your raw SQL schema
   Future<List<LabTests>> getAllLabTests(Session session) async {
     try {
@@ -168,13 +171,37 @@ class LabEndpoint extends Endpoint {
         return false;
       }
 
+      // Enforce replacement window: allow replace only within 24h of first upload.
+      // - If never uploaded (is_uploaded=false OR submitted_at is null): allow.
+      // - If already uploaded and submitted_at older than 24h: reject.
+      final stateRows = await session.db.unsafeQuery(
+        r'''
+        SELECT
+          is_uploaded,
+          submitted_at,
+          (submitted_at IS NOT NULL AND submitted_at < (NOW() - INTERVAL '24 hours')) AS expired
+        FROM test_results
+        WHERE result_id = @id
+        LIMIT 1
+        ''',
+        parameters: QueryParameters.named({'id': resultId}),
+      );
+
+      if (stateRows.isEmpty) return false;
+      final state = stateRows.first.toColumnMap();
+      final isUploaded = (state['is_uploaded'] as bool?) ?? false;
+      final expired = (state['expired'] as bool?) ?? false;
+      if (isUploaded && expired) {
+        return false;
+      }
+
       // Save URL and timestamp in DB
       await session.db.unsafeExecute(
         '''
       UPDATE test_results
       SET attachment_path = @url,
           is_uploaded = TRUE,
-          submitted_at = NOW()
+          submitted_at = COALESCE(submitted_at, NOW())
       WHERE result_id = @id
       ''',
         parameters: QueryParameters.named({
@@ -237,8 +264,8 @@ class LabEndpoint extends Endpoint {
     }
   }
 
-  /// Fetch Lab Staff profile by userId
-  Future<StaffProfileDto?> getStaffProfile(Session session, int userId) async {
+  /// Fetch Lab Staff profile for the authenticated user
+  Future<StaffProfileDto?> getStaffProfile(Session session) async {
     try {
       final resolvedUserId = requireAuthenticatedUserId(session);
       final result = await session.db.unsafeQuery(
@@ -279,7 +306,6 @@ class LabEndpoint extends Endpoint {
   /// Update Staff Profile (Users + Staff_Profiles tables)
   Future<bool> updateStaffProfile(
     Session session, {
-    required int userId,
     required String name,
     required String phone,
     required String email,

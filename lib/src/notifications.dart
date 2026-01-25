@@ -2,9 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:backend_client/backend_client.dart';
-
 import 'date_time_utils.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // SharedPreferences ইমপোর্ট করা হলো
 import 'route_refresh.dart';
 
 enum NotificationFilter { all, unread, read }
@@ -52,28 +50,12 @@ class _NotificationsState extends State<Notifications>
     await _loadAll();
   }
 
-  // get user ID function
-  Future<int> _getUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString('user_id');
-    return int.tryParse(stored ?? '') ?? 0;
-  }
-
   // load all data function
   Future<void> _loadAll() async {
     setState(() => loading = true);
     try {
-      // Do not send real userId from frontend; backend resolves from session.
-      const userId = 0;
-
-      // ব্যাকএন্ডে userId পাঠানো হচ্ছে
-      final counts = await client.notification.getMyNotificationCounts(
-        userId: userId,
-      );
-      final list = await client.notification.getMyNotifications(
-        limit: 190,
-        userId: userId,
-      );
+      final counts = await client.notification.getMyNotificationCounts();
+      final list = await client.notification.getMyNotifications(limit: 190);
 
       if (!mounted) return;
       setState(() {
@@ -91,7 +73,7 @@ class _NotificationsState extends State<Notifications>
 
   // mark as read all function
   Future<void> _markAllRead() async {
-    final ok = await client.notification.markAllAsRead(userId: 0);
+    final ok = await client.notification.markAllAsRead();
     if (ok) await _loadAll();
   }
 
@@ -99,10 +81,7 @@ class _NotificationsState extends State<Notifications>
   Future<void> _markOneRead(NotificationInfo n) async {
     if (n.isRead) return;
 
-    await client.notification.markAsRead(
-      notificationId: n.notificationId,
-      userId: 0,
-    );
+    await client.notification.markAsRead(notificationId: n.notificationId);
     await _loadAll();
   }
 
@@ -242,7 +221,6 @@ class _NotificationsState extends State<Notifications>
                                   MaterialPageRoute(
                                     builder: (_) => NotificationDetails(
                                       notificationId: n.notificationId,
-                                      userID: n.userId,
                                     ),
                                   ),
                                 );
@@ -260,12 +238,7 @@ class _NotificationsState extends State<Notifications>
 // notification details page
 class NotificationDetails extends StatefulWidget {
   final int notificationId;
-  final int userID;
-  const NotificationDetails({
-    super.key,
-    required this.notificationId,
-    required this.userID,
-  });
+  const NotificationDetails({super.key, required this.notificationId});
 
   @override
   State<NotificationDetails> createState() => _NotificationDetailsState();
@@ -286,7 +259,6 @@ class _NotificationDetailsState extends State<NotificationDetails> {
     try {
       final res = await client.notification.getNotificationById(
         notificationId: widget.notificationId,
-        userId: widget.userID, // userID from parent widget
       );
 
       if (mounted) {

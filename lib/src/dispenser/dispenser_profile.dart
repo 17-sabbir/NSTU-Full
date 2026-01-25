@@ -93,7 +93,7 @@ class _DispenserProfileState extends State<DispenserProfile>
 
       String role = '';
       try {
-        role = (await client.patient.getUserRole(0)).toUpperCase();
+        role = (await client.patient.getUserRole()).toUpperCase();
       } catch (e) {
         debugPrint('Failed to fetch user role: $e');
       }
@@ -525,267 +525,274 @@ class _DispenserProfileState extends State<DispenserProfile>
               children: [
                 // Header
                 Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Colors.blue, Colors.blueAccent],
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Colors.blue, Colors.blueAccent],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 18,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Stack(
-                      children: [
-                        CircleAvatar(
-                          radius: 40,
-                          backgroundImage: _imageBytes != null
-                              ? MemoryImage(_imageBytes!)
-                              : (profileImageUrl.isNotEmpty
-                                        ? NetworkImage(profileImageUrl)
-                                        : null)
-                                    as ImageProvider<Object>?,
-                          child:
-                              (_imageBytes == null && profileImageUrl.isEmpty)
-                              ? const Icon(Icons.person, size: 40)
-                              : null,
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: InkWell(
-                            onTap: _pickImage,
-                            child: const CircleAvatar(
-                              radius: 14,
-                              backgroundColor: Colors.white,
-                              child: Icon(Icons.edit, size: 16),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Stack(
                         children: [
-                          Text(
-                            _nameCtrl.text.isEmpty
-                                ? 'Dispenser'
-                                : _nameCtrl.text,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                          CircleAvatar(
+                            radius: 40,
+                            backgroundImage: _imageBytes != null
+                                ? MemoryImage(_imageBytes!)
+                                : (profileImageUrl.isNotEmpty
+                                          ? NetworkImage(profileImageUrl)
+                                          : null)
+                                      as ImageProvider<Object>?,
+                            child:
+                                (_imageBytes == null && profileImageUrl.isEmpty)
+                                ? const Icon(Icons.person, size: 40)
+                                : null,
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: InkWell(
+                              onTap: _pickImage,
+                              child: const CircleAvatar(
+                                radius: 14,
+                                backgroundColor: Colors.white,
+                                child: Icon(Icons.edit, size: 16),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _emailCtrl.text.isEmpty
-                                ? 'Dispenser'
-                                : _emailCtrl.text,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white70),
-                          ),
-                          const SizedBox(height: 4),
-                          if (designation.isNotEmpty)
+                        ],
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              designation,
+                              _nameCtrl.text.isEmpty
+                                  ? 'Dispenser'
+                                  : _nameCtrl.text,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _emailCtrl.text.isEmpty
+                                  ? 'Dispenser'
+                                  : _emailCtrl.text,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(color: Colors.white70),
                             ),
-                        ],
+                            const SizedBox(height: 4),
+                            if (designation.isNotEmpty)
+                              Text(
+                                designation,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Card(
-                elevation: 0,
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: Colors.grey.shade200),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      _field(_nameCtrl, Icons.person, 'Name'),
-                      const SizedBox(height: 12),
-                      _field(
-                        _emailCtrl,
-                        Icons.email,
-                        'Email',
-                        keyboardType: TextInputType.emailAddress,
-                        inputFormatters: [
-                          MailPhnUpdateVerify.denyWhitespaceFormatter,
-                        ],
-                        suffix:
-                            (_emailChanged && !_emailVerifiedForCurrentValue)
-                            ? _verifySuffixButton(_verifyEmailChange)
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      _field(_designationCtrl, Icons.work, 'Designation'),
-                      const SizedBox(height: 12),
-                      _field(
-                        _phoneCtrl,
-                        Icons.phone,
-                        'Phone',
-                        hintText: '+8801XXXXXXXXX',
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          MailPhnUpdateVerify
-                              .phoneDigitsAndOptionalLeadingPlusFormatter,
-                          LengthLimitingTextInputFormatter(14),
-                        ],
-                        suffix:
-                            (_phoneChanged && !_phoneVerifiedForCurrentValue)
-                            ? _verifySuffixButton(_verifyPhoneChangeDummy)
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      _field(_qualificationCtrl, Icons.school, 'Qualification'),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final maxWidth = constraints.maxWidth;
-                  final contentWidth = maxWidth > 520 ? 520.0 : maxWidth;
-                  return SizedBox(
-                    width: contentWidth,
+                const SizedBox(height: 20),
+                Card(
+                  elevation: 0,
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: 52,
-                                child: OutlinedButton.icon(
-                                  onPressed: () => Navigator.pushNamed(
-                                    context,
-                                    '/change-password',
-                                  ),
-                                  icon: const Icon(
-                                    Icons.lock_reset,
-                                    size: 20,
-                                    color: Colors.deepPurple,
-                                  ),
-                                  label: const Text(
-                                    'Change Password',
-                                    style: TextStyle(
-                                      color: Colors.deepPurple,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide(
-                                      color: Colors.deepPurple.withOpacity(
-                                        0.35,
-                                      ),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: SizedBox(
-                                height: 52,
-                                child: ElevatedButton(
-                                  onPressed: (_canSave && !_isSaving)
-                                      ? _saveProfile
-                                      : null,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _canSave
-                                        ? Colors.deepPurple
-                                        : Colors.grey.shade300,
-                                    disabledBackgroundColor:
-                                        Colors.grey.shade300,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                    elevation: _canSave ? 3 : 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                  ),
-                                  child: _isSaving
-                                      ? const SizedBox(
-                                          height: 18,
-                                          width: 18,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : Text(
-                                          'Save Changes',
-                                          style: TextStyle(
-                                            color: _canSave
-                                                ? Colors.white
-                                                : Colors.grey.shade700,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                ),
-                              ),
-                            ),
+                        _field(_nameCtrl, Icons.person, 'Name'),
+                        const SizedBox(height: 12),
+                        _field(
+                          _emailCtrl,
+                          Icons.email,
+                          'Email',
+                          keyboardType: TextInputType.emailAddress,
+                          inputFormatters: [
+                            MailPhnUpdateVerify.denyWhitespaceFormatter,
                           ],
+                          suffix:
+                              (_emailChanged && !_emailVerifiedForCurrentValue)
+                              ? _verifySuffixButton(_verifyEmailChange)
+                              : null,
                         ),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: OutlinedButton.icon(
-                            onPressed: _confirmLogout,
-                            icon: const Icon(Icons.logout, color: Colors.red),
-                            label: const Text(
-                              'Logout',
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: Colors.red.shade200),
-                              padding: const EdgeInsets.symmetric(vertical: 15),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                          ),
+                        const SizedBox(height: 12),
+                        _field(_designationCtrl, Icons.work, 'Designation'),
+                        const SizedBox(height: 12),
+                        _field(
+                          _phoneCtrl,
+                          Icons.phone,
+                          'Phone',
+                          hintText: '+8801XXXXXXXXX',
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            MailPhnUpdateVerify
+                                .phoneDigitsAndOptionalLeadingPlusFormatter,
+                            LengthLimitingTextInputFormatter(14),
+                          ],
+                          suffix:
+                              (_phoneChanged && !_phoneVerifiedForCurrentValue)
+                              ? _verifySuffixButton(_verifyPhoneChangeDummy)
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        _field(
+                          _qualificationCtrl,
+                          Icons.school,
+                          'Qualification',
                         ),
                       ],
                     ),
-                  );
-                },
-              ),
-            ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final maxWidth = constraints.maxWidth;
+                    final contentWidth = maxWidth > 520 ? 520.0 : maxWidth;
+                    return SizedBox(
+                      width: contentWidth,
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 52,
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => Navigator.pushNamed(
+                                      context,
+                                      '/change-password',
+                                    ),
+                                    icon: const Icon(
+                                      Icons.lock_reset,
+                                      size: 20,
+                                      color: Colors.deepPurple,
+                                    ),
+                                    label: const Text(
+                                      'Change Password',
+                                      style: TextStyle(
+                                        color: Colors.deepPurple,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(
+                                        color: Colors.deepPurple.withOpacity(
+                                          0.35,
+                                        ),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 52,
+                                  child: ElevatedButton(
+                                    onPressed: (_canSave && !_isSaving)
+                                        ? _saveProfile
+                                        : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _canSave
+                                          ? Colors.deepPurple
+                                          : Colors.grey.shade300,
+                                      disabledBackgroundColor:
+                                          Colors.grey.shade300,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      elevation: _canSave ? 3 : 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    child: _isSaving
+                                        ? const SizedBox(
+                                            height: 18,
+                                            width: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : Text(
+                                            'Save Changes',
+                                            style: TextStyle(
+                                              color: _canSave
+                                                  ? Colors.white
+                                                  : Colors.grey.shade700,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: OutlinedButton.icon(
+                              onPressed: _confirmLogout,
+                              icon: const Icon(Icons.logout, color: Colors.red),
+                              label: const Text(
+                                'Logout',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: Colors.red.shade200),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 15,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),    );
+    );
   }
 
   Widget _field(

@@ -120,7 +120,6 @@ class LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
     return s[0] + s.substring(1).toLowerCase();
   }
 
-  // ------------------ UPDATED TILE ------------------
   Widget buildTile(TestResult r) {
     final isPending = r.submittedAt == null;
     final bool highlight =
@@ -135,7 +134,8 @@ class LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
     final submittedAt = r.submittedAt;
     final bool canReplace =
         submittedAt != null &&
-        DateTime.now().difference(submittedAt).inHours < 12;
+        DateTime.now().isBefore(submittedAt.add(const Duration(hours: 24)));
+    final bool isLocked = submittedAt != null && !canReplace;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -176,12 +176,17 @@ class LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
                 onPressed: () => _showPreviewDialog(r),
               ),
 
-            // Pick File button (also allow replace within 12h of submission)
+            // Pick/Replace button
             if (r.submittedAt == null || canReplace)
               IconButton(
-                icon: const Icon(
-                  Icons.file_upload_outlined,
-                  color: Colors.orange,
+                tooltip: r.submittedAt == null
+                    ? 'Upload report'
+                    : 'Replace allowed (within 24h)',
+                icon: Icon(
+                  r.submittedAt == null
+                      ? Icons.file_upload_outlined
+                      : Icons.cached,
+                  color: r.submittedAt == null ? Colors.orange : Colors.blue,
                 ),
                 onPressed: () async {
                   final res = await FilePicker.platform.pickFiles(
@@ -197,6 +202,12 @@ class LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
                     });
                   }
                 },
+              )
+            else if (isLocked)
+              IconButton(
+                tooltip: 'Locked after 24h',
+                icon: const Icon(Icons.lock, color: Colors.grey),
+                onPressed: null,
               ),
 
             // Submit / Replace button (only if file selected)
@@ -239,12 +250,10 @@ class LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
 
                   if (ok) {
                     setState(() {
-                      r.submittedAt = DateTime.now();
-                      r.isUploaded = true;
-                      r.attachmentPath = uploadedUrl;
                       pickedFiles.remove(r.resultId);
                       pickedFileNames.remove(r.resultId);
                     });
+                    await fetchResults();
                     // ignore: use_build_context_synchronously
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -255,30 +264,17 @@ class LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Submit failed')),
+                      const SnackBar(
+                        content: Text(
+                          'Submit failed (maybe replace window expired: 24h)',
+                        ),
+                      ),
                     );
                   }
 
                   setState(() => loading = false);
                 },
               ),
-
-            // Completed: show Replace option within 12h, otherwise show completed badge
-            if (r.submittedAt != null) ...[
-              if (canReplace)
-                TextButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Select a file then press Replace'),
-                      ),
-                    );
-                  },
-                  child: const Text('Replace'),
-                )
-              else
-                const Icon(Icons.check_circle, color: Colors.green),
-            ],
           ],
         ),
       ),
@@ -585,7 +581,7 @@ class LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
                   if (canReadMorePending) ...[
                     const SizedBox(height: 8),
                     Align(
-                      alignment: Alignment.centerRight,
+                      alignment: Alignment.centerLeft,
                       child: TextButton(
                         onPressed: () {
                           setState(() {
@@ -621,7 +617,7 @@ class LabTestCreateAndUploadState extends State<LabTestCreateAndUpload>
                   if (canReadMoreCompleted) ...[
                     const SizedBox(height: 8),
                     Align(
-                      alignment: Alignment.centerRight,
+                      alignment: Alignment.centerLeft,
                       child: TextButton(
                         onPressed: () {
                           setState(() {

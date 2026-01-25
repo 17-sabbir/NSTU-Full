@@ -89,7 +89,7 @@ class _UniversalRouteGuardState extends State<UniversalRouteGuard> {
       if (widget.allowedRoles != null) {
         String role = '';
         try {
-          role = (await client.patient.getUserRole(0)).trim().toUpperCase();
+          role = (await client.patient.getUserRole()).trim().toUpperCase();
         } catch (e) {
           debugPrint('Failed to fetch user role: $e');
         }

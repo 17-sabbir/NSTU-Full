@@ -80,7 +80,7 @@ class _PatientReportUploadState extends State<PatientReportUpload>
   // ১. প্রেসক্রিপশন লিস্ট আনা
   Future<void> _fetchPrescriptions() async {
     try {
-      final list = await client.patient.getMyPrescriptionList(0);
+      final list = await client.patient.getMyPrescriptionList();
       _prescriptions = list;
     } catch (e) {
       debugPrint("Prescription fetch error: $e");
@@ -91,7 +91,7 @@ class _PatientReportUploadState extends State<PatientReportUpload>
   Future<void> _fetchMyPastReports() async {
     try {
       // দ্রষ্টব্য: আপনার ব্যাকএন্ডে এই মেথডটি থাকতে হবে যা PatientExternalReport রিটার্ন করে
-      final reports = await client.patient.getMyExternalReports(0);
+      final reports = await client.patient.getMyExternalReports();
       _myPastReports = reports;
     } catch (e) {
       debugPrint("Past reports fetch error: $e");
@@ -206,7 +206,6 @@ class _PatientReportUploadState extends State<PatientReportUpload>
       try {
         // assign to outer variable (don't redeclare)
         success = await client.patient.finalizeReportUpload(
-          patientId: 0,
           prescriptionId: replacePrescriptionId ?? _selectedPrescriptionId!,
           reportType: _selectedType ?? "Other",
           fileUrl: uploadedUrl,

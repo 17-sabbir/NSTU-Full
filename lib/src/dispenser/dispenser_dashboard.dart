@@ -22,6 +22,8 @@ class DispenserDashboard extends StatefulWidget {
 class _DispenserDashboardState extends State<DispenserDashboard>
     with RouteRefreshMixin<DispenserDashboard> {
   final _searchController = TextEditingController();
+  final ScrollController _homeScrollController = ScrollController();
+  final GlobalKey _recentHeaderKey = GlobalKey();
   PrescriptionMap? _currentPrescription;
   bool _isLoading = false;
   int _selectedIndex = 0;
@@ -38,6 +40,13 @@ class _DispenserDashboardState extends State<DispenserDashboard>
   List<DispenseHistoryEntry> _dispenseHistory = [];
   List<InventoryAuditLog> stockHistory = [];
   bool stockHistoryLoading = false;
+
+  static const int _initialHistoryVisibleCount = 10;
+  static const int _readMoreStep = 20;
+  int _visibleRecentCount = _initialHistoryVisibleCount;
+  int _visibleStockCount = _initialHistoryVisibleCount;
+
+  bool _highlightTodayInRecent = false;
 
   final List<PrescriptionMap> _allPrescriptions = [];
 
@@ -93,6 +102,161 @@ class _DispenserDashboardState extends State<DispenserDashboard>
     });
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _homeScrollController.dispose();
+    super.dispose();
+  }
+
+  bool _isSameLocalDay(DateTime a, DateTime b) {
+    final aa = a.toLocal();
+    final bb = b.toLocal();
+    return aa.year == bb.year && aa.month == bb.month && aa.day == bb.day;
+  }
+
+  void _highlightTodayDispenses() {
+    if (!mounted) return;
+
+    final now = DateTime.now();
+    final todayCount = _last7DaysDispenses()
+        .where((d) => _isSameLocalDay(d.dispensedAt, now))
+        .length;
+
+    setState(() {
+      _highlightTodayInRecent = true;
+      final minVisible = todayCount > _initialHistoryVisibleCount
+          ? todayCount
+          : _initialHistoryVisibleCount;
+      if (_visibleRecentCount < minVisible) {
+        _visibleRecentCount = minVisible;
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _recentHeaderKey.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        alignment: 0.1,
+      );
+    });
+  }
+
+  void _openDispenseFromHome() {
+    if (!mounted) return;
+    if (_selectedIndex == 1) return;
+
+    if (_navigationHistory.isEmpty || _navigationHistory.last != 1) {
+      _navigationHistory.add(1);
+    }
+    setState(() {
+      _selectedIndex = 1;
+      _currentPrescription = null; // always show the list first
+    });
+  }
+
+  void _showDispenseHistoryDetails(DispenseHistoryEntry entry) {
+    final when = AppDateTime.formatLocalDateTime(
+      entry.dispensedAt,
+      pattern: 'dd/MM/yyyy HH:mm',
+    );
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Rx #${entry.prescriptionId}'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${entry.patientName} (${entry.mobileNumber})',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                Text('Dispensed: $when'),
+                const SizedBox(height: 12),
+                const Text(
+                  'Medicines',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                if (entry.items.isEmpty)
+                  Text(
+                    'No items',
+                    style: TextStyle(color: Colors.grey.shade700),
+                  )
+                else
+                  Column(
+                    children: List.generate(entry.items.length, (index) {
+                      final it = entry.items[index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        it.medicineName,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (it.isAlternative)
+                                        Text(
+                                          'Alternative',
+                                          style: TextStyle(
+                                            color: Colors.grey.shade700,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  '× ${it.quantity}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (index != entry.items.length - 1)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 8),
+                                child: Divider(height: 1),
+                              ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<bool> _verifyDispenser() async {
     try {
       final authKey = await client.authenticationKeyManager?.get();
@@ -106,7 +270,7 @@ class _DispenserDashboardState extends State<DispenserDashboard>
 
       String role = '';
       try {
-        role = (await client.patient.getUserRole(0)).toUpperCase();
+        role = (await client.patient.getUserRole()).toUpperCase();
       } catch (_) {
         if (mounted) {
           Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
@@ -209,6 +373,11 @@ class _DispenserDashboardState extends State<DispenserDashboard>
   @override
   Future<void> refreshOnFocus() async {
     if (!_authChecked || !_authorized) return;
+
+    // Clear any one-off highlight when coming back to this screen.
+    if (mounted && _highlightTodayInRecent) {
+      setState(() => _highlightTodayInRecent = false);
+    }
     await Future.wait([
       _loadPendingPrescriptions(silent: true),
       _loadHome(silent: true),
@@ -292,10 +461,34 @@ class _DispenserDashboardState extends State<DispenserDashboard>
   Future<void> _dispensePrescription() async {
     final meds = _currentPrescription!['medicines'] as List<Medicine>;
 
+    String _cleanServerMessage(Object e) {
+      final s = e.toString();
+      // Common wrappers: "Exception: ..." / "ServerpodClientException: ..."
+      final idx = s.indexOf('Exception:');
+      if (idx >= 0) return s.substring(idx + 'Exception:'.length).trim();
+      return s.trim();
+    }
+
     final List<DispenseItemRequest> items = [];
+    final List<String> issues = [];
 
     for (var m in meds) {
-      if (m.dispenseQty <= 0 || m.itemId == null) continue;
+      if (m.dispenseQty <= 0) {
+        continue;
+      }
+
+      if (m.itemId == null) {
+        issues.add('No stock available for ${m.name}');
+        continue;
+      }
+
+      // Local stock check (server will still verify with locking).
+      if (m.stock < m.dispenseQty) {
+        issues.add(
+          'Insufficient stock for ${m.name} (available ${m.stock}, need ${m.dispenseQty})',
+        );
+        continue;
+      }
 
       int? originalId;
 
@@ -320,12 +513,45 @@ class _DispenserDashboardState extends State<DispenserDashboard>
       );
     }
 
-    if (items.isEmpty) {
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No valid medicine selected for dispensing'),
+    if (issues.isNotEmpty) {
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cannot dispense'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: issues
+                    .take(8)
+                    .map(
+                      (t) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text('• $t'),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
         ),
+      );
+      return;
+    }
+
+    if (items.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No medicines selected for dispensing')),
       );
       return;
     }
@@ -341,11 +567,18 @@ class _DispenserDashboardState extends State<DispenserDashboard>
       if (success) {
         await Future.wait([_loadPendingPrescriptions(), _loadHome()]);
         if (mounted) setState(() => _currentPrescription = null);
+      } else {
+        // Should be rare now (backend throws on failure), but keep a fallback.
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Dispense failed. Please try again.')),
+        );
       }
     } catch (e) {
-      // ignore: use_build_context_synchronously
+      if (!mounted) return;
+      final msg = _cleanServerMessage(e);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Dispense failed: ${e.toString()}')),
+        SnackBar(content: Text(msg.isEmpty ? 'Dispense failed' : msg)),
       );
     }
   }
@@ -360,6 +593,11 @@ class _DispenserDashboardState extends State<DispenserDashboard>
   }
 
   Future<void> _refresh() async {
+    setState(() {
+      _visibleRecentCount = _initialHistoryVisibleCount;
+      _visibleStockCount = _initialHistoryVisibleCount;
+      _highlightTodayInRecent = false;
+    });
     await Future.wait([_loadPendingPrescriptions(), _loadHome()]);
     // ensure stock history also refreshes
     await loadStockHistory();
@@ -387,8 +625,9 @@ class _DispenserDashboardState extends State<DispenserDashboard>
     required Color background,
     required Color iconBg,
     required Color iconColor,
+    VoidCallback? onTap,
   }) {
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: background,
@@ -421,17 +660,37 @@ class _DispenserDashboardState extends State<DispenserDashboard>
         ],
       ),
     );
+
+    if (onTap == null) return card;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: card,
+      ),
+    );
   }
 
   Widget _buildHome() {
     final profile = _profile;
     final pending = _allPrescriptions.length;
     final dispensedToday = _countDispensedToday();
-    final recent = _last7DaysDispenses();
+    final recentAll = _last7DaysDispenses()
+      ..sort((a, b) => b.dispensedAt.compareTo(a.dispensedAt));
+    final recentVisible = recentAll.take(_visibleRecentCount).toList();
+    final canReadMoreRecent = recentVisible.length < recentAll.length;
+
+    final stockAll = List<InventoryAuditLog>.from(stockHistory)
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final stockVisible = stockAll.take(_visibleStockCount).toList();
+    final canReadMoreStock = stockVisible.length < stockAll.length;
 
     return RefreshIndicator(
       onRefresh: _refresh,
       child: SingleChildScrollView(
+        controller: _homeScrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
 
@@ -521,6 +780,7 @@ class _DispenserDashboardState extends State<DispenserDashboard>
                         background: const Color(0xFFF7F1E6),
                         iconBg: const Color(0xFFF3DDB1),
                         iconColor: const Color(0xFFF59E0B),
+                        onTap: _openDispenseFromHome,
                       ),
 
                       const SizedBox(height: 12),
@@ -530,6 +790,7 @@ class _DispenserDashboardState extends State<DispenserDashboard>
                         background: const Color(0xFFEAF7EF),
                         iconBg: const Color(0xFFBFE8CC),
                         iconColor: const Color(0xFF16A34A),
+                        onTap: _highlightTodayDispenses,
                       ),
                     ],
                   );
@@ -544,6 +805,7 @@ class _DispenserDashboardState extends State<DispenserDashboard>
                         background: const Color(0xFFF7F1E6),
                         iconBg: const Color(0xFFF3DDB1),
                         iconColor: const Color(0xFFF59E0B),
+                        onTap: _openDispenseFromHome,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -554,6 +816,7 @@ class _DispenserDashboardState extends State<DispenserDashboard>
                         background: const Color(0xFFEAF7EF),
                         iconBg: const Color(0xFFBFE8CC),
                         iconColor: const Color.fromARGB(255, 86, 86, 86),
+                        onTap: _highlightTodayDispenses,
                       ),
                     ),
                   ],
@@ -563,6 +826,7 @@ class _DispenserDashboardState extends State<DispenserDashboard>
 
             const SizedBox(height: 18),
             Text(
+              key: _recentHeaderKey,
               'Recent History (Last 7 Days)',
               style: TextStyle(
                 fontSize: 16,
@@ -572,7 +836,7 @@ class _DispenserDashboardState extends State<DispenserDashboard>
             ),
             const SizedBox(height: 10),
 
-            if (recent.isEmpty)
+            if (recentAll.isEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -593,14 +857,21 @@ class _DispenserDashboardState extends State<DispenserDashboard>
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.grey.shade200),
                 ),
+                clipBehavior: Clip.antiAlias,
                 child: ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: recent.length > 8 ? 8 : recent.length,
+                  itemCount: recentVisible.length,
                   separatorBuilder: (_, __) =>
                       Divider(height: 1, color: Colors.grey.shade200),
                   itemBuilder: (context, index) {
-                    final d = recent[index];
+                    final d = recentVisible[index];
+                    final isToday = _isSameLocalDay(
+                      d.dispensedAt,
+                      DateTime.now(),
+                    );
+                    final highlight = _highlightTodayInRecent && isToday;
+                    const highlightBg = Color(0xFFFFF3B0); // strong yellow
                     final itemsText = d.items.isEmpty
                         ? 'No items'
                         : d.items
@@ -612,32 +883,62 @@ class _DispenserDashboardState extends State<DispenserDashboard>
                         ? '$itemsText +$moreCount more'
                         : itemsText;
 
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.orange.withOpacity(0.12),
-                        child: const Icon(Icons.outbox, color: Colors.orange),
-                      ),
-                      title: Text(
-                        d.patientName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text(
-                        'Rx #${d.prescriptionId} • $subtitle',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: Text(
-                        DateFormat(
-                          'dd/MM/yyyy',
-                        ).format(d.dispensedAt.toLocal()),
-                        style: TextStyle(color: Colors.grey.shade600),
+                    return Material(
+                      color: highlight ? highlightBg : Colors.transparent,
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: highlight
+                              ? const Color(0xFFFFE08A)
+                              : Colors.orange.withOpacity(0.12),
+                          child: Icon(
+                            Icons.outbox,
+                            color: highlight
+                                ? const Color(0xFF8A5B00)
+                                : Colors.orange,
+                          ),
+                        ),
+                        title: Text(
+                          d.patientName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          'Rx #${d.prescriptionId} • $subtitle',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: Text(
+                          DateFormat(
+                            'dd/MM/yyyy',
+                          ).format(d.dispensedAt.toLocal()),
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                        onTap: () => _showDispenseHistoryDetails(d),
                       ),
                     );
                   },
                 ),
               ),
+
+            if (canReadMoreRecent) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _visibleRecentCount =
+                          (_visibleRecentCount + _readMoreStep).clamp(
+                            0,
+                            recentAll.length,
+                          );
+                    });
+                  },
+                  child: const Text('Read more'),
+                ),
+              ),
+            ],
             const SizedBox(height: 18),
             Text(
               'Stock History (Last 1 Month)',
@@ -680,11 +981,11 @@ class _DispenserDashboardState extends State<DispenserDashboard>
                 child: ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: stockHistory.length > 8 ? 8 : stockHistory.length,
+                  itemCount: stockVisible.length,
                   separatorBuilder: (_, __) =>
                       Divider(height: 1, color: Colors.grey.shade200),
                   itemBuilder: (context, index) {
-                    final h = stockHistory[index];
+                    final h = stockVisible[index];
 
                     final title = h.userName ?? 'Unknown Item';
                     final action = h.action;
@@ -717,6 +1018,22 @@ class _DispenserDashboardState extends State<DispenserDashboard>
                   },
                 ),
               ),
+
+            if (canReadMoreStock) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _visibleStockCount = (_visibleStockCount + _readMoreStep)
+                          .clamp(0, stockAll.length);
+                    });
+                  },
+                  child: const Text('Read more'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1436,7 +1753,12 @@ class _DispenserDashboardState extends State<DispenserDashboard>
                 _navigationHistory.last != index) {
               _navigationHistory.add(index);
             }
-            setState(() => _selectedIndex = index);
+
+            setState(() {
+              _selectedIndex = index;
+              // If user navigates away and returns, don't keep highlight stuck.
+              _highlightTodayInRecent = false;
+            });
           },
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,

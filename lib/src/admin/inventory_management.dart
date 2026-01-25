@@ -308,7 +308,6 @@ class _InventoryManagementState extends State<InventoryManagement>
                   .updateMinimumThreshold(
                     itemId: product['id'],
                     newThreshold: newMin,
-                    adminUserId: adminUserId,
                   );
 
               if (success) {
@@ -385,7 +384,6 @@ class _InventoryManagementState extends State<InventoryManagement>
                     itemId: product['id'],
                     quantity: qty,
                     type: delta > 0 ? 'IN' : 'OUT',
-                    userId: adminUserId, // admin id ( logged-in user)
                   );
 
               if (!success) {
@@ -401,7 +399,7 @@ class _InventoryManagementState extends State<InventoryManagement>
                     .updateDispenserRestockFlag(
                       itemId: product['id'],
                       canRestock: canRestockDispenser,
-                      adminUserId: adminUserId,
+                 
                     );
 
                 if (!restockSuccess) {
@@ -986,7 +984,6 @@ class _InventoryManagementState extends State<InventoryManagement>
                                   minStockController.text,
                                 ),
                                 initialStock: 0, // Defaulted to 0
-                                adminUserId: adminUserId,
                                 canRestockDispenser: canRestockDispenser,
                               );
 

@@ -481,6 +481,9 @@ class DispenserEndpoint extends Endpoint {
 
     return await session.db.transaction((transaction) async {
       try {
+        if (items.isEmpty) {
+          throw Exception('No medicines selected for dispensing');
+        }
         // ১. মেইন ডিসপেন্স রেকর্ড তৈরি
         final dispenseResult = await session.db.unsafeQuery('''
           INSERT INTO prescription_dispense (prescription_id, dispenser_id, status)
@@ -516,10 +519,23 @@ class DispenserEndpoint extends Endpoint {
                   FOR UPDATE
               ''', parameters: QueryParameters.named({'id': item.itemId}));
 
-          int currentStock = stockCheck.first.first as int;
+          if (stockCheck.isEmpty) {
+            throw Exception('No stock available for ${item.medicineName}');
+          }
 
+          final stockRow = stockCheck.first.toColumnMap();
+          final currentStock = (stockRow['current_quantity'] as int?) ?? 0;
+
+          if (currentStock <= 0) {
+            throw Exception('No stock available for ${item.medicineName}');
+          }
+          if (item.quantity <= 0) {
+            throw Exception('Invalid quantity for ${item.medicineName}');
+          }
           if (currentStock < item.quantity) {
-            throw Exception('Insufficient stock for ${item.medicineName}');
+            throw Exception(
+              'Insufficient stock for ${item.medicineName} (available $currentStock, need ${item.quantity})',
+            );
           }
 
           // ৩. ডিসপেন্সড আইটেম ইনসার্ট (অল্টারনেটিভ সহ)
@@ -603,9 +619,10 @@ class DispenserEndpoint extends Endpoint {
         }
 
         return true; // সব সফল হলে ট্রানজ্যাকশন কমিট হবে
-      } catch (e) {
-        session.log('Transaction failed: $e');
-        return false; // কোনো এরর হলে সব আগের অবস্থায় ফিরে যাবে (Rollback)
+      } catch (e, st) {
+        session.log('Transaction failed: $e',
+            level: LogLevel.error, stackTrace: st);
+        rethrow; // rollback + propagate reason to client
       }
     });
   }

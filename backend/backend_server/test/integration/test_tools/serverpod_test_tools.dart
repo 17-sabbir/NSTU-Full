@@ -929,7 +929,6 @@ class _AdminInventoryEndpoints {
     required int minimumStock,
     required int initialStock,
     required bool canRestockDispenser,
-    required int adminUserId,
   }) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -949,7 +948,6 @@ class _AdminInventoryEndpoints {
             'minimumStock': minimumStock,
             'initialStock': initialStock,
             'canRestockDispenser': canRestockDispenser,
-            'adminUserId': adminUserId,
           }),
           serializationManager: _serializationManager,
         );
@@ -971,7 +969,6 @@ class _AdminInventoryEndpoints {
     required int itemId,
     required int quantity,
     required String type,
-    required int userId,
   }) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -988,7 +985,6 @@ class _AdminInventoryEndpoints {
             'itemId': itemId,
             'quantity': quantity,
             'type': type,
-            'userId': userId,
           }),
           serializationManager: _serializationManager,
         );
@@ -1009,7 +1005,6 @@ class _AdminInventoryEndpoints {
     _i1.TestSessionBuilder sessionBuilder, {
     required int itemId,
     required bool canRestock,
-    required int adminUserId,
   }) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -1025,7 +1020,6 @@ class _AdminInventoryEndpoints {
           parameters: _i1.testObjectToJson({
             'itemId': itemId,
             'canRestock': canRestock,
-            'adminUserId': adminUserId,
           }),
           serializationManager: _serializationManager,
         );
@@ -1076,7 +1070,6 @@ class _AdminInventoryEndpoints {
     _i1.TestSessionBuilder sessionBuilder, {
     required int itemId,
     required int newThreshold,
-    required int adminUserId,
   }) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -1092,7 +1085,6 @@ class _AdminInventoryEndpoints {
           parameters: _i1.testObjectToJson({
             'itemId': itemId,
             'newThreshold': newThreshold,
-            'adminUserId': adminUserId,
           }),
           serializationManager: _serializationManager,
         );
@@ -3057,7 +3049,6 @@ class _LabEndpoint {
 
   _i3.Future<_i33.StaffProfileDto?> getStaffProfile(
     _i1.TestSessionBuilder sessionBuilder,
-    int userId,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -3070,7 +3061,7 @@ class _LabEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'lab',
           methodName: 'getStaffProfile',
-          parameters: _i1.testObjectToJson({'userId': userId}),
+          parameters: _i1.testObjectToJson({}),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -3088,7 +3079,6 @@ class _LabEndpoint {
 
   _i3.Future<bool> updateStaffProfile(
     _i1.TestSessionBuilder sessionBuilder, {
-    required int userId,
     required String name,
     required String phone,
     required String email,
@@ -3108,7 +3098,6 @@ class _LabEndpoint {
           endpointPath: 'lab',
           methodName: 'updateStaffProfile',
           parameters: _i1.testObjectToJson({
-            'userId': userId,
             'name': name,
             'phone': phone,
             'email': email,
@@ -3204,7 +3193,6 @@ class _NotificationEndpoint {
 
   _i3.Future<bool> createNotification(
     _i1.TestSessionBuilder sessionBuilder, {
-    required int userId,
     required String title,
     required String message,
   }) async {
@@ -3220,7 +3208,6 @@ class _NotificationEndpoint {
           endpointPath: 'notification',
           methodName: 'createNotification',
           parameters: _i1.testObjectToJson({
-            'userId': userId,
             'title': title,
             'message': message,
           }),
@@ -3242,7 +3229,6 @@ class _NotificationEndpoint {
   _i3.Future<List<_i36.NotificationInfo>> getMyNotifications(
     _i1.TestSessionBuilder sessionBuilder, {
     required int limit,
-    required int userId,
   }) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -3255,10 +3241,7 @@ class _NotificationEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'notification',
           methodName: 'getMyNotifications',
-          parameters: _i1.testObjectToJson({
-            'limit': limit,
-            'userId': userId,
-          }),
+          parameters: _i1.testObjectToJson({'limit': limit}),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -3275,9 +3258,8 @@ class _NotificationEndpoint {
   }
 
   _i3.Future<Map<String, int>> getMyNotificationCounts(
-    _i1.TestSessionBuilder sessionBuilder, {
-    required int userId,
-  }) async {
+    _i1.TestSessionBuilder sessionBuilder,
+  ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
           (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
@@ -3289,7 +3271,7 @@ class _NotificationEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'notification',
           methodName: 'getMyNotificationCounts',
-          parameters: _i1.testObjectToJson({'userId': userId}),
+          parameters: _i1.testObjectToJson({}),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -3308,7 +3290,6 @@ class _NotificationEndpoint {
   _i3.Future<_i36.NotificationInfo?> getNotificationById(
     _i1.TestSessionBuilder sessionBuilder, {
     required int notificationId,
-    required int userId,
   }) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -3321,10 +3302,7 @@ class _NotificationEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'notification',
           methodName: 'getNotificationById',
-          parameters: _i1.testObjectToJson({
-            'notificationId': notificationId,
-            'userId': userId,
-          }),
+          parameters: _i1.testObjectToJson({'notificationId': notificationId}),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -3343,7 +3321,6 @@ class _NotificationEndpoint {
   _i3.Future<bool> markAsRead(
     _i1.TestSessionBuilder sessionBuilder, {
     required int notificationId,
-    required int userId,
   }) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -3356,10 +3333,7 @@ class _NotificationEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'notification',
           methodName: 'markAsRead',
-          parameters: _i1.testObjectToJson({
-            'notificationId': notificationId,
-            'userId': userId,
-          }),
+          parameters: _i1.testObjectToJson({'notificationId': notificationId}),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -3375,10 +3349,7 @@ class _NotificationEndpoint {
     });
   }
 
-  _i3.Future<bool> markAllAsRead(
-    _i1.TestSessionBuilder sessionBuilder, {
-    required int userId,
-  }) async {
+  _i3.Future<bool> markAllAsRead(_i1.TestSessionBuilder sessionBuilder) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
           (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
@@ -3390,7 +3361,7 @@ class _NotificationEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'notification',
           methodName: 'markAllAsRead',
-          parameters: _i1.testObjectToJson({'userId': userId}),
+          parameters: _i1.testObjectToJson({}),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -3523,10 +3494,7 @@ class _PatientEndpoint {
     });
   }
 
-  _i3.Future<String> getUserRole(
-    _i1.TestSessionBuilder sessionBuilder,
-    int userId,
-  ) async {
+  _i3.Future<String> getUserRole(_i1.TestSessionBuilder sessionBuilder) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
           (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
@@ -3538,7 +3506,7 @@ class _PatientEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'patient',
           methodName: 'getUserRole',
-          parameters: _i1.testObjectToJson({'userId': userId}),
+          parameters: _i1.testObjectToJson({}),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -3556,7 +3524,6 @@ class _PatientEndpoint {
 
   _i3.Future<String> updatePatientProfile(
     _i1.TestSessionBuilder sessionBuilder,
-    int userId,
     String name,
     String phone,
     String? bloodGroup,
@@ -3576,7 +3543,6 @@ class _PatientEndpoint {
           endpointPath: 'patient',
           methodName: 'updatePatientProfile',
           parameters: _i1.testObjectToJson({
-            'userId': userId,
             'name': name,
             'phone': phone,
             'bloodGroup': bloodGroup,
@@ -3601,7 +3567,6 @@ class _PatientEndpoint {
 
   _i3.Future<List<_i38.PatientReportDto>> getMyLabReports(
     _i1.TestSessionBuilder sessionBuilder,
-    int userId,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -3614,7 +3579,7 @@ class _PatientEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'patient',
           methodName: 'getMyLabReports',
-          parameters: _i1.testObjectToJson({'userId': userId}),
+          parameters: _i1.testObjectToJson({}),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -3632,7 +3597,6 @@ class _PatientEndpoint {
 
   _i3.Future<List<_i39.PrescriptionList>> getMyPrescriptionList(
     _i1.TestSessionBuilder sessionBuilder,
-    int userId,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -3645,7 +3609,7 @@ class _PatientEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'patient',
           methodName: 'getMyPrescriptionList',
-          parameters: _i1.testObjectToJson({'userId': userId}),
+          parameters: _i1.testObjectToJson({}),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -3663,7 +3627,6 @@ class _PatientEndpoint {
 
   _i3.Future<bool> finalizeReportUpload(
     _i1.TestSessionBuilder sessionBuilder, {
-    required int patientId,
     required int prescriptionId,
     required String reportType,
     required String fileUrl,
@@ -3680,7 +3643,6 @@ class _PatientEndpoint {
           endpointPath: 'patient',
           methodName: 'finalizeReportUpload',
           parameters: _i1.testObjectToJson({
-            'patientId': patientId,
             'prescriptionId': prescriptionId,
             'reportType': reportType,
             'fileUrl': fileUrl,
@@ -3702,7 +3664,6 @@ class _PatientEndpoint {
 
   _i3.Future<List<_i28.PatientExternalReport>> getMyExternalReports(
     _i1.TestSessionBuilder sessionBuilder,
-    int userId,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -3715,7 +3676,7 @@ class _PatientEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'patient',
           methodName: 'getMyExternalReports',
-          parameters: _i1.testObjectToJson({'userId': userId}),
+          parameters: _i1.testObjectToJson({}),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
