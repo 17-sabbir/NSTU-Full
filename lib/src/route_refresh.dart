@@ -125,6 +125,9 @@ mixin RouteRefreshMixin<T extends StatefulWidget> on State<T>
   void didChangeViewFocus(ViewFocusEvent event) {}
 
   @override
+  void handleStatusBarTap() {}
+
+  @override
   Future<AppExitResponse> didRequestAppExit() async => AppExitResponse.exit;
   @override
   Future<bool> didPopRoute() async => false;
